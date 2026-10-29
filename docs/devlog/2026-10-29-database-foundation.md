@@ -5,4 +5,7 @@
 - Designed accounts: separate sign-up and log-in, a profile setup screen after the first log-in, unique usernames, free display names, and password rules (decision 0013).
 - Chose sync database code (added to decision 0009).
 - Connected the backend to PostgreSQL with SQLAlchemy and set up Alembic migrations. CI now runs the tests against a real PostgreSQL and checks that migrations match the tables.
+- Merged PR #6. Set the password rules in Firebase.
+- Decided to log in with email for now; username log-in through the backend may come later (decision 0013).
+- Discussed moving into the dev container. Staying on Windows for now, with Claude running tests in Docker. Added how we work together to CLAUDE.md so any future session follows it.
 - Next: check Firebase tokens in the backend, then user accounts and profile setup.

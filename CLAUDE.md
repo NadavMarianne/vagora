@@ -35,3 +35,10 @@ See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), o
 
 ## Communication
 The owner is learning as he builds. Keep explanations short and in plain words, and say what to do, why, and what to write in the devlog.
+
+## Working together
+- The owner makes every decision, product and technical (language, database, libraries, structure, hosting). Claude does the hands-on work.
+- Before any step that involves a choice, show the realistic options with short pros and cons in plain words, give a recommendation, and wait for the owner's decision. Never pick tooling silently. Small details inside a chosen tool can be decided by Claude, but list them in the pull request so they can be questioned.
+- One decision and one step at a time. Record each decision in `docs/decisions/` and keep the devlog up to date.
+- Every change goes through its own branch and pull request (see decision 0012). Run lint and tests before opening it.
+- Say where the owner can see the result: the VS Code file list, or GitHub.
