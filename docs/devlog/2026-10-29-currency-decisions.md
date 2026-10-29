@@ -7,4 +7,5 @@
 - Compared backend languages (Python, TypeScript) and databases (PostgreSQL, MongoDB, SQLite). Kept Python and accepted PostgreSQL (decision 0007).
 - From now on I make the technical choices too, from options with pros and cons.
 - Compared plain SQL, SQLAlchemy, and SQLModel. Chose SQLAlchemy with Alembic (decision 0009).
-- Next: decide on login, then build markets, members, and balances in the backend.
+- Decided real login comes first, through a login service instead of building our own (decision 0010).
+- Next: choose which login service, then build markets, members, and balances in the backend.
