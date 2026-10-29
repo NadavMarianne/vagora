@@ -10,4 +10,7 @@
 - Discussed moving into the dev container. Staying on Windows for now, with Claude running tests in Docker. Added how we work together to CLAUDE.md so any future session follows it.
 - Decided to require a verified email before using vagora.
 - Added Firebase token checking to the backend (decision 0014). Found that the Firebase library looks for a secret key on startup even though checking tokens doesn't need one, and fixed it so no key is used at all. Tested against the real `vagora-dev` project: fake tokens are rejected.
-- Next: user accounts and profile setup.
+- Decided username and display name rules, and that usernames are set once for now (decision 0013).
+- Added the `users` table (first migration) and two endpoints: `GET /me` ("who am I?", or 404 if the profile isn't set up yet) and `POST /me` (first-time profile setup). The tests caught a bug where capital letters in a username were refused instead of lowercased; fixed.
+- Login (3 pull requests) is done on the backend side.
+- Next: markets, members, and balances.

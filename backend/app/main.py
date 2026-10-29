@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 
+from app import users
+
 app = FastAPI(title="vagora", version="0.0.1")
+app.include_router(users.router)
 
 
 @app.get("/health")
