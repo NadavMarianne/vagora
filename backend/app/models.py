@@ -46,6 +46,8 @@ class Market(Base):
     # A time zone name like "Asia/Jerusalem". Schedules use it.
     time_zone: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Set when the last member leaves. Deleted for good 30 days later unless someone rejoins.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="market")
 
@@ -68,6 +70,8 @@ class Membership(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Who invited this person. Empty for the person who created the market.
     invited_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Set when they leave. Their balance stays frozen here until they come back.
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     market: Mapped[Market] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(foreign_keys=[user_id])
