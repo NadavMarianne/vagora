@@ -16,13 +16,13 @@ Guidance for Claude (and anyone else) working on this repo.
 See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), one backend plus one database, no microservices, virtual currency only, one market first.
 
 ## Repo layout
-- `backend/`: FastAPI app (`app/`) and tests (`tests/`), configured in `pyproject.toml`
+- `backend/`: FastAPI app (`app/`), tests (`tests/`), and Alembic migrations (`migrations/`), configured in `pyproject.toml`
 - `docs/`: vision, decision records (`decisions/`), build diary (`devlog/`), setup guide
 - `.devcontainer/`: dev environment (app container plus PostgreSQL)
 - `.github/`: CI workflow, Dependabot, issue and PR templates
 
 ## Commands (run inside the devcontainer)
-`make run`, `make test`, `make lint`, `make format`
+`make run`, `make test`, `make lint`, `make format`, `make migrate`, `make migration name="..."`
 
 ## Rules
 - Keep it simple. No new complexity without a real need.

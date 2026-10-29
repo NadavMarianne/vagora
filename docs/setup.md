@@ -19,7 +19,16 @@ Run these in the VS Code terminal (inside the container):
 | `make test` | Runs the tests |
 | `make lint` | Checks code style |
 | `make format` | Fixes code style automatically |
+| `make migrate` | Brings your local database up to date with the latest table changes |
+| `make migration name="add users"` | Creates a new migration file after you change a table class |
+
+## Database
+The dev container runs PostgreSQL beside the app. The backend finds it through the `DATABASE_URL` setting. Your data is kept in a Docker volume, so it survives restarts.
+
+If you opened the container before this setting changed, rebuild it once: press `F1` and run *Dev Containers: Rebuild Container*.
+
+Table changes are saved as migration files in `backend/migrations/versions/` and committed to Git. After pulling new code, run `make migrate`.
 
 ## Automatic checks
 - **Before each commit** (pre-commit): trailing whitespace, code style, and the commit message format (`feat:`, `fix:`, `docs:`, `chore:`).
-- **On every pull request** (GitHub Actions): lint, format check, and tests.
+- **On every pull request** (GitHub Actions): lint, format check, migrations, a check that migrations match the table classes, and tests against a real PostgreSQL.
