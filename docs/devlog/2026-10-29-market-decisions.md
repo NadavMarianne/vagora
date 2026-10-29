@@ -9,4 +9,6 @@
 - Decided on whole coins only (added to decision 0016).
 - Built markets, memberships, and the ledger: create a market, list your markets, change settings, and see your recent transactions. The starting amount is the first ledger entry.
 - Tested the "no debt" rule with a real race: two payments of 80 from a balance of 100 at the same moment. One went through, one was refused, and the balance matched the ledger.
-- Next: invites by username.
+- Merged PR #11. Decided invite rules: the inviter picks the expiry, any member can cancel, no duplicates, no limit on re-inviting after a decline (blocking is a future idea), and who invited whom is saved for a future market chat (decision 0015).
+- Built invites: send by username, accept, decline, cancel, see pending invites, and the member list. Open invites show only who is invited.
+- Next: leaving and rejoining markets.

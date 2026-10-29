@@ -8,9 +8,11 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -64,9 +66,48 @@ class Membership(Base):
     # Always equal to the sum of this membership's ledger entries (see app/ledger.py).
     balance: Mapped[int] = mapped_column(BigInteger, server_default="0")
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Who invited this person. Empty for the person who created the market.
+    invited_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
     market: Mapped[Market] = relationship(back_populates="memberships")
-    user: Mapped[User] = relationship()
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+    invited_by: Mapped[User | None] = relationship(foreign_keys=[invited_by_id])
+
+
+class InviteStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
+class Invite(Base):
+    """An invitation for someone to join a market. They accept or decline it."""
+
+    __tablename__ = "invites"
+    __table_args__ = (
+        # At most one pending invite per person per market.
+        Index(
+            "one_pending_invite_per_person",
+            "market_id",
+            "invited_user_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"))
+    invited_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    invited_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(20), server_default=InviteStatus.PENDING)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    market: Mapped[Market] = relationship()
+    invited_user: Mapped[User] = relationship(foreign_keys=[invited_user_id])
+    invited_by: Mapped[User] = relationship(foreign_keys=[invited_by_id])
 
 
 class EntryKind(StrEnum):

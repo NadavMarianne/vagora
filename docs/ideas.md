@@ -9,7 +9,9 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 
 ## Markets and members
 - Invite links or codes, single-use or expiring.
+- Blocking a market or a person, so they can't send you invites.
 - Owner or admin roles, including removing members.
+- A market chat, with automatic messages like "Noa joined from Dana's invite". Who invited each member is already saved for this.
 
 ## Coins
 - Optional debt (balances below zero), with limits.
