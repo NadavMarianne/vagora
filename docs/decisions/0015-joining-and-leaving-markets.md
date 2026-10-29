@@ -16,6 +16,8 @@
 ## Leaving
 - Anyone can leave a market. Nobody can remove someone else (that waits for admin roles).
 - **Coins are frozen, not lost.** Within 30 days of leaving, you can rejoin yourself from settings and get your coins back. After 30 days you need a new invite, and your frozen coins come back then too.
+- **Coming back never gives the starting amount again**, whether by rejoining or by a new invite. You get your frozen coins. Otherwise leaving and coming back would be a way to collect free coins.
+- **Invites you sent are cancelled when you leave.** Otherwise a friend could join with your long invite after you're gone.
 - **History is kept.** Other members' ledgers point to your entries, so nothing is deleted.
 - **When the last member leaves**, the market is archived (hidden, data kept). If nobody rejoins within 30 days, it is deleted for good.
 - Deleting old empty markets runs alongside normal use, at most once a day, so it needs no always-on server. A market is deleted *at least* 30 days after it empties.

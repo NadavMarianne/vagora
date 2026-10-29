@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.markets import MarketView, add_member, get_membership, view
+from app.markets import MarketView, active_memberships, add_member, get_membership, view
 from app.models import Invite, InviteStatus, Membership, User
 from app.users import CurrentUser, DbSession, Username
 
@@ -83,8 +83,9 @@ def send_invite(
     if invited is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No one has that username.")
 
+    # Former members can be invited back. They return with their frozen coins.
     already_member = db.scalar(
-        select(Membership).where(
+        active_memberships().where(
             Membership.market_id == market_id, Membership.user_id == invited.id
         )
     )
@@ -166,7 +167,7 @@ def get_my_open_invite(db: Session, user: User, invite_id: int) -> Invite:
 
 @router.post("/invites/{invite_id}/accept")
 def accept_invite(invite_id: int, user: CurrentUser, db: DbSession) -> MarketView:
-    """Joins the market and gets its starting amount."""
+    """Joins the market: the starting amount for newcomers, frozen coins for those coming back."""
     invite = get_my_open_invite(db, user, invite_id)
     invite.status = InviteStatus.ACCEPTED
     try:
