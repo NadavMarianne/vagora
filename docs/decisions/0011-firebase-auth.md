@@ -5,6 +5,8 @@
 ## Decision
 Use Firebase Auth (by Google) for login. The app signs in through Firebase and gets a token. The backend checks that token and links it to the person's vagora account in our own PostgreSQL database. Market data never lives in Firebase.
 
+Development uses the Firebase project `vagora-dev`. A separate `vagora-prod` project is created when we go live (see decision 0012).
+
 ## Why
 - It never pauses: login keeps working even after weeks without use. This is a hard requirement.
 - The free plan is enough for vagora for a long time.

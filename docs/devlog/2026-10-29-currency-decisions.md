@@ -10,4 +10,7 @@
 - Decided real login comes first, through a login service instead of building our own (decision 0010).
 - Compared Supabase, Firebase, Auth0, and Clerk. Ruled out Supabase free because it pauses when unused. Chose Firebase Auth (decision 0011).
 - New rule for hosting: the app must keep working after weeks without use, with no manual wake-up.
-- Next: set up a Firebase project, then build markets, members, and balances in the backend.
+- Merged PR #4 (decisions) and Dependabot's two CI updates (#2, #3).
+- Learned that production is a place the app runs, not a separate repo. Recorded our Git workflow and environments (decision 0012).
+- Turned on "CI must pass before merging" for `main` on GitHub.
+- Next: create the Firebase project `vagora-dev`, choose sign-in methods, then build markets, members, and balances in the backend.
