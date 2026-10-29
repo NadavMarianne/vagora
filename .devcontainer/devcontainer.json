@@ -1,0 +1,27 @@
+{
+  "name": "vagora",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/vagora",
+  "forwardPorts": [8000],
+  "postCreateCommand": "pip install -e './backend[dev]' && pre-commit install --hook-type pre-commit --hook-type commit-msg",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "anthropic.claude-code",
+        "github.vscode-pull-request-github"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        },
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["backend/tests"]
+      }
+    }
+  }
+}

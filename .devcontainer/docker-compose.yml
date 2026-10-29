@@ -1,0 +1,25 @@
+# Local development only. The passwords below are throwaway values for a
+# database that exists only on your own machine. Never reuse them anywhere real.
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/python:1-3.12
+    volumes:
+      - ..:/workspaces/vagora:cached
+    command: sleep infinity
+    environment:
+      DATABASE_URL: postgresql://vagora:vagora@db:5432/vagora
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vagora
+      POSTGRES_PASSWORD: vagora
+      POSTGRES_DB: vagora
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
