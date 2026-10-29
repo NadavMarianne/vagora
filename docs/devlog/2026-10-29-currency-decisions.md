@@ -8,4 +8,6 @@
 - From now on I make the technical choices too, from options with pros and cons.
 - Compared plain SQL, SQLAlchemy, and SQLModel. Chose SQLAlchemy with Alembic (decision 0009).
 - Decided real login comes first, through a login service instead of building our own (decision 0010).
-- Next: choose which login service, then build markets, members, and balances in the backend.
+- Compared Supabase, Firebase, Auth0, and Clerk. Ruled out Supabase free because it pauses when unused. Chose Firebase Auth (decision 0011).
+- New rule for hosting: the app must keep working after weeks without use, with no manual wake-up.
+- Next: set up a Firebase project, then build markets, members, and balances in the backend.
