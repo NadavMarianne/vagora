@@ -39,6 +39,17 @@ def find_user(db: Session, firebase_uid: str) -> User | None:
     return db.scalar(select(User).where(User.firebase_uid == firebase_uid))
 
 
+def get_current_user(login: CurrentLogin, db: DbSession) -> User:
+    """Use as a dependency on endpoints that need a set-up profile."""
+    user = find_user(db, login.uid)
+    if user is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Set up your profile first.")
+    return user
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
 @router.get("/me")
 def get_me(login: CurrentLogin, db: DbSession) -> Profile:
     """Returns your profile, or 404 if you still need to set it up."""

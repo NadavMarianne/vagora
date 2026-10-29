@@ -6,4 +6,7 @@
 - Allowance (decision 0017): daily, weekly, or monthly with several times or dates, a time zone per market, and delivery by catching up instead of a timer.
 - For the shop: whoever posts a product chooses whether its price goes to them or vanishes.
 - Started `docs/ideas.md` for future ideas.
-- Next: build markets, memberships, and the ledger.
+- Decided on whole coins only (added to decision 0016).
+- Built markets, memberships, and the ledger: create a market, list your markets, change settings, and see your recent transactions. The starting amount is the first ledger entry.
+- Tested the "no debt" rule with a real race: two payments of 80 from a balance of 100 at the same moment. One went through, one was refused, and the balance matched the ledger.
+- Next: invites by username.

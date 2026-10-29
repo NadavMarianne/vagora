@@ -16,6 +16,7 @@ users ──< memberships >── markets
 - Every change does both steps in **one database transaction**: add the entry and change the stored balance by the same amount. Either both happen or neither does.
 - **No debt** is enforced by the database itself: a balance can never be below zero, and a payment only goes through if the balance covers it, even when two happen at the same moment.
 - When coins move between two people, there are two linked entries (−3000 for the buyer, +3000 for the seller).
+- **Whole coins only** (no fractions), so there are no rounding problems. Settings are limited to 1,000,000,000 coins, and balances use big numbers so totals can't overflow.
 
 Recorded early for the shop: whoever posts a product chooses whether its price **goes to them** (two linked entries) or **vanishes** (only the buyer's entry).
 
