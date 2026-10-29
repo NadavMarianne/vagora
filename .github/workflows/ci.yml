@@ -8,6 +8,23 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      # A throwaway database for the tests, same version as the dev container.
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vagora
+          POSTGRES_PASSWORD: vagora
+          POSTGRES_DB: vagora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://vagora:vagora@localhost:5432/vagora
     defaults:
       run:
         working-directory: backend
@@ -28,6 +45,12 @@ jobs:
 
       - name: Format check
         run: ruff format --check .
+
+      - name: Migrate
+        run: alembic upgrade head
+
+      - name: Check migrations match the tables
+        run: alembic check
 
       - name: Test
         run: pytest

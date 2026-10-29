@@ -7,7 +7,7 @@ services:
       - ..:/workspaces/vagora:cached
     command: sleep infinity
     environment:
-      DATABASE_URL: postgresql://vagora:vagora@db:5432/vagora
+      DATABASE_URL: postgresql+psycopg://vagora:vagora@db:5432/vagora
     depends_on:
       - db
 
