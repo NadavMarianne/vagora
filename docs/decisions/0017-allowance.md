@@ -13,11 +13,15 @@ Each market can give every member the same amount of coins on a flexible schedul
 
 - A monthly date that doesn't exist in a shorter month (like the 31st) becomes that month's last day.
 - The allowance can be switched off and on.
-- Someone who joins gets their first allowance on the next scheduled time. Their starting amount covers them until then.
+- Someone who joins gets their first allowance on the next scheduled time. Their starting amount covers them until then. Joining on the 13th with a payout on the 14th means you get it.
+- **No allowance for time away.** Someone who leaves and comes back is paid again from the moment they return, never for the time they were gone.
+- **Changing the schedule** (or the time zone, or switching the allowance on): payouts whose time already passed are paid first, under the old settings. Then the new timing starts immediately, and anything the old schedule had coming is dropped. Switching the allowance on never pays for the past.
 - **Time zone:** each market has one. It defaults to the creator's time zone and can be changed to any time zone. All schedule times use it.
 
 ## Delivery: catching up
 Nothing runs on a timer. Whenever a market is used, the backend adds any allowances that came due since the last payout, each dated with its original scheduled time. Balances and history are always correct whenever anyone looks.
+
+Two people opening a market at the same moment can't cause a double payout: each member's payouts are claimed in one database step, and only one request can win the claim.
 
 ## Why
 Flexible schedules fit the "settings, not code" rule. Catching up works on hosts that sleep when unused (see decision 0007), with nothing to miss or break.
