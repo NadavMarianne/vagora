@@ -1,0 +1,7 @@
+# 2026-10-29: Currency decisions
+
+- Merged PR #1 (dev environment and backend skeleton). Phase 1 setup is on `main`.
+- Installed the GitHub CLI so Claude can open pull requests.
+- Agreed on a way of working: I make the high-level decisions, Claude does the building, step by step.
+- Decided how currency works (see decision 0008): starting amount and allowance as market settings, no debt for now, direct transfers off by default, equal members, one person can be in several markets.
+- Next: build markets, members, and balances in the backend.
