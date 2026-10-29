@@ -5,6 +5,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from app import models  # noqa: F401  (loads the table classes so Alembic can see them)
 from app.config import settings
 from app.db import Base
 
