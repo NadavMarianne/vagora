@@ -67,6 +67,14 @@ class EntryView(BaseModel):
     created_at: datetime
 
 
+class MemberView(BaseModel):
+    username: str
+    display_name: str
+    joined_at: datetime
+    # Display name of who invited them. Empty for the person who created the market.
+    invited_by: str | None
+
+
 def view(membership: Membership) -> MarketView:
     market = membership.market
     return MarketView(
@@ -90,17 +98,24 @@ def get_membership(db: Session, user: User, market_id: int) -> Membership:
     return membership
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> MarketView:
-    """Creates a market. You become its first member and get its starting amount."""
-    market = Market(**new.model_dump())
-    membership = Membership(market=market, user=user)
-    db.add_all([market, membership])
+def add_member(db: Session, market: Market, user: User, invited_by: User | None) -> Membership:
+    """Adds someone to a market and gives them its starting amount. The caller commits."""
+    membership = Membership(market=market, user=user, invited_by=invited_by)
+    db.add(membership)
     db.flush()
     if market.starting_amount > 0:
         ledger.record(
             db, membership, market.starting_amount, EntryKind.STARTING_AMOUNT, "Starting amount"
         )
+    return membership
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> MarketView:
+    """Creates a market. You become its first member and get its starting amount."""
+    market = Market(**new.model_dump())
+    db.add(market)
+    membership = add_member(db, market, user, invited_by=None)
     db.commit()
     return view(membership)
 
@@ -128,6 +143,26 @@ def change_settings(
         setattr(membership.market, setting, value)
     db.commit()
     return view(membership)
+
+
+@router.get("/{market_id}/members")
+def list_members(market_id: int, user: CurrentUser, db: DbSession) -> list[MemberView]:
+    """Everyone in the market and who invited them. Other people's balances stay private."""
+    membership = get_membership(db, user, market_id)
+    members = db.scalars(
+        select(Membership)
+        .where(Membership.market_id == membership.market_id)
+        .order_by(Membership.joined_at, Membership.id)
+    )
+    return [
+        MemberView(
+            username=m.user.username,
+            display_name=m.user.display_name,
+            joined_at=m.joined_at,
+            invited_by=m.invited_by.display_name if m.invited_by else None,
+        )
+        for m in members
+    ]
 
 
 @router.get("/{market_id}/ledger")

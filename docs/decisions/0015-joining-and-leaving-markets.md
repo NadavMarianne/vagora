@@ -5,6 +5,12 @@
 ## Joining
 - The person who creates a market is its first member.
 - Any member can invite someone **by username**. The invited person accepts or declines. Nobody is added without agreeing.
+- The invite shows who sent it. The market's member list shows who invited each person.
+- **The inviter sets when the invite expires:** 1 hour to 30 days, 7 days if not chosen.
+- Any member can cancel an invite that hasn't been answered.
+- Inviting someone who is already a member, or already has a pending invite, is refused.
+- Someone who declined can be invited again, with no limit. Blocking markets or people is a future idea.
+- New members get the market's starting amount when they accept.
 
 ## Leaving
 - Anyone can leave a market. Nobody can remove someone else (that waits for admin roles).

@@ -9,6 +9,7 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 
 ## Markets and members
 - Invite links or codes, single-use or expiring.
+- Blocking a market or a person, so they can't send you invites.
 - Owner or admin roles, including removing members.
 
 ## Coins
