@@ -4,4 +4,6 @@
 - Installed the GitHub CLI so Claude can open pull requests.
 - Agreed on a way of working: I make the high-level decisions, Claude does the building, step by step.
 - Decided how currency works (see decision 0008): starting amount and allowance as market settings, no debt for now, direct transfers off by default, equal members, one person can be in several markets.
-- Next: build markets, members, and balances in the backend.
+- Compared backend languages (Python, TypeScript) and databases (PostgreSQL, MongoDB, SQLite). Kept Python and accepted PostgreSQL (decision 0007).
+- From now on I make the technical choices too, from options with pros and cons.
+- Next: choose how Python talks to the database, then build markets, members, and balances in the backend.
