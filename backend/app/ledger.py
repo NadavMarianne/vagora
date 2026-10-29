@@ -1,5 +1,7 @@
 """The only way coins move: a ledger entry plus the same change to the stored balance."""
 
+from datetime import datetime
+
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
@@ -12,13 +14,19 @@ class NotEnoughCoins(Exception):
 
 
 def record(
-    db: Session, membership: Membership, amount: int, kind: EntryKind, note: str
+    db: Session,
+    membership: Membership,
+    amount: int,
+    kind: EntryKind,
+    note: str,
+    at: datetime | None = None,
 ) -> LedgerEntry:
     """Adds a ledger entry and changes the stored balance by the same amount.
 
     Both happen in the caller's transaction, so either both are saved or neither is.
     The balance is changed in one database step that only succeeds if it stays at zero or
     above, so two payments at the same moment can't overdraw it.
+    `at` dates the entry when it belongs to an earlier moment, like a caught-up allowance.
     """
     new_balance = db.scalar(
         update(Membership)
@@ -32,6 +40,8 @@ def record(
     set_committed_value(membership, "balance", new_balance)
 
     entry = LedgerEntry(membership_id=membership.id, amount=amount, kind=kind, note=note)
+    if at is not None:
+        entry.created_at = at
     db.add(entry)
     db.flush()
     return entry

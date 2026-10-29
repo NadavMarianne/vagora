@@ -9,7 +9,8 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app import ledger
+from app import allowance, ledger
+from app.allowance import AllowanceSchedule
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
 
@@ -38,6 +39,9 @@ class MarketCreate(BaseModel):
     # The app sends the creator's time zone, like "Asia/Jerusalem".
     time_zone: TimeZone
     transfers_enabled: bool = False
+    allowance_enabled: bool = False
+    allowance_amount: Coins = 0
+    allowance_schedule: AllowanceSchedule | None = None
 
 
 class MarketUpdate(BaseModel):
@@ -48,6 +52,9 @@ class MarketUpdate(BaseModel):
     starting_amount: Coins | None = None
     time_zone: TimeZone | None = None
     transfers_enabled: bool | None = None
+    allowance_enabled: bool | None = None
+    allowance_amount: Coins | None = None
+    allowance_schedule: AllowanceSchedule | None = None
 
 
 class MarketView(BaseModel):
@@ -57,7 +64,14 @@ class MarketView(BaseModel):
     starting_amount: int
     time_zone: str
     transfers_enabled: bool
+    allowance_enabled: bool
+    allowance_amount: int
+    allowance_schedule: AllowanceSchedule | None
     my_balance: int
+
+
+# Changing any of these moves when allowances fall, so the allowance starts fresh from now.
+ALLOWANCE_TIMING = {"allowance_enabled", "allowance_schedule", "time_zone"}
 
 
 class EntryView(BaseModel):
@@ -101,8 +115,27 @@ def view(membership: Membership) -> MarketView:
         starting_amount=market.starting_amount,
         time_zone=market.time_zone,
         transfers_enabled=market.transfers_enabled,
+        allowance_enabled=market.allowance_enabled,
+        allowance_amount=market.allowance_amount,
+        allowance_schedule=market.allowance_schedule,
         my_balance=membership.balance,
     )
+
+
+def check_allowance(market: Market) -> None:
+    if market.allowance_enabled and (
+        market.allowance_amount < 1 or market.allowance_schedule is None
+    ):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "To turn on the allowance, set an amount and a schedule.",
+        )
+
+
+def catch_up(db: Session, market: Market) -> None:
+    """Pays any allowances that came due since the market was last used."""
+    if allowance.pay_due(db, market):
+        db.commit()
 
 
 def active_memberships():
@@ -117,13 +150,18 @@ def get_membership(db: Session, user: User, market_id: int) -> Membership:
     )
     if membership is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Market not found.")
+    catch_up(db, membership.market)
     return membership
 
 
 def come_back(membership: Membership, invited_by: User | None) -> None:
-    """Makes a former member active again, with their frozen balance. The caller commits."""
+    """Makes a former member active again, with their frozen balance. The caller commits.
+
+    Their allowance starts again from now: time away is never paid.
+    """
     membership.left_at = None
     membership.joined_at = now()
+    membership.allowance_paid_until = now()
     membership.invited_by = invited_by
     membership.market.archived_at = None
 
@@ -155,6 +193,7 @@ def add_member(db: Session, market: Market, user: User, invited_by: User | None)
 def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> MarketView:
     """Creates a market. You become its first member and get its starting amount."""
     market = Market(**new.model_dump())
+    check_allowance(market)
     db.add(market)
     membership = add_member(db, market, user, invited_by=None)
     db.commit()
@@ -165,7 +204,9 @@ def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> Market
 def list_my_markets(user: CurrentUser, db: DbSession) -> list[MarketView]:
     memberships = db.scalars(
         active_memberships().where(Membership.user_id == user.id).order_by(Membership.joined_at)
-    )
+    ).all()
+    for membership in memberships:
+        catch_up(db, membership.market)
     return [view(membership) for membership in memberships]
 
 
@@ -199,10 +240,19 @@ def get_market(market_id: int, user: CurrentUser, db: DbSession) -> MarketView:
 def change_settings(
     market_id: int, changes: MarketUpdate, user: CurrentUser, db: DbSession
 ) -> MarketView:
-    """Any member can change the settings (all members are equal)."""
+    """Any member can change the settings (all members are equal).
+
+    Allowances already due are paid first (under the old settings). After a change to when
+    allowances fall, the new timing starts now and nothing earlier is paid.
+    """
     membership = get_membership(db, user, market_id)
-    for setting, value in changes.model_dump(exclude_unset=True, exclude_none=True).items():
-        setattr(membership.market, setting, value)
+    market = membership.market
+    changed = changes.model_dump(exclude_unset=True, exclude_none=True)
+    for setting, value in changed.items():
+        setattr(market, setting, value)
+    check_allowance(market)
+    if ALLOWANCE_TIMING & changed.keys():
+        allowance.start_fresh(db, market)
     db.commit()
     return view(membership)
 

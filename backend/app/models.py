@@ -14,6 +14,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -36,7 +37,10 @@ class Market(Base):
     """A market and its settings. Its rules are data, not code."""
 
     __tablename__ = "markets"
-    __table_args__ = (CheckConstraint("starting_amount >= 0", name="starting_amount_not_negative"),)
+    __table_args__ = (
+        CheckConstraint("starting_amount >= 0", name="starting_amount_not_negative"),
+        CheckConstraint("allowance_amount >= 0", name="allowance_amount_not_negative"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50))
@@ -45,6 +49,10 @@ class Market(Base):
     transfers_enabled: Mapped[bool] = mapped_column(server_default="false")
     # A time zone name like "Asia/Jerusalem". Schedules use it.
     time_zone: Mapped[str] = mapped_column(String(64))
+    allowance_enabled: Mapped[bool] = mapped_column(server_default="false")
+    allowance_amount: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    # When it's paid, as described by AllowanceSchedule in app/allowance.py. Stored as JSON.
+    allowance_schedule: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Set when the last member leaves. Deleted for good 30 days later unless someone rejoins.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -72,6 +80,10 @@ class Membership(Base):
     invited_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     # Set when they leave. Their balance stays frozen here until they come back.
     left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Allowances are paid up to this moment. Time away from the market is never paid.
+    allowance_paid_until: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     market: Mapped[Market] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(foreign_keys=[user_id])
@@ -118,6 +130,7 @@ class EntryKind(StrEnum):
     """Why coins moved."""
 
     STARTING_AMOUNT = "starting_amount"
+    ALLOWANCE = "allowance"
 
 
 class LedgerEntry(Base):

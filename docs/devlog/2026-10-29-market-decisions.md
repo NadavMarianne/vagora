@@ -15,4 +15,9 @@
 - Closed two loopholes: invites you sent are cancelled when you leave (spotted by me), and coming back never gives the starting amount again (spotted by Claude).
 - Built leaving: leave, see markets you left with your frozen coins, rejoin within 30 days, be invited back later, archive when empty, and a once-a-day cleanup that deletes markets empty for 30 days.
 - Tested the last two members leaving at the same moment: the market was archived correctly every time.
-- Next: the allowance.
+- Merged PR #13. Decided allowance edge cases: a schedule change starts the new schedule immediately, and time away from a market is never paid (decision 0017).
+- Built the allowance: daily, weekly, or monthly schedules with several times or dates, in the market's time zone, paid by catching up whenever a market is opened. Each payout is dated with its scheduled time.
+- Caught a gap in the generated migration: Alembic doesn't add new check constraints to existing tables, so I added it by hand.
+- Tested 4 people opening a market at the same moment, 10 times: every payout was paid exactly once.
+- Markets (4 pull requests) are done on the backend side.
+- Next: decide what comes next (the shop, or a first app screen to try it all).
