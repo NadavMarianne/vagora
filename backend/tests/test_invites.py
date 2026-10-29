@@ -1,9 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 
-from app.models import Invite
+from app.models import Invite, Membership
 
 NEW_MARKET = {
     "name": "Home",
@@ -55,20 +55,44 @@ def test_accepting_joins_with_starting_amount(member, dana_market):
     assert [m["name"] for m in noa.get("/markets").json()] == ["Home"]
 
 
-def test_member_list_shows_who_invited_whom(member, dana_market):
+def test_member_list(member, dana_market):
+    dana, market_id = dana_market
+    noa = member("noa_r")
+    noa.post(f"/invites/{invite(dana, market_id, 'noa_r').json()['id']}/accept")
+
+    members = noa.get(f"/markets/{market_id}/members").json()
+
+    assert [m["username"] for m in members] == ["dana_k", "noa_r"]
+    assert set(members[0]) == {"username", "display_name", "joined_at"}
+
+
+def test_who_invited_whom_is_saved_for_the_chat(db, member, dana_market):
     dana, market_id = dana_market
     noa, tal = member("noa_r"), member("tal_s")
     noa.post(f"/invites/{invite(dana, market_id, 'noa_r').json()['id']}/accept")
     tal.post(f"/invites/{invite(noa, market_id, 'tal_s').json()['id']}/accept")
 
-    members = dana.get(f"/markets/{market_id}/members").json()
+    memberships = db.scalars(
+        select(Membership).where(Membership.market_id == market_id).order_by(Membership.id)
+    )
 
-    assert [(m["username"], m["invited_by"]) for m in members] == [
+    assert [(m.user.username, m.invited_by and m.invited_by.username) for m in memberships] == [
         ("dana_k", None),
-        ("noa_r", "Dana_K"),
-        ("tal_s", "Noa_R"),
+        ("noa_r", "dana_k"),
+        ("tal_s", "noa_r"),
     ]
-    assert "balance" not in members[0]
+
+
+def test_open_invites_show_who_is_invited_not_who_invited(member, dana_market):
+    dana, market_id = dana_market
+    member("noa_r")
+    invite(dana, market_id, "noa_r")
+
+    pending = dana.get(f"/markets/{market_id}/invites").json()
+
+    assert [i["invited_username"] for i in pending] == ["noa_r"]
+    assert "invited_by_username" not in pending[0]
+    assert "invited_by_display_name" not in pending[0]
 
 
 def test_declining(member, dana_market):
@@ -193,16 +217,6 @@ def test_any_member_can_cancel(member, dana_market):
     assert noa.delete(f"/markets/{market_id}/invites/{invite_id}").status_code == 204
     assert tal.get("/invites").json() == []
     assert tal.post(f"/invites/{invite_id}/accept").status_code == 404
-
-
-def test_market_lists_its_pending_invites(member, dana_market):
-    dana, market_id = dana_market
-    member("noa_r")
-    invite(dana, market_id, "noa_r")
-
-    pending = dana.get(f"/markets/{market_id}/invites").json()
-
-    assert [i["invited_username"] for i in pending] == ["noa_r"]
 
 
 def test_cannot_answer_someone_elses_invite(member, dana_market):

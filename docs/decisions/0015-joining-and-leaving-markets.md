@@ -5,7 +5,8 @@
 ## Joining
 - The person who creates a market is its first member.
 - Any member can invite someone **by username**. The invited person accepts or declines. Nobody is added without agreeing.
-- The invite shows who sent it. The market's member list shows who invited each person.
+- The invited person sees who sent the invite. The market's list of open invites shows only who is invited.
+- Who invited each member is saved, for a future market chat ("Noa joined from Dana's invite").
 - **The inviter sets when the invite expires:** 1 hour to 30 days, 7 days if not chosen.
 - Any member can cancel an invite that hasn't been answered.
 - Inviting someone who is already a member, or already has a pending invite, is refused.

@@ -24,24 +24,40 @@ class InviteCreate(BaseModel):
     expires_in_hours: ExpiresInHours = 7 * 24
 
 
-class InviteView(BaseModel):
+class PendingInviteView(BaseModel):
+    """An open invite as the market's members see it: who is invited, not who invited them."""
+
+    id: int
+    invited_username: str
+    invited_display_name: str
+    expires_at: datetime
+
+
+class ReceivedInviteView(BaseModel):
+    """An invite as the invited person sees it: which market, and who invited them."""
+
     id: int
     market_id: int
     market_name: str
-    invited_username: str
-    invited_display_name: str
     invited_by_username: str
     invited_by_display_name: str
     expires_at: datetime
 
 
-def invite_view(invite: Invite) -> InviteView:
-    return InviteView(
+def pending_view(invite: Invite) -> PendingInviteView:
+    return PendingInviteView(
+        id=invite.id,
+        invited_username=invite.invited_user.username,
+        invited_display_name=invite.invited_user.display_name,
+        expires_at=invite.expires_at,
+    )
+
+
+def received_view(invite: Invite) -> ReceivedInviteView:
+    return ReceivedInviteView(
         id=invite.id,
         market_id=invite.market_id,
         market_name=invite.market.name,
-        invited_username=invite.invited_user.username,
-        invited_display_name=invite.invited_user.display_name,
         invited_by_username=invite.invited_by.username,
         invited_by_display_name=invite.invited_by.display_name,
         expires_at=invite.expires_at,
@@ -58,7 +74,9 @@ def open_invites():
 
 
 @router.post("/markets/{market_id}/invites", status_code=status.HTTP_201_CREATED)
-def send_invite(market_id: int, new: InviteCreate, user: CurrentUser, db: DbSession) -> InviteView:
+def send_invite(
+    market_id: int, new: InviteCreate, user: CurrentUser, db: DbSession
+) -> PendingInviteView:
     """Invites someone to the market by their username. Any member can invite."""
     membership = get_membership(db, user, market_id)
     invited = db.scalar(select(User).where(User.username == new.username))
@@ -98,17 +116,19 @@ def send_invite(market_id: int, new: InviteCreate, user: CurrentUser, db: DbSess
         # Two members invited the same person at the same moment.
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have an invite.") from error
-    return invite_view(invite)
+    return pending_view(invite)
 
 
 @router.get("/markets/{market_id}/invites")
-def list_market_invites(market_id: int, user: CurrentUser, db: DbSession) -> list[InviteView]:
+def list_market_invites(
+    market_id: int, user: CurrentUser, db: DbSession
+) -> list[PendingInviteView]:
     """Invites from this market that are still waiting for an answer."""
     get_membership(db, user, market_id)
     invites = db.scalars(
         open_invites().where(Invite.market_id == market_id).order_by(Invite.created_at)
     )
-    return [invite_view(invite) for invite in invites]
+    return [pending_view(invite) for invite in invites]
 
 
 @router.delete("/markets/{market_id}/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -123,12 +143,12 @@ def cancel_invite(market_id: int, invite_id: int, user: CurrentUser, db: DbSessi
 
 
 @router.get("/invites")
-def list_my_invites(user: CurrentUser, db: DbSession) -> list[InviteView]:
+def list_my_invites(user: CurrentUser, db: DbSession) -> list[ReceivedInviteView]:
     """Invites waiting for your answer."""
     invites = db.scalars(
         open_invites().where(Invite.invited_user_id == user.id).order_by(Invite.created_at)
     )
-    return [invite_view(invite) for invite in invites]
+    return [received_view(invite) for invite in invites]
 
 
 def get_my_open_invite(db: Session, user: User, invite_id: int) -> Invite:

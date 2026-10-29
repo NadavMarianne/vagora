@@ -71,8 +71,6 @@ class MemberView(BaseModel):
     username: str
     display_name: str
     joined_at: datetime
-    # Display name of who invited them. Empty for the person who created the market.
-    invited_by: str | None
 
 
 def view(membership: Membership) -> MarketView:
@@ -147,7 +145,7 @@ def change_settings(
 
 @router.get("/{market_id}/members")
 def list_members(market_id: int, user: CurrentUser, db: DbSession) -> list[MemberView]:
-    """Everyone in the market and who invited them. Other people's balances stay private."""
+    """Everyone in the market. Other people's balances stay private."""
     membership = get_membership(db, user, market_id)
     members = db.scalars(
         select(Membership)
@@ -156,10 +154,7 @@ def list_members(market_id: int, user: CurrentUser, db: DbSession) -> list[Membe
     )
     return [
         MemberView(
-            username=m.user.username,
-            display_name=m.user.display_name,
-            joined_at=m.joined_at,
-            invited_by=m.invited_by.display_name if m.invited_by else None,
+            username=m.user.username, display_name=m.user.display_name, joined_at=m.joined_at
         )
         for m in members
     ]
