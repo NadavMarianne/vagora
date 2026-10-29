@@ -17,3 +17,4 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0011](0011-firebase-auth.md) | Firebase Auth as the login service | Accepted |
 | [0012](0012-git-workflow-and-environments.md) | Git workflow and environments | Accepted |
 | [0013](0013-accounts-and-profiles.md) | Accounts and profiles | Accepted |
+| [0014](0014-checking-login-tokens.md) | Checking login tokens | Accepted |
