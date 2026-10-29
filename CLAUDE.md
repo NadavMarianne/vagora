@@ -17,7 +17,7 @@ See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), o
 
 ## Repo layout
 - `backend/`: FastAPI app (`app/`), tests (`tests/`), and Alembic migrations (`migrations/`), configured in `pyproject.toml`
-- `docs/`: vision, decision records (`decisions/`), build diary (`devlog/`), setup guide
+- `docs/`: vision, decision records (`decisions/`), build diary (`devlog/`), setup guide, future ideas (`ideas.md`)
 - `.devcontainer/`: dev environment (app container plus PostgreSQL)
 - `.github/`: CI workflow, Dependabot, issue and PR templates
 

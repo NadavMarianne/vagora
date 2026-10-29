@@ -18,3 +18,6 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0012](0012-git-workflow-and-environments.md) | Git workflow and environments | Accepted |
 | [0013](0013-accounts-and-profiles.md) | Accounts and profiles | Accepted |
 | [0014](0014-checking-login-tokens.md) | Checking login tokens | Accepted |
+| [0015](0015-joining-and-leaving-markets.md) | Joining and leaving markets | Accepted |
+| [0016](0016-ledger-and-balances.md) | Ledger and balances | Accepted |
+| [0017](0017-allowance.md) | Allowance | Accepted |
