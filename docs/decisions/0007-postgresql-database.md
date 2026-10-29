@@ -13,4 +13,4 @@ Coin balances and orders must stay correct. PostgreSQL handles safe multi-step c
 - SQLite: simplest to start (one file), but weak with many users at once and awkward to host online.
 
 ## Still open
-Which free hosting service will run it, and which Python library connects to it.
+Which free hosting service will run it. (The Python library is chosen in decision 0009.)

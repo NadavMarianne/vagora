@@ -6,4 +6,5 @@
 - Decided how currency works (see decision 0008): starting amount and allowance as market settings, no debt for now, direct transfers off by default, equal members, one person can be in several markets.
 - Compared backend languages (Python, TypeScript) and databases (PostgreSQL, MongoDB, SQLite). Kept Python and accepted PostgreSQL (decision 0007).
 - From now on I make the technical choices too, from options with pros and cons.
-- Next: choose how Python talks to the database, then build markets, members, and balances in the backend.
+- Compared plain SQL, SQLAlchemy, and SQLModel. Chose SQLAlchemy with Alembic (decision 0009).
+- Next: decide on login, then build markets, members, and balances in the backend.

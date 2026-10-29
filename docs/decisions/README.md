@@ -12,3 +12,4 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0006](0006-dev-environment.md) | Development environment | Accepted |
 | [0007](0007-postgresql-database.md) | PostgreSQL as the database | Accepted |
 | [0008](0008-currency-and-market-settings.md) | Currency and market settings | Accepted |
+| [0009](0009-sqlalchemy-and-alembic.md) | SQLAlchemy and Alembic for database access | Accepted |
