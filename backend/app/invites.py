@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import signals
 from app.markets import MarketView, active_memberships, add_member, get_membership, view
 from app.models import Invite, InviteStatus, Membership, User
 from app.users import CurrentUser, DbSession, Username
@@ -117,6 +118,11 @@ def send_invite(
         # Two members invited the same person at the same moment.
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have an invite.") from error
+    market_name = membership.market.name
+    signals.notify(
+        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}"
+    )
+    signals.notify_market(db, market_id)
     return pending_view(invite)
 
 
@@ -141,6 +147,8 @@ def cancel_invite(market_id: int, invite_id: int, user: CurrentUser, db: DbSessi
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite not found.")
     invite.status = InviteStatus.CANCELLED
     db.commit()
+    signals.notify([invite.invited_user.firebase_uid], "invite")
+    signals.notify_market(db, market_id)
 
 
 @router.get("/invites")
@@ -177,6 +185,8 @@ def accept_invite(invite_id: int, user: CurrentUser, db: DbSession) -> MarketVie
         # The same invite accepted twice at the same moment (a double tap).
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "You're already in this market.") from error
+    market = membership.market
+    signals.notify_market(db, market.id, f"{user.display_name} joined {market.name}", but=user)
     return view(membership)
 
 
@@ -185,3 +195,4 @@ def decline_invite(invite_id: int, user: CurrentUser, db: DbSession) -> None:
     invite = get_my_open_invite(db, user, invite_id)
     invite.status = InviteStatus.DECLINED
     db.commit()
+    signals.notify_market(db, invite.market_id)

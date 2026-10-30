@@ -8,7 +8,7 @@ import { firebaseConfig } from "@/config";
 
 // While developing, code reloads run this file again, and Firebase allows only one setup.
 // So reuse what's already set up.
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 function setUpAuth(): Auth {
   try {

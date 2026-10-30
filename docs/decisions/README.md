@@ -23,3 +23,4 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0017](0017-allowance.md) | Allowance | Accepted |
 | [0018](0018-hosting.md) | Hosting on Neon and Vercel | Accepted (for now) |
 | [0019](0019-expo-app.md) | The app is built with Expo | Accepted |
+| [0020](0020-live-updates.md) | Live updates through Firestore | Accepted |
