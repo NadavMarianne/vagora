@@ -21,6 +21,13 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 - Rules that give or take coins automatically, like "+1000 on your birthday" or "−500 for a broken promise".
 - Earning coins through tasks.
 
+## Store
+- Counter proposals: a seller answers a proposal with a different price.
+- Availability windows on offers ("only during this week").
+- Reviews of sellers, and sorting offers by them.
+- Penalties decided through reports: reducing an allowance, a fine, a period where the person can't buy, or something the other side decides. Grouped into severity levels, each market defining its levels and how judgement works (both sides agree, a market member as judge, a platform judge, or an AI). See decision 0021.
+- A time limit on disputes.
+
 ## Time
 - A clock in each market showing the market's time.
 - Showing every time in each person's own time zone.
