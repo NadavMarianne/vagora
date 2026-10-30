@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
-from app.models import Allowance, Invite, LedgerEntry, Market, Membership
+from app.models import Allowance, Invite, LedgerEntry, Market, Membership, Offer, Product, Proposal
 
 DELETE_EMPTY_AFTER = timedelta(days=30)
 RUN_EVERY = timedelta(days=1)
@@ -30,6 +30,10 @@ def delete_old_empty_markets(db: Session) -> int:
     memberships = select(Membership.id).where(Membership.market_id.in_(market_ids))
     db.execute(delete(LedgerEntry).where(LedgerEntry.membership_id.in_(memberships)))
     db.execute(delete(Invite).where(Invite.market_id.in_(market_ids)))
+    products = select(Product.id).where(Product.market_id.in_(market_ids))
+    db.execute(delete(Offer).where(Offer.product_id.in_(products)))
+    db.execute(delete(Proposal).where(Proposal.product_id.in_(products)))
+    db.execute(delete(Product).where(Product.market_id.in_(market_ids)))
     db.execute(delete(Membership).where(Membership.market_id.in_(market_ids)))
     db.execute(delete(Allowance).where(Allowance.market_id.in_(market_ids)))
     db.execute(delete(Market).where(Market.id.in_(market_ids)))

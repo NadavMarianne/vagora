@@ -77,3 +77,89 @@ export type ReceivedInvite = {
   invited_by_display_name: string;
   expires_at: string;
 };
+
+// The store. Mirrors backend/app/store.py and app/products.py.
+
+/** Where the coins of a completed order go. */
+export type CoinMode = "to_seller" | "vanish";
+
+export type Commitment = {
+  until: string | null;
+  stock: number | null;
+  /** With both: released when the first runs out, or only when both have. */
+  release: "first" | "all";
+};
+
+/** A seller's terms for their offer. */
+export type OfferTerms = {
+  delivery: "deadline" | "on_request";
+  duration_seconds: number;
+  refundable: boolean;
+  refund_percent: number;
+  stock: number | null;
+  commitment: Commitment | null;
+  remove_at: string | null;
+};
+
+export type Offer = {
+  id: number;
+  seller_username: string;
+  seller_display_name: string;
+  is_mine: boolean;
+  price: number;
+  delivery: OfferTerms["delivery"];
+  duration_seconds: number;
+  refundable: boolean;
+  refund_percent: number;
+  stock: number | null;
+  committed: boolean;
+  committed_price: number | null;
+  committed_until: string | null;
+  committed_stock: number | null;
+  commitment_release: "first" | "all" | null;
+  remove_at: string | null;
+};
+
+export type ProductStatus = "waiting" | "live" | "no_sellers" | "closed";
+
+export type ProductSummary = {
+  id: number;
+  name: string;
+  description: string;
+  coin_mode: CoinMode;
+  status: ProductStatus;
+  creator_username: string;
+  creator_display_name: string;
+  is_mine: boolean;
+  offer_count: number;
+  lowest_price: number | null;
+};
+
+/** A proposal as the product's creator sees it. */
+export type Proposal = {
+  id: number;
+  seller_username: string;
+  seller_display_name: string;
+  price: number;
+  status: "pending" | "accepted" | "declined" | "expired" | "cancelled";
+  expires_at: string;
+};
+
+export type Product = ProductSummary & {
+  proposal_expiry_seconds: number;
+  offers: Offer[];
+  /** Only the creator gets these. */
+  proposals: Proposal[];
+};
+
+/** A proposal waiting for your answer. */
+export type MyProposal = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  product_description: string;
+  coin_mode: CoinMode;
+  creator_display_name: string;
+  price: number;
+  expires_at: string;
+};
