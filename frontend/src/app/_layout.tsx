@@ -48,6 +48,7 @@ function Screens() {
         <Stack.Screen name="markets/new" options={{ title: "Create a market" }} />
         <Stack.Screen name="markets/[id]/index" options={{ title: "Market" }} />
         <Stack.Screen name="markets/[id]/settings" options={{ title: "Market settings" }} />
+        <Stack.Screen name="markets/[id]/invite" options={{ title: "Invite someone" }} />
       </Stack.Protected>
     </Stack>
   );

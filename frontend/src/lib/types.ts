@@ -59,3 +59,21 @@ export type TimeZone = {
   region: string;
   offset: string;
 };
+
+/** An open invite, as the market's members see it: who is invited. */
+export type PendingInvite = {
+  id: number;
+  invited_username: string;
+  invited_display_name: string;
+  expires_at: string;
+};
+
+/** An invite waiting for your answer: which market, and who invited you. */
+export type ReceivedInvite = {
+  id: number;
+  market_id: number;
+  market_name: string;
+  invited_by_username: string;
+  invited_by_display_name: string;
+  expires_at: string;
+};
