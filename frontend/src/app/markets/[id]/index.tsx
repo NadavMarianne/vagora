@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
 import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
@@ -19,6 +19,7 @@ type MarketPage = {
 export default function MarketScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [actionError, setActionError] = useState("");
+  const [leaveError, setLeaveError] = useState("");
   const { data, error, reload } = useLoad(
     useCallback(async (): Promise<MarketPage> => {
       // The market first: opening it pays any allowance that came due.
@@ -41,6 +42,29 @@ export default function MarketScreen() {
     } catch (e) {
       setActionError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
     }
+  }
+
+  function leave() {
+    Alert.alert(
+      "Leave this market?",
+      "Your coins stay frozen here. You can rejoin yourself within 30 days and get them back. Your offers without a commitment are removed, and invites you sent are cancelled.",
+      [
+        { text: "Stay", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            setLeaveError("");
+            try {
+              await api(`/markets/${id}/leave`, { method: "POST" });
+              router.replace("/");
+            } catch (e) {
+              setLeaveError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+            }
+          },
+        },
+      ],
+    );
   }
 
   if (!data) {
@@ -117,6 +141,8 @@ export default function MarketScreen() {
         kind="secondary"
         onPress={() => router.push(`/markets/${id}/settings`)}
       />
+      <Button title="Leave market" kind="secondary" onPress={leave} />
+      <ErrorText>{leaveError}</ErrorText>
     </Screen>
   );
 }

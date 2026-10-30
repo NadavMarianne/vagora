@@ -6,4 +6,5 @@
 - New screens: the store, a new product, a product's page (sellers sorted by price, the creator's tools), answering a proposal with your terms, and changing your offer.
 - Added a time picker with a slider, a number box, and a unit, which stay in sync. It needed the slider package (`@react-native-community/slider`).
 - Wanted to test on the phones before merging, but Vercel's preview links needed a Vercel login. Chose to turn off Deployment Protection, so every pull request can be tested first. The app points at the preview link with `EXPO_PUBLIC_API_URL`.
+- Added Leave and Rejoin to the app (the backend had them already): Leave at the bottom of a market, and "Markets you left" with Rejoin on the home screen.
 - Next: try it on both phones, then step 2 (buying and orders).

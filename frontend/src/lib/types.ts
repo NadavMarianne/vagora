@@ -60,6 +60,16 @@ export type TimeZone = {
   offset: string;
 };
 
+/** A market you left recently. You can rejoin it yourself until `rejoin_until`. */
+export type LeftMarket = {
+  id: number;
+  name: string;
+  currency_name: string;
+  my_balance: number;
+  left_at: string;
+  rejoin_until: string;
+};
+
 /** An open invite, as the market's members see it: who is invited. */
 export type PendingInvite = {
   id: number;
