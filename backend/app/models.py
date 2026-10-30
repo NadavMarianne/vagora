@@ -37,10 +37,7 @@ class Market(Base):
     """A market and its settings. Its rules are data, not code."""
 
     __tablename__ = "markets"
-    __table_args__ = (
-        CheckConstraint("starting_amount >= 0", name="starting_amount_not_negative"),
-        CheckConstraint("allowance_amount >= 0", name="allowance_amount_not_negative"),
-    )
+    __table_args__ = (CheckConstraint("starting_amount >= 0", name="starting_amount_not_negative"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50))
@@ -49,15 +46,37 @@ class Market(Base):
     transfers_enabled: Mapped[bool] = mapped_column(server_default="false")
     # A time zone name like "Asia/Jerusalem". Schedules use it.
     time_zone: Mapped[str] = mapped_column(String(64))
-    allowance_enabled: Mapped[bool] = mapped_column(server_default="false")
-    allowance_amount: Mapped[int] = mapped_column(BigInteger, server_default="0")
-    # When it's paid, as described by AllowanceSchedule in app/allowance.py. Stored as JSON.
-    allowance_schedule: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Set when the last member leaves. Deleted for good 30 days later unless someone rejoins.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="market")
+    allowances: Mapped[list["Allowance"]] = relationship(
+        back_populates="market", cascade="all, delete-orphan", order_by="Allowance.id"
+    )
+
+
+class Allowance(Base):
+    """Coins every member gets on a schedule. A market can have any number of them."""
+
+    __tablename__ = "allowances"
+    __table_args__ = (CheckConstraint("amount > 0", name="allowance_amount_positive"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"), index=True)
+    # Shown on each payout, like "Pocket money". Doesn't have to be unique.
+    name: Mapped[str] = mapped_column(String(50))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    enabled: Mapped[bool] = mapped_column(server_default="true")
+    # When it's paid, as described by AllowanceSchedule in app/allowance.py. Stored as JSON.
+    schedule: Mapped[dict] = mapped_column(JSONB)
+    # Payouts count from this moment. Reset when the allowance is created, switched on, or its
+    # timing changes, so nothing from before then is paid.
+    counting_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    market: Mapped[Market] = relationship(back_populates="allowances")
 
 
 class Membership(Base):

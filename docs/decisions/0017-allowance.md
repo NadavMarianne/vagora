@@ -3,7 +3,9 @@
 **Date:** 2026-10-29 **Status:** Accepted
 
 ## Decision
-Each market can give every member the same amount of coins on a flexible schedule:
+Each market can have **any number of allowances** (updated 2026-10-30). Each one has its own **name** (shown on every payment, like "+100 Pocket money"; names may repeat), **amount**, **on/off switch**, and **schedule**. There's no limit on how many; if abuse ever slows the app, a generous safety cap can be added.
+
+Each allowance gives every member the same amount of coins on a flexible schedule:
 
 | Frequency | The market picks | Example |
 |---|---|---|
@@ -15,7 +17,8 @@ Each market can give every member the same amount of coins on a flexible schedul
 - The allowance can be switched off and on.
 - Someone who joins gets their first allowance on the next scheduled time. Their starting amount covers them until then. Joining on the 13th with a payout on the 14th means you get it.
 - **No allowance for time away.** Someone who leaves and comes back is paid again from the moment they return, never for the time they were gone.
-- **Changing the schedule** (or the time zone, or switching the allowance on): payouts whose time already passed are paid first, under the old settings. Then the new timing starts immediately, and anything the old schedule had coming is dropped. Switching the allowance on never pays for the past.
+- **Changing an allowance's schedule** (or switching it on): payouts whose time already passed are paid first, under the old settings. Then the new timing starts immediately for that allowance only, and anything its old schedule had coming is dropped. Switching it on never pays for the past. Renaming it or changing its amount doesn't restart it.
+- **Changing the market's time zone** restarts every allowance the same way.
 - **Time zone:** each market has one. It defaults to the creator's time zone and can be changed to any time zone. All schedule times use it.
 
 ## Delivery: catching up

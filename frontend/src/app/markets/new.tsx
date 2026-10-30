@@ -1,15 +1,21 @@
 import { router } from "expo-router";
 import { useState } from "react";
 
-import { defaultSettings, MarketSettingsForm, settingsToSend } from "@/components/market-settings-form";
+import {
+  defaultSettings,
+  MarketSettingsForm,
+  type SettingsDraft,
+  settingsToSend,
+  toDraft,
+} from "@/components/market-settings-form";
 import { Body, Button, ErrorText, Field, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { Market, MarketSettings } from "@/lib/types";
+import type { Market } from "@/lib/types";
 
 export default function NewMarket() {
   const [name, setName] = useState("");
   const [currencyName, setCurrencyName] = useState("");
-  const [settings, setSettings] = useState<MarketSettings>(defaultSettings);
+  const [settings, setSettings] = useState<SettingsDraft>(() => toDraft(defaultSettings()));
   const [error, setError] = useState("");
 
   async function create() {

@@ -16,14 +16,21 @@ export type AllowanceSchedule = {
   days: number[]; // 1 to 31
 };
 
+/** Coins every member gets on a schedule. A new one has no `id` yet. */
+export type Allowance = {
+  id?: number;
+  name: string;
+  amount: number;
+  enabled: boolean;
+  schedule: AllowanceSchedule;
+};
+
 /** The settings a market can change (everything except its name and currency name). */
 export type MarketSettings = {
   starting_amount: number;
   time_zone: string;
   transfers_enabled: boolean;
-  allowance_enabled: boolean;
-  allowance_amount: number;
-  allowance_schedule: AllowanceSchedule | null;
+  allowances: Allowance[];
 };
 
 export type Market = MarketSettings & {
