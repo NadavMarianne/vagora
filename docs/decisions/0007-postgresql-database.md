@@ -13,6 +13,6 @@ Coin balances and orders must stay correct. PostgreSQL handles safe multi-step c
 - SQLite: simplest to start (one file), but weak with many users at once and awkward to host online.
 
 ## Still open
-Which free hosting service will run it. (The Python library is chosen in decision 0009.)
+Hosting is chosen in decision 0018 (Neon). The Python library is chosen in decision 0009.
 
 Requirement for hosting: the app must keep working after weeks without use. A host that sleeps and wakes up by itself on the next request is fine. A host that needs a manual restore is not. Whether a slow first open after a quiet period is acceptable is decided when we choose the backend host.
