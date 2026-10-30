@@ -45,6 +45,9 @@ function Screens() {
       </Stack.Protected>
       <Stack.Protected guard={is("ready")}>
         <Stack.Screen name="index" options={{ title: "vagora" }} />
+        <Stack.Screen name="markets/new" options={{ title: "Create a market" }} />
+        <Stack.Screen name="markets/[id]/index" options={{ title: "Market" }} />
+        <Stack.Screen name="markets/[id]/settings" options={{ title: "Market settings" }} />
       </Stack.Protected>
     </Stack>
   );
