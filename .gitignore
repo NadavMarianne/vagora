@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# vagora: the app's own code folder, not a Python build folder (see "lib/" above)
+!frontend/src/lib/

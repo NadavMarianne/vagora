@@ -13,10 +13,11 @@ Guidance for Claude (and anyone else) working on this repo.
 - Document the process as we go: decisions go in `docs/decisions/`, work sessions in `docs/devlog/`.
 
 ## Decisions so far
-See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), one backend plus one database, no microservices, virtual currency only, one market first.
+See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), one backend plus one database (PostgreSQL), no microservices, virtual currency only, one market first. Login through Firebase Auth. Hosted on Vercel (backend) and Neon (database). The app is built with Expo (TypeScript).
 
 ## Repo layout
 - `backend/`: FastAPI app (`app/`), tests (`tests/`), and Alembic migrations (`migrations/`), configured in `pyproject.toml`
+- `frontend/`: the Expo app. Screens in `src/app/`, see `frontend/README.md` and `frontend/AGENTS.md`
 - `docs/`: vision, decision records (`decisions/`), build diary (`devlog/`), setup guide, future ideas (`ideas.md`)
 - `.devcontainer/`: dev environment (app container plus PostgreSQL)
 - `.github/`: CI workflow, Dependabot, issue and PR templates
@@ -24,13 +25,15 @@ See `docs/decisions/`. In short: Python with FastAPI (Pydantic, Ruff, pytest), o
 ## Commands (run inside the devcontainer)
 `make run`, `make test`, `make lint`, `make format`, `make migrate`, `make migration name="..."`
 
+The app runs on the computer itself (not the devcontainer), from `frontend/`: `npx expo start`, `npx expo lint`, `npx tsc --noEmit`.
+
 ## Rules
 - Keep it simple. No new complexity without a real need.
 - Settings, not code: markets, items, prices, and earning rules should be configurable data.
 - Backend first and API-based, so any frontend can be replaced later.
 - Never commit secrets (keys, passwords).
 - No real money features.
-- PostgreSQL is proposed (decision 0007). The frontend and hosting choices are still open. Do not assume them.
+- Don't assume choices that haven't been made. Check `docs/decisions/`, and ask the owner.
 - Every PR should keep CI green (lint, format check, tests).
 
 ## Communication

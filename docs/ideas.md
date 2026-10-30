@@ -7,6 +7,8 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 - Logging in with your username, through the backend so emails stay private (see decision 0013).
 - Disabling an account instantly, not only when its login expires (needs a Firebase secret key; see decision 0014).
 
+- Login emails (verification, password reset) sent from our own domain instead of Firebase's default address, so they don't land in spam. Needs a domain we own, set up with SPF and DKIM. Before going live.
+
 ## Markets and members
 - Invite links or codes, single-use or expiring.
 - Blocking a market or a person, so they can't send you invites.
