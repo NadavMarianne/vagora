@@ -3,18 +3,40 @@
 // Here, moving more than a few pixels in any direction cancels the tap, even if the finger
 // comes back. Every button-like thing in the app uses this.
 import { useRef } from "react";
-import { type GestureResponderEvent, Pressable, type PressableProps } from "react-native";
+import {
+  type GestureResponderEvent,
+  Platform,
+  Pressable,
+  type PressableProps,
+  type TurboModule,
+  TurboModuleRegistry,
+} from "react-native";
 
 // How far (in screen points) the finger may move and still count as a tap.
 const MOVE_LIMIT = 8;
 
-export function Tappable({ onPress, onPressIn, onTouchMove, ...props }: PressableProps) {
+// Android's system click sound. Pressable plays it on every release, even for a cancelled tap,
+// so we switch that off and play it ourselves only for real taps. (iPhones have no such sound.)
+interface SoundManager extends TurboModule {
+  playTouchSound(): void;
+}
+const sounds =
+  Platform.OS === "android" ? TurboModuleRegistry.get<SoundManager>("SoundManager") : null;
+
+export function Tappable({
+  onPress,
+  onPressIn,
+  onTouchMove,
+  android_disableSound,
+  ...props
+}: PressableProps) {
   const start = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
 
   return (
     <Pressable
       {...props}
+      android_disableSound
       onPressIn={(event) => {
         start.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
         moved.current = false;
@@ -27,7 +49,9 @@ export function Tappable({ onPress, onPressIn, onTouchMove, ...props }: Pressabl
         onTouchMove?.(event);
       }}
       onPress={(event) => {
-        if (!moved.current) onPress?.(event);
+        if (moved.current) return;
+        if (!android_disableSound) sounds?.playTouchSound();
+        onPress?.(event);
       }}
     />
   );
