@@ -57,6 +57,17 @@ function Screens() {
         <Stack.Screen name="markets/[id]/index" options={{ title: "Market" }} />
         <Stack.Screen name="markets/[id]/settings" options={{ title: "Market settings" }} />
         <Stack.Screen name="markets/[id]/invite" options={{ title: "Invite someone" }} />
+        <Stack.Screen name="markets/[id]/store/index" options={{ title: "Store" }} />
+        <Stack.Screen name="markets/[id]/store/new" options={{ title: "New product" }} />
+        <Stack.Screen name="markets/[id]/store/[productId]/index" options={{ title: "Product" }} />
+        <Stack.Screen
+          name="markets/[id]/store/[productId]/my-offer"
+          options={{ title: "My offer" }}
+        />
+        <Stack.Screen
+          name="markets/[id]/proposals/[proposalId]"
+          options={{ title: "Asked to sell" }}
+        />
       </Stack.Protected>
     </Stack>
   );

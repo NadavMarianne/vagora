@@ -9,7 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app import allowance, ledger, signals
+from app import allowance, ledger, signals, store
 from app.allowance import AllowanceIn, AllowanceView, allowance_view
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
@@ -273,9 +273,12 @@ def list_members(market_id: int, user: CurrentUser, db: DbSession) -> list[Membe
 def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     """Leaves the market. Your coins are frozen, and invites you sent are cancelled.
 
-    You can rejoin yourself within 30 days. If you were the last member, the market is archived.
+    Not possible while you have committed offers. Your other offers are removed, and proposals
+    waiting for you are declined. You can rejoin yourself within 30 days. If you were the last
+    member, the market is archived.
     """
     membership = get_membership(db, user, market_id)
+    store.leave_store(db, market_id, user.id)
     # Lock the market so two last members leaving at once can't both miss archiving it.
     market = db.get(Market, market_id, with_for_update=True, populate_existing=True)
     membership.left_at = now()

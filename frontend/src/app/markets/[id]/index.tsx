@@ -1,11 +1,11 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
 import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { LedgerEntry, Market, Member, PendingInvite } from "@/lib/types";
+import type { LedgerEntry, Market, Member, MyProposal, PendingInvite } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type MarketPage = {
@@ -13,21 +13,24 @@ type MarketPage = {
   entries: LedgerEntry[];
   members: Member[];
   invites: PendingInvite[];
+  proposals: MyProposal[];
 };
 
 export default function MarketScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [actionError, setActionError] = useState("");
+  const [leaveError, setLeaveError] = useState("");
   const { data, error, reload } = useLoad(
     useCallback(async (): Promise<MarketPage> => {
       // The market first: opening it pays any allowance that came due.
       const market = await api<Market>(`/markets/${id}`);
-      const [entries, members, invites] = await Promise.all([
+      const [entries, members, invites, proposals] = await Promise.all([
         api<LedgerEntry[]>(`/markets/${id}/ledger`),
         api<Member[]>(`/markets/${id}/members`),
         api<PendingInvite[]>(`/markets/${id}/invites`),
+        api<MyProposal[]>(`/markets/${id}/proposals`),
       ]);
-      return { market, entries, members, invites };
+      return { market, entries, members, invites, proposals };
     }, [id]),
   );
 
@@ -41,6 +44,29 @@ export default function MarketScreen() {
     }
   }
 
+  function leave() {
+    Alert.alert(
+      "Leave this market?",
+      "Your coins stay frozen here. You can rejoin yourself within 30 days and get them back. Your offers without a commitment are removed, and invites you sent are cancelled.",
+      [
+        { text: "Stay", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            setLeaveError("");
+            try {
+              await api(`/markets/${id}/leave`, { method: "POST" });
+              router.replace("/");
+            } catch (e) {
+              setLeaveError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+            }
+          },
+        },
+      ],
+    );
+  }
+
   if (!data) {
     return (
       <Screen>
@@ -49,7 +75,7 @@ export default function MarketScreen() {
       </Screen>
     );
   }
-  const { market, entries, members, invites } = data;
+  const { market, entries, members, invites, proposals } = data;
 
   return (
     <Screen>
@@ -60,6 +86,15 @@ export default function MarketScreen() {
           {market.my_balance.toLocaleString()} {market.currency_name}
         </Text>
       </View>
+
+      <Button title="Store" onPress={() => router.push(`/markets/${id}/store`)} />
+      {proposals.length > 0 && (
+        <Body>
+          {proposals.length === 1
+            ? "Someone asked you to sell a product. Open the store to answer."
+            : `You were asked to sell ${proposals.length} products. Open the store to answer.`}
+        </Body>
+      )}
 
       <Text style={styles.heading}>Recent transactions</Text>
       {entries.length === 0 && <Body>Nothing yet.</Body>}
@@ -91,9 +126,7 @@ export default function MarketScreen() {
             <Text style={styles.note}>
               {invite.invited_display_name} (@{invite.invited_username})
             </Text>
-            <Text style={styles.date}>
-              Expires {new Date(invite.expires_at).toLocaleString()}
-            </Text>
+            <Text style={styles.date}>Expires {new Date(invite.expires_at).toLocaleString()}</Text>
           </View>
           <Tappable onPress={() => cancelInvite(invite.id)} accessibilityRole="button">
             <Text style={styles.cancel}>Cancel</Text>
@@ -108,6 +141,8 @@ export default function MarketScreen() {
         kind="secondary"
         onPress={() => router.push(`/markets/${id}/settings`)}
       />
+      <Button title="Leave market" kind="secondary" onPress={leave} />
+      <ErrorText>{leaveError}</ErrorText>
     </Screen>
   );
 }
