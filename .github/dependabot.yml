@@ -4,15 +4,9 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule:
-      interval: weekly
-    # Expo picks matching versions of its packages, so only take small, safe updates here.
-    # Bigger ones come with Expo SDK upgrades (`npx expo install --fix`).
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+  # No npm entry for frontend/: Expo pins exact versions of its packages, and Expo Go has its
+  # own built-in copies, so even small updates can break it. App packages are updated with
+  # `npx expo install --fix` when upgrading Expo. (Security alerts still arrive.)
   - package-ecosystem: github-actions
     directory: /
     schedule:
