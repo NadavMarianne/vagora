@@ -1,16 +1,21 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 
-import { MarketSettingsForm, settingsToSend } from "@/components/market-settings-form";
+import {
+  MarketSettingsForm,
+  type SettingsDraft,
+  settingsToSend,
+  toDraft,
+} from "@/components/market-settings-form";
 import { Body, Button, ErrorText, Field, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { Market, MarketSettings } from "@/lib/types";
+import type { Market } from "@/lib/types";
 
 export default function MarketSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [name, setName] = useState("");
   const [currencyName, setCurrencyName] = useState("");
-  const [settings, setSettings] = useState<MarketSettings | null>(null);
+  const [settings, setSettings] = useState<SettingsDraft | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -18,14 +23,14 @@ export default function MarketSettingsScreen() {
       .then((market) => {
         setName(market.name);
         setCurrencyName(market.currency_name);
-        setSettings({
-          starting_amount: market.starting_amount,
-          time_zone: market.time_zone,
-          transfers_enabled: market.transfers_enabled,
-          allowance_enabled: market.allowance_enabled,
-          allowance_amount: market.allowance_amount,
-          allowance_schedule: market.allowance_schedule,
-        });
+        setSettings(
+          toDraft({
+            starting_amount: market.starting_amount,
+            time_zone: market.time_zone,
+            transfers_enabled: market.transfers_enabled,
+            allowances: market.allowances,
+          }),
+        );
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Something went wrong."));
   }, [id]);

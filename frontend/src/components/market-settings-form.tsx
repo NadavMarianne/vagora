@@ -5,14 +5,14 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chips, Foldable, Toggle } from "@/components/controls";
 import { TimeZonePicker } from "@/components/time-zone-picker";
-import { Body, colors, Field, useRevealFocused } from "@/components/ui";
-import type { AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
+import { Body, Button, colors, Field, useRevealFocused } from "@/components/ui";
+import type { Allowance, AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
 
 export function phoneTimeZone(): string {
   return getCalendars()[0]?.timeZone ?? "UTC";
 }
 
-export const defaultSchedule: AllowanceSchedule = {
+const defaultSchedule: AllowanceSchedule = {
   frequency: "weekly",
   times: ["09:00"],
   weekdays: ["sunday"],
@@ -24,15 +24,29 @@ export function defaultSettings(): MarketSettings {
     starting_amount: 0,
     time_zone: phoneTimeZone(),
     transfers_enabled: false,
-    allowance_enabled: false,
-    allowance_amount: 0,
-    allowance_schedule: null,
+    allowances: [],
   };
 }
 
-/** What to send to the backend: no schedule while the allowance is off. */
-export function settingsToSend(settings: MarketSettings): MarketSettings {
-  return settings.allowance_enabled ? settings : { ...settings, allowance_schedule: null };
+// Allowances being edited carry a key, so each keeps its place on screen while others are
+// added or removed. The key never goes to the backend.
+type DraftAllowance = Allowance & { key: string };
+export type SettingsDraft = Omit<MarketSettings, "allowances"> & { allowances: DraftAllowance[] };
+
+let nextKey = 0;
+const newKey = () => `new-${nextKey++}`;
+
+/** Turns settings from the backend into a draft for the form. */
+export function toDraft(settings: MarketSettings): SettingsDraft {
+  return {
+    ...settings,
+    allowances: settings.allowances.map((a) => ({ ...a, key: String(a.id ?? newKey()) })),
+  };
+}
+
+/** What to send to the backend. */
+export function settingsToSend(draft: SettingsDraft): MarketSettings {
+  return { ...draft, allowances: draft.allowances.map(({ key: _key, ...a }) => a) };
 }
 
 const WEEKDAYS: { value: Weekday; label: string }[] = [
@@ -103,17 +117,98 @@ function TimesEditor({
   );
 }
 
+/** A short line describing an allowance, like "10 · weekly Sun, Wed · 09:00". */
+function summary(allowance: Allowance): string {
+  const { frequency, weekdays, days, times } = allowance.schedule;
+  const when =
+    frequency === "weekly"
+      ? `weekly ${WEEKDAYS.filter((d) => weekdays.includes(d.value))
+          .map((d) => d.label)
+          .join(", ")}`
+      : frequency === "monthly"
+        ? `monthly on ${days.join(", ")}`
+        : "daily";
+  return `${allowance.amount} · ${when} · ${times.join(", ")}${allowance.enabled ? "" : " (off)"}`;
+}
+
+function AllowanceEditor({
+  value,
+  onChange,
+  onRemove,
+}: {
+  value: DraftAllowance;
+  onChange: (value: DraftAllowance) => void;
+  onRemove: () => void;
+}) {
+  const set = (changes: Partial<Allowance>) => onChange({ ...value, ...changes });
+  const setSchedule = (changes: Partial<AllowanceSchedule>) =>
+    set({ schedule: { ...value.schedule, ...changes } });
+  const { schedule } = value;
+
+  return (
+    <Foldable title={`${value.name || "New allowance"}: ${summary(value)}`} startOpen={!value.id}>
+      <Field
+        label="Name (shown on each payment)"
+        value={value.name}
+        onChangeText={(name) => set({ name })}
+        placeholder="e.g. Pocket money"
+      />
+      <Toggle label="On" value={value.enabled} onChange={(enabled) => set({ enabled })} />
+      <CoinsField label="Amount each time" value={value.amount} onChange={(amount) => set({ amount })} />
+      <Chips
+        label="How often"
+        options={[
+          { value: "daily", label: "Daily" },
+          { value: "weekly", label: "Weekly" },
+          { value: "monthly", label: "Monthly" },
+        ]}
+        selected={[schedule.frequency]}
+        onChange={([frequency]) => setSchedule({ frequency })}
+      />
+      {schedule.frequency === "weekly" && (
+        <Chips
+          label="Which days"
+          multiple
+          options={WEEKDAYS}
+          selected={schedule.weekdays}
+          onChange={(weekdays) => setSchedule({ weekdays })}
+        />
+      )}
+      {schedule.frequency === "monthly" && (
+        <>
+          <Chips
+            label="Which dates"
+            multiple
+            options={DAYS}
+            selected={schedule.days}
+            onChange={(days) => setSchedule({ days })}
+          />
+          <Body>A date a month doesn’t have, like the 31st, means its last day.</Body>
+        </>
+      )}
+      <TimesEditor times={schedule.times} onChange={(times) => setSchedule({ times })} />
+      <Body>Times are in the market’s time zone.</Body>
+      <Button title="Remove this allowance" kind="secondary" onPress={onRemove} />
+    </Foldable>
+  );
+}
+
 export function MarketSettingsForm({
   value,
   onChange,
 }: {
-  value: MarketSettings;
-  onChange: (value: MarketSettings) => void;
+  value: SettingsDraft;
+  onChange: (value: SettingsDraft) => void;
 }) {
-  const set = (changes: Partial<MarketSettings>) => onChange({ ...value, ...changes });
-  const schedule = value.allowance_schedule ?? defaultSchedule;
-  const setSchedule = (changes: Partial<AllowanceSchedule>) =>
-    set({ allowance_schedule: { ...schedule, ...changes } });
+  const set = (changes: Partial<SettingsDraft>) => onChange({ ...value, ...changes });
+  const setAllowances = (allowances: DraftAllowance[]) => set({ allowances });
+
+  function addAllowance() {
+    setAllowances([
+      ...value.allowances,
+      { key: newKey(), name: "", amount: 0, enabled: true, schedule: defaultSchedule },
+    ]);
+  }
 
   return (
     <Foldable title="Settings">
@@ -131,56 +226,21 @@ export function MarketSettingsForm({
         />
       </Foldable>
 
-      <Foldable title="Allowance">
-        <Toggle
-          label="Give everyone coins on a schedule"
-          value={value.allowance_enabled}
-          onChange={(allowance_enabled) =>
-            set({ allowance_enabled, allowance_schedule: value.allowance_schedule ?? schedule })
-          }
-        />
-        {value.allowance_enabled && (
-          <>
-            <CoinsField
-              label="Amount each time"
-              value={value.allowance_amount}
-              onChange={(allowance_amount) => set({ allowance_amount })}
-            />
-            <Chips
-              label="How often"
-              options={[
-                { value: "daily", label: "Daily" },
-                { value: "weekly", label: "Weekly" },
-                { value: "monthly", label: "Monthly" },
-              ]}
-              selected={[schedule.frequency]}
-              onChange={([frequency]) => setSchedule({ frequency })}
-            />
-            {schedule.frequency === "weekly" && (
-              <Chips
-                label="Which days"
-                multiple
-                options={WEEKDAYS}
-                selected={schedule.weekdays}
-                onChange={(weekdays) => setSchedule({ weekdays })}
-              />
-            )}
-            {schedule.frequency === "monthly" && (
-              <>
-                <Chips
-                  label="Which dates"
-                  multiple
-                  options={DAYS}
-                  selected={schedule.days}
-                  onChange={(days) => setSchedule({ days })}
-                />
-                <Body>A date a month doesn’t have, like the 31st, means its last day.</Body>
-              </>
-            )}
-            <TimesEditor times={schedule.times} onChange={(times) => setSchedule({ times })} />
-            <Body>Times are in the market’s time zone.</Body>
-          </>
-        )}
+      <Foldable title={`Allowances (${value.allowances.length})`}>
+        <Body>Coins everyone gets on a schedule. Add as many as you like.</Body>
+        {value.allowances.map((allowance) => (
+          <AllowanceEditor
+            key={allowance.key}
+            value={allowance}
+            onChange={(changed) =>
+              setAllowances(value.allowances.map((a) => (a.key === allowance.key ? changed : a)))
+            }
+            onRemove={() =>
+              setAllowances(value.allowances.filter((a) => a.key !== allowance.key))
+            }
+          />
+        ))}
+        <Button title="+ Add an allowance" kind="secondary" onPress={addAllowance} />
       </Foldable>
     </Foldable>
   );
