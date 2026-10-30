@@ -21,3 +21,4 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0015](0015-joining-and-leaving-markets.md) | Joining and leaving markets | Accepted |
 | [0016](0016-ledger-and-balances.md) | Ledger and balances | Accepted |
 | [0017](0017-allowance.md) | Allowance | Accepted |
+| [0018](0018-hosting.md) | Hosting on Neon and Vercel | Accepted (for now) |
