@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
 
@@ -41,9 +41,8 @@ export default function SignIn() {
       />
       <ErrorText>{error}</ErrorText>
       <Button title="Log in" onPress={logIn} />
-      <Body>
-        New here? <Link href="/sign-up">Create an account</Link>
-      </Body>
+      <Body>New here?</Body>
+      <Button title="Create an account" kind="secondary" onPress={() => router.push("/sign-up")} />
     </Screen>
   );
 }
