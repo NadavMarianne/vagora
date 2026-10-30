@@ -1,10 +1,11 @@
 // Form controls for settings: foldable sections, switches, and choice chips.
-import { useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { type HostInstance, StyleSheet, Switch, Text, View } from "react-native";
 
-import { colors } from "@/components/ui";
+import { Tappable } from "@/components/tappable";
+import { colors, useRevealView } from "@/components/ui";
 
-/** A section that opens and closes when its title is tapped. */
+/** A section that opens and closes when its title is tapped. Opening it scrolls it into view. */
 export function Foldable({
   title,
   children,
@@ -15,17 +16,25 @@ export function Foldable({
   startOpen?: boolean;
 }) {
   const [open, setOpen] = useState(startOpen);
+  const box = useRef<HostInstance>(null);
+  const reveal = useRevealView();
+
+  function toggle() {
+    if (!open) reveal(box.current);
+    setOpen(!open);
+  }
+
   return (
-    <View style={styles.foldable}>
-      <Pressable
-        onPress={() => setOpen(!open)}
+    <View ref={box} style={styles.foldable}>
+      <Tappable
+        onPress={toggle}
         style={styles.foldableHeader}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
       >
         <Text style={styles.foldableArrow}>{open ? "▾" : "▸"}</Text>
         <Text style={styles.foldableTitle}>{title}</Text>
-      </Pressable>
+      </Tappable>
       {open && <View style={styles.foldableBody}>{children}</View>}
     </View>
   );
@@ -77,7 +86,7 @@ export function Chips<T extends string | number>({
         {options.map((option) => {
           const on = selected.includes(option.value);
           return (
-            <Pressable
+            <Tappable
               key={option.value}
               onPress={() => press(option.value)}
               style={[styles.chip, on && styles.chipOn]}
@@ -85,7 +94,7 @@ export function Chips<T extends string | number>({
               accessibilityState={{ checked: on }}
             >
               <Text style={[styles.chipText, on && styles.chipTextOn]}>{option.label}</Text>
-            </Pressable>
+            </Tappable>
           );
         })}
       </View>
