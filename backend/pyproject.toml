@@ -29,6 +29,11 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.vercel.scripts]
+# Runs on every Vercel deploy, before the new version goes live (decision 0018).
+# Each deploy updates its own database: previews the Neon "preview" branch, production "main".
+build = "alembic upgrade head"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
