@@ -1,11 +1,13 @@
 // Form controls for settings: foldable sections, switches, and choice chips.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type HostInstance, StyleSheet, Switch, Text, View } from "react-native";
 
+import { Deeper, newFoldId, useFoldDepth, useFoldRegistry } from "@/components/folds";
 import { Tappable } from "@/components/tappable";
 import { colors, useRevealView } from "@/components/ui";
 
-/** A section that opens and closes when its title is tapped. Opening it scrolls it into view. */
+/** A section that opens and closes when its title is tapped. Opening it scrolls it into view.
+ * On Android, the back button closes open sections (deepest first) before leaving the page. */
 export function Foldable({
   title,
   children,
@@ -16,8 +18,18 @@ export function Foldable({
   startOpen?: boolean;
 }) {
   const [open, setOpen] = useState(startOpen);
+  const [id] = useState(newFoldId);
+  const depth = useFoldDepth();
+  const registry = useFoldRegistry();
   const box = useRef<HostInstance>(null);
   const reveal = useRevealView();
+
+  // Tell the page while this section is open, so back can close it.
+  useEffect(() => {
+    if (!open || !registry) return;
+    registry.opened({ id, depth, openedAt: Date.now(), close: () => setOpen(false) });
+    return () => registry.closed(id);
+  }, [open, registry, id, depth]);
 
   function toggle() {
     if (!open) reveal(box.current);
@@ -35,7 +47,11 @@ export function Foldable({
         <Text style={styles.foldableArrow}>{open ? "▾" : "▸"}</Text>
         <Text style={styles.foldableTitle}>{title}</Text>
       </Tappable>
-      {open && <View style={styles.foldableBody}>{children}</View>}
+      {open && (
+        <View style={styles.foldableBody}>
+          <Deeper depth={depth}>{children}</Deeper>
+        </View>
+      )}
     </View>
   );
 }
