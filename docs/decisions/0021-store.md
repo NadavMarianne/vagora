@@ -34,7 +34,7 @@ Before buying, the buyer sees:
 - The product goes live as soon as one seller accepts. A seller who declines is simply not a seller.
 - If a seller declines, the creator can edit the price for that seller and send a new proposal.
 - The creator can send proposals to more members at any time while the product isn't closed.
-- **Proposal expiry:** the creator sets it per product, from 5 minutes to 30 days, with a slider and a number box that stay in sync. Default: 3 days.
+- **Proposal expiry:** the creator sets it per product, from 10 seconds to 30 days, with a slider and a number box that stay in sync, and a unit to pick (seconds, minutes, hours, days). Default: 3 days.
 - Accepting a proposal is the agreement: a seller can't refuse an order placed on their offer.
 - **Later:** counter proposals.
 
@@ -71,15 +71,15 @@ Before buying, the buyer sees:
 - If the buyer disputes, a dispute starts (section 7). The coins stay held until it ends.
 
 **Missed deadline.** On a fixed deadline, the timer ran out. On client's request, the buyer tapped Refused. The buyer can then choose, with **no time limit**:
-1. **Cancel:** the coins are returned in full, the order is marked "not delivered", and an automatic report is filed against the seller.
+1. **Cancel:** the coins are returned in full, and the order is marked "not delivered".
 2. **Accept late:** wait for the work, or accept work already done, then mark it fulfilled. The seller can still tap I did it.
 3. **Propose a new deadline:** if the seller agrees, a new timer starts. If the seller declines, the buyer can propose another one or cancel (as in 1).
 
-While the buyer hasn't chosen, or is accepting late, **the seller can end the order**. That counts as a cancelled order: a full refund to the buyer and an automatic report against the seller. This prevents orders lingering for years.
+While the buyer hasn't chosen, or is accepting late, **the seller can end the order**. That counts as a cancelled order, with a full refund to the buyer. This prevents orders lingering for years.
 
 A missed deadline always lets the buyer cancel with a full refund, even on non-refundable offers.
 
-After any outcome, either side has **3 days** to file a report, and may choose not to.
+**Reports are never automatic.** After any outcome, the side that was hurt has **3 days** to file a report against the other, and may choose not to.
 
 ## 6. Refunds
 - **Refundable:** the buyer can cancel before the deadline (or validity) ends, and gets the offer's refund percentage back.
@@ -98,10 +98,9 @@ After any outcome, either side has **3 days** to file a report, and may choose n
   - who filed it, and against whom
   - the order
   - what happened
-  - whether it was automatic
   - the written text, and one written reply from the other side
   - a severity
-  - whether the accused person had left the market when it was filed, or when they gave up
+  - whether it's marked **"left"**: the accused person left the market while it was open, or before it was filed
 - A report doesn't do anything yet. Later it puts the person "on trial" and decides a penalty, if any.
 
 ## 8. Leaving a market (completes decision 0015)
@@ -113,8 +112,7 @@ After any outcome, either side has **3 days** to file a report, and may choose n
   - refunds from expired orders go to your frozen coins;
   - a seller's I did it completes after 3 days as usual.
 - **Disputes** you have open are lost: the other side wins, and can still file a report.
-- **A report against you in progress** counts as giving up. It's saved as "left during report", for more severe treatment when you return.
-- **A report filed after you left** is saved the same way. If it turns out unjustified, nothing happens. If you're found guilty, it counts as more severe when you return.
+- **Reports against you** (in progress, or filed within the 3 days after you left) are marked **"left"**. A report in progress counts as giving up. Marked reports are treated with extra severity when you return, but only if you're found guilty: an unjustified report costs you nothing.
 
 ## Open
 - What a report is and does: the trial, who judges, the penalties.
