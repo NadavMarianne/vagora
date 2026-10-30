@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type HostInstance, StyleSheet, Switch, Text, View } from "react-native";
 
-import { Deeper, newFoldId, useFoldDepth, useFoldRegistry } from "@/components/folds";
+import { Inside, newFoldId, useFoldPlace, useFoldRegistry } from "@/components/folds";
 import { Tappable } from "@/components/tappable";
 import { colors, useRevealView } from "@/components/ui";
 
@@ -19,7 +19,7 @@ export function Foldable({
 }) {
   const [open, setOpen] = useState(startOpen);
   const [id] = useState(newFoldId);
-  const depth = useFoldDepth();
+  const place = useFoldPlace();
   const registry = useFoldRegistry();
   const box = useRef<HostInstance>(null);
   const reveal = useRevealView();
@@ -27,9 +27,15 @@ export function Foldable({
   // Tell the page while this section is open, so back can close it.
   useEffect(() => {
     if (!open || !registry) return;
-    registry.opened({ id, depth, openedAt: Date.now(), close: () => setOpen(false) });
+    registry.opened({
+      id,
+      parentId: place.parentId,
+      depth: place.depth,
+      openedAt: Date.now(),
+      close: () => setOpen(false),
+    });
     return () => registry.closed(id);
-  }, [open, registry, id, depth]);
+  }, [open, registry, id, place.parentId, place.depth]);
 
   function toggle() {
     if (!open) reveal(box.current);
@@ -49,7 +55,9 @@ export function Foldable({
       </Tappable>
       {open && (
         <View style={styles.foldableBody}>
-          <Deeper depth={depth}>{children}</Deeper>
+          <Inside place={place} parentId={id}>
+            {children}
+          </Inside>
         </View>
       )}
     </View>
