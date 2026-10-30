@@ -1,7 +1,10 @@
 import { Stack } from "expo-router";
+import { View } from "react-native";
 
+import { LiveBanner } from "@/components/live-banner";
 import { Body, Button, Loading, Screen, Title } from "@/components/ui";
 import { warmUp } from "@/lib/api";
+import { LiveProvider } from "@/lib/live";
 import { SessionProvider, useSession } from "@/lib/session";
 
 // Wake the backend and database right away, while Firebase checks who is logged in.
@@ -10,7 +13,12 @@ warmUp();
 export default function RootLayout() {
   return (
     <SessionProvider>
-      <Screens />
+      <LiveProvider>
+        <View style={{ flex: 1 }}>
+          <Screens />
+          <LiveBanner />
+        </View>
+      </LiveProvider>
     </SessionProvider>
   );
 }

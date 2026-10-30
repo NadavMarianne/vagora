@@ -1,0 +1,17 @@
+// Firestore security rules for vagora (decision 0020).
+// Firestore only carries live-update notes; all real data lives in PostgreSQL.
+// To change them: Firebase console -> Firestore Database -> Rules, paste this file, Publish.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each person may read only their own "something changed" note. Only the backend writes.
+    match /signals/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

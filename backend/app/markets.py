@@ -9,7 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app import allowance, ledger
+from app import allowance, ledger, signals
 from app.allowance import AllowanceIn, AllowanceView, allowance_view
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
@@ -125,6 +125,8 @@ def catch_up(db: Session, market: Market) -> None:
     """Pays any allowances that came due since the market was last used."""
     if allowance.pay_due(db, market):
         db.commit()
+        # Everyone's balance changed, so their open screens should show it.
+        signals.notify_market(db, market.id)
 
 
 def active_memberships():
@@ -246,6 +248,7 @@ def change_settings(
     if changes.allowances is not None:
         set_allowances(market, changes.allowances)
     db.commit()
+    signals.notify_market(db, market_id)
     return view(membership)
 
 
@@ -278,7 +281,7 @@ def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     membership.left_at = now()
 
     # Otherwise a friend could join with your invite long after you left.
-    db.execute(
+    cancelled_for = db.scalars(
         update(Invite)
         .where(
             Invite.market_id == market_id,
@@ -286,7 +289,8 @@ def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
             Invite.status == InviteStatus.PENDING,
         )
         .values(status=InviteStatus.CANCELLED)
-    )
+        .returning(Invite.invited_user_id)
+    ).all()
 
     db.flush()
     still_in = db.scalar(
@@ -297,6 +301,10 @@ def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     if still_in == 0:
         market.archived_at = now()
     db.commit()
+
+    uninvited = db.scalars(select(User.firebase_uid).where(User.id.in_(cancelled_for))).all()
+    signals.notify(uninvited, "invite")
+    signals.notify_market(db, market_id, f"{user.display_name} left {market.name}")
 
 
 @router.post("/{market_id}/rejoin")
@@ -317,6 +325,9 @@ def rejoin_market(market_id: int, user: CurrentUser, db: DbSession) -> MarketVie
         )
     come_back(membership, invited_by=membership.invited_by)
     db.commit()
+    signals.notify_market(
+        db, market_id, f"{user.display_name} is back in {membership.market.name}", but=user
+    )
     return view(membership)
 
 
