@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chips, Foldable, Toggle } from "@/components/controls";
 import { TimeZonePicker } from "@/components/time-zone-picker";
-import { Body, colors, Field } from "@/components/ui";
+import { Body, colors, Field, useRevealFocused } from "@/components/ui";
 import type { AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
 
 export function phoneTimeZone(): string {
@@ -73,6 +73,7 @@ function TimesEditor({
   times: string[];
   onChange: (times: string[]) => void;
 }) {
+  const reveal = useRevealFocused();
   return (
     <View style={styles.times}>
       <Text style={styles.label}>Times (24-hour, like 09:00)</Text>
@@ -86,6 +87,7 @@ function TimesEditor({
             placeholderTextColor={colors.muted}
             keyboardType="numbers-and-punctuation"
             maxLength={5}
+            onFocus={reveal}
           />
           {times.length > 1 && (
             <Pressable onPress={() => onChange(times.filter((_, i) => i !== index))}>

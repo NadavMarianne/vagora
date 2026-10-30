@@ -1,9 +1,12 @@
 // Plain building blocks shared by the screens. Styling comes later.
-import { useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  type HostInstance,
+  Keyboard,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   Text,
   TextInput,
@@ -20,15 +23,60 @@ export const colors = {
   background: "#FFFFFF",
 };
 
+// Lets a text field ask its screen to scroll it into view when the keyboard opens.
+const RevealContext = createContext<() => void>(() => {});
+
+/** Call when a text field gets focus, so it isn't hidden behind the keyboard. */
+export function useRevealFocused() {
+  return useContext(RevealContext);
+}
+
+/** A scrollable page. Keeps the field being typed in visible above the keyboard,
+ * and closes the keyboard when the page is scrolled. */
 export function Screen({ children }: { children: React.ReactNode }) {
+  const scroll = useRef<ScrollViewInstance>(null);
+  const content = useRef<HostInstance>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const reveal = useCallback(() => {
+    // Wait for the keyboard to finish opening, then bring the field near the top.
+    setTimeout(() => {
+      const input = TextInput.State.currentlyFocusedInput();
+      if (!input || !content.current) return;
+      input.measureLayout(
+        content.current,
+        (_x, y) => scroll.current?.scrollTo({ y: Math.max(0, y - 80), animated: true }),
+        () => {},
+      );
+    }, 250);
+  }, []);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+      reveal();
+    });
+    const hidden = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [reveal]);
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      keyboardShouldPersistTaps="handled"
-    >
-      {children}
-    </ScrollView>
+    <RevealContext value={reveal}>
+      <ScrollView
+        ref={scroll}
+        style={styles.screen}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {/* Room below the content while the keyboard is open, so everything can scroll into view. */}
+        <View ref={content} style={[styles.screenContent, { paddingBottom: 24 + keyboardHeight }]}>
+          {children}
+        </View>
+      </ScrollView>
+    </RevealContext>
   );
 }
 
@@ -40,11 +88,20 @@ export function Body({ children }: { children: React.ReactNode }) {
   return <Text style={styles.body}>{children}</Text>;
 }
 
-export function Field({ label, ...input }: { label: string } & TextInputProps) {
+export function Field({ label, onFocus, ...input }: { label: string } & TextInputProps) {
+  const reveal = useRevealFocused();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} placeholderTextColor={colors.muted} {...input} />
+      <TextInput
+        style={styles.input}
+        placeholderTextColor={colors.muted}
+        onFocus={(event) => {
+          onFocus?.(event);
+          reveal();
+        }}
+        {...input}
+      />
     </View>
   );
 }
