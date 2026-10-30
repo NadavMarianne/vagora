@@ -1,8 +1,9 @@
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
 import { useCallback } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
+import { Tappable } from "@/components/tappable";
 import { Body, Button, colors, ErrorText, Loading, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import { auth } from "@/lib/firebase";
@@ -26,7 +27,7 @@ export default function Home() {
       {markets === null && !error && <Loading />}
       {markets?.length === 0 && <Body>You’re not in any market yet. Create one!</Body>}
       {markets?.map((market) => (
-        <Pressable
+        <Tappable
           key={market.id}
           style={styles.card}
           onPress={() => router.push(`/markets/${market.id}`)}
@@ -36,7 +37,7 @@ export default function Home() {
           <Text style={styles.cardBalance}>
             {market.my_balance.toLocaleString()} {market.currency_name}
           </Text>
-        </Pressable>
+        </Tappable>
       ))}
 
       <Button title="Create a market" onPress={() => router.push("/markets/new")} />

@@ -1,9 +1,10 @@
 // A market's settings, in foldable categories. Used when creating a market and in its settings.
 // New categories (like the shop or earning rules) go here as more Foldables.
 import { getCalendars } from "expo-localization";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chips, Foldable, Toggle } from "@/components/controls";
+import { Tappable } from "@/components/tappable";
 import { TimeZonePicker } from "@/components/time-zone-picker";
 import { Body, Button, colors, Field, useRevealFocused } from "@/components/ui";
 import type { Allowance, AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
@@ -104,15 +105,15 @@ function TimesEditor({
             onFocus={reveal}
           />
           {times.length > 1 && (
-            <Pressable onPress={() => onChange(times.filter((_, i) => i !== index))}>
+            <Tappable onPress={() => onChange(times.filter((_, i) => i !== index))}>
               <Text style={styles.remove}>Remove</Text>
-            </Pressable>
+            </Tappable>
           )}
         </View>
       ))}
-      <Pressable onPress={() => onChange([...times, "21:00"])}>
+      <Tappable onPress={() => onChange([...times, "21:00"])}>
         <Text style={styles.add}>+ Add a time</Text>
-      </Pressable>
+      </Tappable>
     </View>
   );
 }

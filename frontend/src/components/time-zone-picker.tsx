@@ -1,8 +1,9 @@
 // Picking a market's time zone from a searchable list, like "Jerusalem · Asia (GMT+2)".
 // The list comes from the backend, so every choice is one the backend accepts.
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Modal, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { Tappable } from "@/components/tappable";
 import { Button, colors, ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { TimeZone } from "@/lib/types";
@@ -47,10 +48,10 @@ export function TimeZonePicker({
   return (
     <View style={styles.block}>
       <Text style={styles.label}>Time zone</Text>
-      <Pressable onPress={() => setOpen(true)} style={styles.current} accessibilityRole="button">
+      <Tappable onPress={() => setOpen(true)} style={styles.current} accessibilityRole="button">
         <Text style={styles.currentText}>{current ? describe(current) : value}</Text>
         <Text style={styles.change}>Change</Text>
-      </Pressable>
+      </Tappable>
       <ErrorText>{error}</ErrorText>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -68,7 +69,7 @@ export function TimeZonePicker({
             keyExtractor={(zone) => zone.id}
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
-              <Pressable
+              <Tappable
                 style={[styles.row, item.id === value && styles.rowOn]}
                 onPress={() => {
                   onChange(item.id);
@@ -77,7 +78,7 @@ export function TimeZonePicker({
                 }}
               >
                 <Text style={styles.rowText}>{describe(item)}</Text>
-              </Pressable>
+              </Tappable>
             )}
           />
           <Button title="Cancel" kind="secondary" onPress={() => setOpen(false)} />
