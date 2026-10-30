@@ -10,7 +10,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app import allowance, ledger
-from app.allowance import AllowanceSchedule
+from app.allowance import AllowanceIn, AllowanceView, allowance_view
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
 
@@ -39,22 +39,22 @@ class MarketCreate(BaseModel):
     # The app sends the creator's time zone, like "Asia/Jerusalem".
     time_zone: TimeZone
     transfers_enabled: bool = False
-    allowance_enabled: bool = False
-    allowance_amount: Coins = 0
-    allowance_schedule: AllowanceSchedule | None = None
+    allowances: list[AllowanceIn] = []
 
 
 class MarketUpdate(BaseModel):
-    """Settings to change. Leave out anything that stays the same."""
+    """Settings to change. Leave out anything that stays the same.
+
+    `allowances` replaces the whole list: keep each existing one's `id`, leave out `id` for new
+    ones, and any allowance not in the list is removed.
+    """
 
     name: MarketName | None = None
     currency_name: CurrencyName | None = None
     starting_amount: Coins | None = None
     time_zone: TimeZone | None = None
     transfers_enabled: bool | None = None
-    allowance_enabled: bool | None = None
-    allowance_amount: Coins | None = None
-    allowance_schedule: AllowanceSchedule | None = None
+    allowances: list[AllowanceIn] | None = None
 
 
 class MarketView(BaseModel):
@@ -64,14 +64,8 @@ class MarketView(BaseModel):
     starting_amount: int
     time_zone: str
     transfers_enabled: bool
-    allowance_enabled: bool
-    allowance_amount: int
-    allowance_schedule: AllowanceSchedule | None
+    allowances: list[AllowanceView]
     my_balance: int
-
-
-# Changing any of these moves when allowances fall, so the allowance starts fresh from now.
-ALLOWANCE_TIMING = {"allowance_enabled", "allowance_schedule", "time_zone"}
 
 
 class EntryView(BaseModel):
@@ -115,21 +109,16 @@ def view(membership: Membership) -> MarketView:
         starting_amount=market.starting_amount,
         time_zone=market.time_zone,
         transfers_enabled=market.transfers_enabled,
-        allowance_enabled=market.allowance_enabled,
-        allowance_amount=market.allowance_amount,
-        allowance_schedule=market.allowance_schedule,
+        allowances=[allowance_view(a) for a in market.allowances],
         my_balance=membership.balance,
     )
 
 
-def check_allowance(market: Market) -> None:
-    if market.allowance_enabled and (
-        market.allowance_amount < 1 or market.allowance_schedule is None
-    ):
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "To turn on the allowance, set an amount and a schedule.",
-        )
+def set_allowances(market: Market, wanted: list[AllowanceIn]) -> None:
+    try:
+        allowance.replace_allowances(market, wanted)
+    except allowance.UnknownAllowance as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
 
 
 def catch_up(db: Session, market: Market) -> None:
@@ -192,8 +181,9 @@ def add_member(db: Session, market: Market, user: User, invited_by: User | None)
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> MarketView:
     """Creates a market. You become its first member and get its starting amount."""
-    market = Market(**new.model_dump())
-    check_allowance(market)
+    market = Market(**new.model_dump(exclude={"allowances"}))
+    # A new market has no allowances yet, so any ids sent are ignored.
+    set_allowances(market, [a.model_copy(update={"id": None}) for a in new.allowances])
     db.add(market)
     membership = add_member(db, market, user, invited_by=None)
     db.commit()
@@ -242,17 +232,19 @@ def change_settings(
 ) -> MarketView:
     """Any member can change the settings (all members are equal).
 
-    Allowances already due are paid first (under the old settings). After a change to when
-    allowances fall, the new timing starts now and nothing earlier is paid.
+    Allowances already due are paid first (under the old settings). An allowance whose timing
+    changes, or that's switched on, starts fresh from now. So does every allowance when the
+    market's time zone changes.
     """
     membership = get_membership(db, user, market_id)
     market = membership.market
-    changed = changes.model_dump(exclude_unset=True, exclude_none=True)
+    changed = changes.model_dump(exclude_unset=True, exclude_none=True, exclude={"allowances"})
     for setting, value in changed.items():
         setattr(market, setting, value)
-    check_allowance(market)
-    if ALLOWANCE_TIMING & changed.keys():
-        allowance.start_fresh(db, market)
+    if "time_zone" in changed:
+        allowance.restart_all(market)
+    if changes.allowances is not None:
+        set_allowances(market, changes.allowances)
     db.commit()
     return view(membership)
 

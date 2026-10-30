@@ -1,7 +1,8 @@
-"""The allowance: scheduled coins for every member, paid by catching up (see decision 0017).
+"""Allowances: scheduled coins for every member, paid by catching up (see decision 0017).
 
+A market can have any number of allowances, each with its own name, amount, and schedule.
 Nothing runs on a timer. Whenever a market is used, every member gets the payouts that came
-due since they were last paid, each dated with its scheduled time.
+due since they were last paid, each dated with its scheduled time and named after its allowance.
 """
 
 import calendar
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app import ledger
-from app.models import EntryKind, Market, Membership
+from app.models import Allowance, EntryKind, Market, Membership
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
@@ -23,10 +24,15 @@ WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 ClockTime = Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]
 Weekday = Literal["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 DayOfMonth = Annotated[int, Field(ge=1, le=31)]
+AllowanceName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+]
+# Whole coins, at least 1. The upper limit keeps totals far from the database's number limits.
+AllowanceAmount = Annotated[int, Field(ge=1, le=1_000_000_000)]
 
 
 class AllowanceSchedule(BaseModel):
-    """When the allowance is paid. Times are in the market's time zone."""
+    """When an allowance is paid. Times are in the market's time zone."""
 
     frequency: Literal["daily", "weekly", "monthly"]
     times: list[ClockTime] = Field(min_length=1, max_length=24)
@@ -48,6 +54,38 @@ class AllowanceSchedule(BaseModel):
         )
         self.days = sorted(set(self.days)) if self.frequency == "monthly" else []
         return self
+
+
+class AllowanceIn(BaseModel):
+    """An allowance as the app sends it. Without an `id` it's a new one."""
+
+    id: int | None = None
+    name: AllowanceName
+    amount: AllowanceAmount
+    enabled: bool = True
+    schedule: AllowanceSchedule
+
+
+class AllowanceView(BaseModel):
+    id: int
+    name: str
+    amount: int
+    enabled: bool
+    schedule: AllowanceSchedule
+
+
+def allowance_view(allowance: Allowance) -> AllowanceView:
+    return AllowanceView(
+        id=allowance.id,
+        name=allowance.name,
+        amount=allowance.amount,
+        enabled=allowance.enabled,
+        schedule=AllowanceSchedule(**allowance.schedule),
+    )
+
+
+class UnknownAllowance(ValueError):
+    """The app referred to an allowance this market doesn't have."""
 
 
 def is_payday(schedule: dict, day: date) -> bool:
@@ -86,7 +124,8 @@ def pay_due(db: Session, market: Market) -> bool:
 
     Returns True if anything was paid, so the caller knows to commit.
     """
-    if not market.allowance_enabled:
+    allowances = [a for a in market.allowances if a.enabled]
+    if not allowances:
         return False
     until = datetime.now(UTC)
     paid = False
@@ -97,7 +136,19 @@ def pay_due(db: Session, market: Market) -> bool:
     )
     for membership in members:
         last_paid = membership.allowance_paid_until
-        due = payout_times(market.allowance_schedule, market.time_zone, last_paid, until)
+        due = sorted(
+            (
+                (moment, allowance)
+                for allowance in allowances
+                for moment in payout_times(
+                    allowance.schedule,
+                    market.time_zone,
+                    max(last_paid, allowance.counting_from),
+                    until,
+                )
+            ),
+            key=lambda payout: (payout[0], payout[1].id),
+        )
         if not due:
             continue
         # Claim these payouts. If another request claimed them at the same moment, it pays them.
@@ -110,22 +161,53 @@ def pay_due(db: Session, market: Market) -> bool:
         if claimed.rowcount == 0:
             continue
         set_committed_value(membership, "allowance_paid_until", until)
-        for moment in due:
+        for moment, allowance in due:
             ledger.record(
-                db, membership, market.allowance_amount, EntryKind.ALLOWANCE, "Allowance", at=moment
+                db, membership, allowance.amount, EntryKind.ALLOWANCE, allowance.name, at=moment
             )
         paid = True
     return paid
 
 
-def start_fresh(db: Session, market: Market) -> None:
-    """Starts every current member's allowance from now, after a change to it.
+def restart_all(market: Market) -> None:
+    """After the market's time zone changes, every allowance counts from now."""
+    now = datetime.now(UTC)
+    for allowance in market.allowances:
+        allowance.counting_from = now
 
-    Payouts already due were paid just before the change; nothing from before now is paid again.
+
+def replace_allowances(market: Market, wanted: list[AllowanceIn]) -> None:
+    """Makes the market's allowances match the list the app sent. The caller commits.
+
+    Allowances with an `id` are updated, ones without are added, and missing ones are removed.
+    An allowance whose timing changed, or that was switched on, starts fresh from now. Renaming
+    it or changing its amount doesn't.
     """
-    db.execute(
-        update(Membership)
-        .where(Membership.market_id == market.id, Membership.left_at.is_(None))
-        .values(allowance_paid_until=datetime.now(UTC))
-        .execution_options(synchronize_session=False)
-    )
+    now = datetime.now(UTC)
+    current = {allowance.id: allowance for allowance in market.allowances}
+    kept: list[Allowance] = []
+    for item in wanted:
+        schedule = item.schedule.model_dump()
+        if item.id is None:
+            kept.append(
+                Allowance(
+                    name=item.name,
+                    amount=item.amount,
+                    enabled=item.enabled,
+                    schedule=schedule,
+                    counting_from=now,
+                )
+            )
+            continue
+        allowance = current.pop(item.id, None)
+        if allowance is None:
+            raise UnknownAllowance("One of these allowances isn't in this market.")
+        if allowance.schedule != schedule or (item.enabled and not allowance.enabled):
+            allowance.counting_from = now
+        allowance.name = item.name
+        allowance.amount = item.amount
+        allowance.enabled = item.enabled
+        allowance.schedule = schedule
+        kept.append(allowance)
+    # Anything not in the list is removed (delete-orphan on Market.allowances).
+    market.allowances = kept
