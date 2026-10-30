@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { FoldRegistry } from "@/components/folds";
 import { Tappable } from "@/components/tappable";
 
 export const colors = {
@@ -95,19 +96,22 @@ export function Screen({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <RevealContext value={{ focused, view }}>
-      <ScrollView
-        ref={scroll}
-        style={styles.screen}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        {/* Room below the content while the keyboard is open, so everything can scroll into view. */}
-        <View ref={content} style={[styles.screenContent, { paddingBottom: 24 + keyboardRoom }]}>
-          {children}
-        </View>
-      </ScrollView>
-    </RevealContext>
+    // FoldRegistry: on Android, back closes this page's open sections before leaving it.
+    <FoldRegistry>
+      <RevealContext value={{ focused, view }}>
+        <ScrollView
+          ref={scroll}
+          style={styles.screen}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {/* Room below the content while the keyboard is open, so everything can scroll into view. */}
+          <View ref={content} style={[styles.screenContent, { paddingBottom: 24 + keyboardRoom }]}>
+            {children}
+          </View>
+        </ScrollView>
+      </RevealContext>
+    </FoldRegistry>
   );
 }
 
