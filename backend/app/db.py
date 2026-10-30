@@ -6,8 +6,11 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from app.config import settings
 
 # pool_pre_ping checks a connection before using it, so a database that went to sleep
-# or restarted doesn't cause errors.
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+# or restarted doesn't cause errors. connect_timeout gives up after 10 seconds instead of
+# waiting forever if the database can't be reached.
+engine = create_engine(
+    settings.database_url, pool_pre_ping=True, connect_args={"connect_timeout": 10}
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
