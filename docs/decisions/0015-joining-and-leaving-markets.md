@@ -31,5 +31,5 @@ Invites by username use the unique usernames, and need no extra system. Freezing
 - Coins vanishing on leave: harsh and easy to regret.
 - A scheduled job (on the server or on GitHub) for deleting old markets: runs on time even when nobody uses vagora, but needs an always-on server or extra setup. Planned for production.
 
-## Still open
-What happens to unfinished orders when someone leaves. Decided with the shop.
+## Unfinished orders
+What happens to offers, orders, and disputes when someone leaves is decided in decision 0021 (section 8): you can't leave while you have committed offers or open orders as a seller.
