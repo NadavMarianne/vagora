@@ -7,8 +7,9 @@ import { Animated, PanResponder, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Tappable } from "@/components/tappable";
-import { colors } from "@/components/ui";
+import { colors, LEVEL_COLOR } from "@/components/ui";
 import { type Banner, useLive } from "@/lib/live";
+import { useNotifications } from "@/lib/notifications";
 
 const SHOW_FOR_MS = 5000;
 // How far a swipe must go, or how fast, to dismiss the banner.
@@ -24,6 +25,7 @@ function open(banner: Banner) {
 
 export function LiveBanner() {
   const { banner, dismissBanner } = useLive();
+  const { markRead } = useNotifications();
   const insets = useSafeAreaInsets();
   const [offset] = useState(() => new Animated.Value(0));
 
@@ -62,6 +64,7 @@ export function LiveBanner() {
       style={[
         styles.banner,
         {
+          backgroundColor: LEVEL_COLOR[banner.level ?? "info"],
           top: insets.top + 8,
           transform: [{ translateX: offset }],
           opacity: offset.interpolate({
@@ -75,6 +78,7 @@ export function LiveBanner() {
       <Tappable
         onPress={() => {
           dismissBanner();
+          if (banner.id) markRead(banner.id);
           open(banner);
         }}
         accessibilityRole="button"

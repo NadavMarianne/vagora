@@ -247,10 +247,12 @@ def decline(market_id: int, request_id: int, user: CurrentUser, db: DbSession) -
     request.status = RequestStatus.DECLINED
     db.commit()
     signals.notify(
+        db,
         [request.requested_by.firebase_uid],
         f"market:{market_id}",
         f"{user.display_name} declined your request for {request.product.name}",
         product_path(request.product),
+        "warning",
     )
     signals.notify_market(db, market_id)
     return product_view(request.product, user, db)

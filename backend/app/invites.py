@@ -122,7 +122,11 @@ def send_invite(
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have an invite.") from error
     market_name = membership.market.name
     signals.notify(
-        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}", "/"
+        db,
+        [invited.firebase_uid],
+        "invite",
+        f"{user.display_name} invited you to {market_name}",
+        "/",
     )
     signals.notify_market(db, market_id)
     return pending_view(invite)
@@ -149,7 +153,7 @@ def cancel_invite(market_id: int, invite_id: int, user: CurrentUser, db: DbSessi
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite not found.")
     invite.status = InviteStatus.CANCELLED
     db.commit()
-    signals.notify([invite.invited_user.firebase_uid], "invite")
+    signals.notify(db, [invite.invited_user.firebase_uid], "invite")
     signals.notify_market(db, market_id)
 
 

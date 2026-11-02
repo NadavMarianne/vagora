@@ -23,7 +23,7 @@ def notes(monkeypatch):
     sent = Sent()
     sent.paths = {}
 
-    def record(firebase_uids, reason, message="", path=""):
+    def record(db, firebase_uids, reason, message="", path="", level="info"):
         sent.extend((uid, reason, message) for uid in sorted(set(firebase_uids)))
         if message:
             sent.paths[message] = path
@@ -99,18 +99,18 @@ def test_settings_change_tells_members(notes, home):
     assert ("uid-dana_k", f"market:{market_id}", "") in notes
 
 
-def test_without_a_key_notes_are_skipped_quietly():
+def test_without_a_key_notes_are_skipped_quietly(db):
     # Tests run without FIREBASE_SERVICE_ACCOUNT, like local development.
-    signals.notify(["uid-anyone"], "invite", "hello")
+    signals.notify(db, ["uid-anyone"], "invite", "hello")
 
 
-def test_a_failing_note_never_breaks_the_action(monkeypatch):
+def test_a_failing_note_never_breaks_the_action(monkeypatch, db):
     def broken():
         raise RuntimeError("Firestore is down")
 
     monkeypatch.setattr(signals, "_client", broken)
 
-    signals.notify(["uid-anyone"], "invite", "hello")
+    signals.notify(db, ["uid-anyone"], "invite", "hello")
 
 
 def test_banners_open_the_page_they_are_about(notes, member, home):

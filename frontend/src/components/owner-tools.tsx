@@ -145,7 +145,6 @@ export function OwnerTools({
 
   return (
     <>
-      <Text style={styles.heading}>Your product</Text>
       {shared && <Body>You own this together. Changes wait until every owner approves.</Body>}
 
       {!selling && !closed && !waitingForMe && (
@@ -284,7 +283,6 @@ export function OwnerTools({
 }
 
 const styles = StyleSheet.create({
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
   small: { fontSize: 13, color: colors.muted },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   rowText: { fontSize: 15, color: colors.text, flexShrink: 1 },

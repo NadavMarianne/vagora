@@ -117,12 +117,23 @@ def catch_up(db: Session, market_id: int, at: datetime) -> list[tuple[Order, str
     return changed
 
 
-def announce(changes: list[tuple[Order, str]]) -> None:
+# How important each kind of news is (see app/signals.py).
+LEVELS: dict[str, signals.Level] = {
+    "missed": "warning",
+    "expired": "warning",
+    "no_answer": "warning",
+    "completed": "good",
+    "not_delivered": "critical",
+}
+
+
+def announce(db: Session, changes: list[tuple[Order, str]]) -> None:
     """Tells the buyer and the seller when an order's time ran out, with a banner that opens it.
     Call after committing."""
     for order, what in changes:
         name = order.product_name
         paid = "You were paid." if order.coin_mode == CoinMode.TO_SELLER else ""
+        level = LEVELS[what]
         buyer_news, seller_news = {
             "missed": (
                 f"The deadline for {name} passed",
@@ -147,8 +158,8 @@ def announce(changes: list[tuple[Order, str]]) -> None:
         }[what]
         reason = f"market:{order.market_id}"
         path = f"/markets/{order.market_id}/orders/{order.id}"
-        signals.notify([order.buyer.firebase_uid], reason, buyer_news, path)
-        signals.notify([order.seller.firebase_uid], reason, seller_news, path)
+        signals.notify(db, [order.buyer.firebase_uid], reason, buyer_news, path, level)
+        signals.notify(db, [order.seller.firebase_uid], reason, seller_news, path, level)
 
 
 def miss(order: Order, at: datetime) -> None:

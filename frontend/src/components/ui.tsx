@@ -31,7 +31,22 @@ export const colors = {
   // Buttons that agree or admit, and buttons that contest or dispute.
   good: "#2E7D32",
   bad: "#C62828",
+  warning: "#EF6C00",
 };
+
+/** How important a notification is (backend/app/signals.py). */
+export type Level = "info" | "good" | "warning" | "critical";
+
+/** The color pattern for notifications: red critical, orange warning, green good, blue info. */
+export const LEVEL_COLOR: Record<Level, string> = {
+  info: colors.primary,
+  good: colors.good,
+  warning: colors.warning,
+  critical: colors.bad,
+};
+
+/** Puts levels in order, so the most important of several can be picked. */
+export const LEVEL_RANK: Record<Level, number> = { info: 0, good: 1, warning: 2, critical: 3 };
 
 // Lets parts of a page ask it to scroll something into view.
 type Reveal = {

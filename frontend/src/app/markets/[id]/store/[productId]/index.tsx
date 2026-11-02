@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
-import { Chips } from "@/components/controls";
+import { Chips, Foldable } from "@/components/controls";
 import { formatDuration } from "@/components/duration-picker";
 import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
 import { OrderRow } from "@/components/order-row";
@@ -127,93 +127,93 @@ export default function ProductScreen() {
         {product.coin_mode === "to_seller" ? "the coins go to the seller" : "the coins vanish"}
       </Text>
 
-      {others.length > 0 && (
-        <Info title="How buying works">
-          The price leaves your balance as soon as you buy, and is held. When the order is done it{" "}
-          {product.coin_mode === "to_seller" ? "goes to the seller" : "vanishes"}. If it’s refunded,
-          it comes back to you. You can buy it as many times as you like.
-        </Info>
+      {/* What waits for your answer comes first. */}
+      {product.requests.length > 0 && (
+        <Foldable
+          title={`Waiting for approval (${product.requests.length})`}
+          startOpen={product.requests.some((r) => r.mine_to_answer)}
+        >
+          {product.requests.map((request) => (
+            <RequestCard
+              key={request.id}
+              request={request}
+              forMe={request.kind === "add_owner" && request.member?.username === me}
+              onAnswer={(approve) =>
+                answering.run(() =>
+                  api(
+                    `/markets/${id}/product-requests/${request.id}/${approve ? "approve" : "decline"}`,
+                    { method: "POST" },
+                  ),
+                )
+              }
+              onCancel={() =>
+                answering.run(() =>
+                  api(`/markets/${id}/product-requests/${request.id}`, { method: "DELETE" }),
+                )
+              }
+            />
+          ))}
+          <ErrorText>{answering.error}</ErrorText>
+        </Foldable>
       )}
 
+      <Foldable title={`${mine ? "Other sellers" : "Sellers"} (${others.length})`} startOpen>
+        {others.length === 0 && (
+          <Body>{mine ? "No one else sells this yet." : "No one sells this yet."}</Body>
+        )}
+        {others.length > 1 && (
+          <Chips
+            options={[
+              { value: "cheapest", label: "Cheapest first" },
+              { value: "priciest", label: "Most expensive first" },
+            ]}
+            selected={[sort]}
+            onChange={([chosen]) => setSort(chosen)}
+          />
+        )}
+        {sorted.map((offer) => (
+          <View key={offer.id} style={styles.buttons}>
+            <OfferCard offer={offer} currency={currency} />
+            {offer.stock !== 0 && (
+              <Button
+                title={`${myOrders.length > 0 ? "Buy again" : "Buy"} for ${offer.price.toLocaleString()} ${currency}`}
+                onPress={() => buy(offer)}
+              />
+            )}
+          </View>
+        ))}
+        <ErrorText>{buying.error}</ErrorText>
+        {others.length > 0 && (
+          <Info title="How buying works">
+            The price leaves your balance as soon as you buy, and is held. When the order is done it{" "}
+            {product.coin_mode === "to_seller" ? "goes to the seller" : "vanishes"}. If it’s
+            refunded, it comes back to you. You can buy it as many times as you like.
+          </Info>
+        )}
+      </Foldable>
+
       {myOrders.length > 0 && (
-        <>
-          <Text style={styles.heading}>Your open orders of this ({myOrders.length})</Text>
+        <Foldable title={`Your open orders of this (${myOrders.length})`}>
           {myOrders.map((o) => (
             <OrderRow key={o.id} order={o} marketId={id} currency={currency} />
           ))}
-        </>
+        </Foldable>
       )}
 
       {mine && (
-        <>
-          <Text style={styles.heading}>Your offer</Text>
+        <Foldable title="Your offer">
           <OfferCard offer={mine} currency={currency} />
-          <View style={styles.buttons}>
-            <Button
-              title="Change my offer"
-              kind="secondary"
-              onPress={() => router.push(`/markets/${id}/store/${productId}/my-offer`)}
-            />
-            {!mine.committed && (
-              <Button title="Stop selling" kind="secondary" onPress={stopSelling} />
-            )}
-          </View>
-          <ErrorText>{selling.error}</ErrorText>
-          <View style={styles.divider} />
-        </>
-      )}
-
-      <Text style={styles.heading}>{mine ? "Other sellers" : "Sellers"}</Text>
-      {others.length === 0 && (
-        <Body>{mine ? "No one else sells this yet." : "No one sells this yet."}</Body>
-      )}
-      {others.length > 1 && (
-        <Chips
-          options={[
-            { value: "cheapest", label: "Cheapest first" },
-            { value: "priciest", label: "Most expensive first" },
-          ]}
-          selected={[sort]}
-          onChange={([chosen]) => setSort(chosen)}
-        />
-      )}
-      {sorted.map((offer) => (
-        <View key={offer.id} style={styles.buttons}>
-          <OfferCard offer={offer} currency={currency} />
-          {offer.stock !== 0 && (
-            <Button
-              title={`${myOrders.length > 0 ? "Buy again" : "Buy"} for ${offer.price.toLocaleString()} ${currency}`}
-              onPress={() => buy(offer)}
-            />
+          <Button
+            title="Change my offer"
+            kind="secondary"
+            onPress={() => router.push(`/markets/${id}/store/${productId}/my-offer`)}
+          />
+          {!mine.committed && (
+            <Button title="Stop selling" kind="secondary" onPress={stopSelling} />
           )}
-        </View>
-      ))}
-      <ErrorText>{buying.error}</ErrorText>
-
-      {product.requests.length > 0 && <Text style={styles.heading}>Waiting for approval</Text>}
-      {product.requests.map((request) => (
-        <RequestCard
-          key={request.id}
-          request={request}
-          forMe={request.kind === "add_owner" && request.member?.username === me}
-          onAnswer={(approve) =>
-            answering.run(() =>
-              api(
-                `/markets/${id}/product-requests/${request.id}/${approve ? "approve" : "decline"}`,
-                {
-                  method: "POST",
-                },
-              ),
-            )
-          }
-          onCancel={() =>
-            answering.run(() =>
-              api(`/markets/${id}/product-requests/${request.id}`, { method: "DELETE" }),
-            )
-          }
-        />
-      ))}
-      <ErrorText>{answering.error}</ErrorText>
+          <ErrorText>{selling.error}</ErrorText>
+        </Foldable>
+      )}
 
       {product.can_claim && (
         <>
@@ -227,15 +227,15 @@ export default function ProductScreen() {
       )}
 
       {product.is_mine && (
-        <OwnerTools product={product} members={members} me={me} path={path} reload={reload} />
+        <Foldable title="Manage this product">
+          <OwnerTools product={product} members={members} me={me} path={path} reload={reload} />
+        </Foldable>
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
   small: { fontSize: 13, color: colors.muted },
   buttons: { gap: 8 },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
 });
