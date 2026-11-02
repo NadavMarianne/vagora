@@ -9,7 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app import allowance, ledger, signals, store
+from app import allowance, ledger, ownership, signals, store
 from app.allowance import AllowanceIn, AllowanceView, allowance_view
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
@@ -126,6 +126,7 @@ def catch_up(db: Session, market: Market) -> None:
     catch up on proposals, offers, and orders whose time is up."""
     paid = allowance.pay_due(db, market)
     store_changed = store.catch_up(db, market.id)
+    store_changed = ownership.expire(db, market.id) or store_changed
     if paid or store_changed:
         db.commit()
         # Balances or the store changed, so everyone's open screens should show it.
@@ -276,12 +277,13 @@ def list_members(market_id: int, user: CurrentUser, db: DbSession) -> list[Membe
 def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     """Leaves the market. Your coins are frozen, and invites you sent are cancelled.
 
-    Not possible while you have committed offers. Your other offers are removed, and proposals
-    waiting for you are declined. You can rejoin yourself within 30 days. If you were the last
-    member, the market is archived.
+    Not possible while you have committed offers or orders to deliver. Your other offers are
+    removed, proposals waiting for you are declined, and you stop owning products. You can
+    rejoin yourself within 30 days. If you were the last member, the market is archived.
     """
     membership = get_membership(db, user, market_id)
     store.leave_store(db, market_id, user.id)
+    ownership.leave(db, market_id, user.id)
     # Lock the market so two last members leaving at once can't both miss archiving it.
     market = db.get(Market, market_id, with_for_update=True, populate_existing=True)
     membership.left_at = now()

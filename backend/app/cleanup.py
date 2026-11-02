@@ -20,7 +20,10 @@ from app.models import (
     Offer,
     Order,
     Product,
+    ProductOwner,
+    ProductRequest,
     Proposal,
+    RequestApproval,
 )
 
 DELETE_EMPTY_AFTER = timedelta(days=30)
@@ -44,6 +47,10 @@ def delete_old_empty_markets(db: Session) -> int:
     products = select(Product.id).where(Product.market_id.in_(market_ids))
     db.execute(delete(Offer).where(Offer.product_id.in_(products)))
     db.execute(delete(Proposal).where(Proposal.product_id.in_(products)))
+    requests = select(ProductRequest.id).where(ProductRequest.product_id.in_(products))
+    db.execute(delete(RequestApproval).where(RequestApproval.request_id.in_(requests)))
+    db.execute(delete(ProductRequest).where(ProductRequest.product_id.in_(products)))
+    db.execute(delete(ProductOwner).where(ProductOwner.product_id.in_(products)))
     db.execute(delete(Product).where(Product.market_id.in_(market_ids)))
     db.execute(delete(Membership).where(Membership.market_id.in_(market_ids)))
     db.execute(delete(Allowance).where(Allowance.market_id.in_(market_ids)))

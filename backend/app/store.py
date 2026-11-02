@@ -198,6 +198,18 @@ def end_offers_and_proposals(offers: list[Offer], proposals: list[Proposal]) -> 
         proposal.status = ProposalStatus.CANCELLED
 
 
+def close_now(product: Product) -> None:
+    """Closes a product: no new proposals, and offers without a commitment end. Committed offers
+    stay until their commitment is released. The caller commits."""
+    if product.closed_at is not None:
+        return
+    product.closed_at = now()
+    end_offers_and_proposals(
+        [o for o in product.offers if o.removed_at is None],
+        [p for p in product.proposals if p.status == ProposalStatus.PENDING],
+    )
+
+
 def leave_store(db: Session, market_id: int, user_id: int) -> None:
     """Called when someone leaves a market. The caller commits.
 

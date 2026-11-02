@@ -12,6 +12,13 @@ Items marked **Open** aren't decided yet. Items marked **Later** are saved for a
 - **Product status:** *waiting* (no seller has accepted yet), *live* (at least one offer), *closed*.
 - The creator can edit the name and description.
 - **Closing a product** stops new proposals and removes every offer without a commitment. Committed offers stay until their commitment is released. Closing never removes them. Orders already placed never change.
+- **Owners** (added 2026-11-02): the creator is the first owner. A product can have several.
+  - Any owner can ask more sellers, and **sell it themselves** (no proposal needed).
+  - **Changing the name or description, closing the product, and adding or removing an owner** need **every owner's approval**. Someone being added must accept too. Someone being removed isn't asked. Any decline cancels the request.
+  - The person asking picks how long the others have to answer, from 10 seconds to 30 days (3 days by default). After that, the request expires. With a single owner, changes happen at once.
+  - An owner can step down alone, unless they're the last one.
+  - If the last owner leaves the market, the product keeps running, and **its sellers can claim** ownership.
+  - The coin mode can't be changed after creation.
 
 Each seller sets these on their own offer:
 - **Delivery type:**
