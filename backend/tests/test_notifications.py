@@ -36,6 +36,7 @@ def test_messages_are_kept(home):
     saved = dana.get("/notifications").json()[0]
     assert saved["path"] == f"/markets/{market_id}"
     assert saved["read"] is False
+    assert saved["level"] == "info"
 
 
 def test_newest_first(home):
@@ -107,3 +108,6 @@ def test_news_from_while_away_is_waiting(home, db):
 
     assert "The deadline for Tea passed" in messages(dana)
     assert "You missed the deadline for Tea" in messages(noa)
+    # A missed deadline is a warning (orange in the app).
+    missed = next(n for n in noa.get("/notifications").json() if "missed" in n["message"])
+    assert missed["level"] == "warning"

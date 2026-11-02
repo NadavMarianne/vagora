@@ -23,6 +23,8 @@ class NotificationView(BaseModel):
     message: str
     # The app page it opens, like "/markets/12/orders/3".
     path: str
+    # How important it is: "info", "good", "warning", or "critical". Sets its color.
+    level: str
     created_at: datetime
     read: bool
 
@@ -45,6 +47,7 @@ def list_notifications(user: CurrentUser, db: DbSession) -> list[NotificationVie
             id=n.id,
             message=n.message,
             path=n.path,
+            level=n.level,
             created_at=n.created_at,
             read=n.read_at is not None,
         )

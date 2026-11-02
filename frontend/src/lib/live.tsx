@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
+import type { Level } from "@/components/ui";
 import { app } from "@/lib/firebase";
 import { useSession } from "@/lib/session";
 
@@ -28,7 +29,14 @@ const db = setUpFirestore();
 
 /** A message to show, what it's about ("invite", or "market:12" for a market), the page it
  * opens, like "/markets/12/orders/3", and the saved notification it is (if any). */
-export type Banner = { message: string; reason: string; path: string; id?: number };
+export type Banner = {
+  message: string;
+  reason: string;
+  path: string;
+  id?: number;
+  /** How important it is, which sets its color. */
+  level?: Level;
+};
 
 type Live = {
   /** Goes up by one each time something changes for you. Screens reload when it does. */
@@ -64,13 +72,14 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         setVersion((v) => v + 1);
-        const { message, reason, path, id } = snapshot.data() ?? {};
+        const { message, reason, path, id, level } = snapshot.data() ?? {};
         if (typeof message === "string" && message) {
           setBanner({
             message,
             reason: typeof reason === "string" ? reason : "",
             path: typeof path === "string" ? path : "",
             id: typeof id === "number" ? id : undefined,
+            level: typeof level === "string" ? (level as Level) : "info",
           });
         }
       },

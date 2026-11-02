@@ -527,6 +527,7 @@ def accept_proposal(
         f"market:{market_id}",
         f"{user.display_name} now sells {product.name}",
         product_path(product),
+        "good",
     )
     return product_view(product, user, db)
 
@@ -545,4 +546,5 @@ def decline_proposal(market_id: int, proposal_id: int, user: CurrentUser, db: Db
         f"market:{market_id}",
         f"{user.display_name} declined to sell {product.name}",
         product_path(product),
+        "warning",
     )

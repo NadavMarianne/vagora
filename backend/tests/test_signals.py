@@ -23,7 +23,7 @@ def notes(monkeypatch):
     sent = Sent()
     sent.paths = {}
 
-    def record(db, firebase_uids, reason, message="", path=""):
+    def record(db, firebase_uids, reason, message="", path="", level="info"):
         sent.extend((uid, reason, message) for uid in sorted(set(firebase_uids)))
         if message:
             sent.paths[message] = path

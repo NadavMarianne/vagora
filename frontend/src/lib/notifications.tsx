@@ -4,6 +4,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { LEVEL_RANK } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import { useSession } from "@/lib/session";
@@ -59,12 +60,23 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         const fresh = loaded.filter((n) => !n.read && Date.parse(n.created_at) > seen);
         if (fresh.length === 1) {
           const [only] = fresh;
-          showBanner({ message: only.message, reason: "", path: only.path, id: only.id });
+          showBanner({
+            message: only.message,
+            reason: "",
+            path: only.path,
+            id: only.id,
+            level: only.level,
+          });
         } else if (fresh.length > 1) {
+          // Colored like the most important of them.
+          const level = fresh
+            .map((n) => n.level)
+            .reduce((a, b) => (LEVEL_RANK[b] > LEVEL_RANK[a] ? b : a));
           showBanner({
             message: `You have ${fresh.length} new notifications`,
             reason: "",
             path: "/notifications",
+            level,
           });
         }
         setList(loaded);

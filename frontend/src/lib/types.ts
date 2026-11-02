@@ -269,6 +269,8 @@ export type AppNotification = {
   message: string;
   /** The page it opens, like "/markets/12/orders/3". */
   path: string;
+  /** How important it is, which sets its color. */
+  level: "info" | "good" | "warning" | "critical";
   created_at: string;
   read: boolean;
 };

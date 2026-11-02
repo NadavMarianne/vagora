@@ -435,5 +435,7 @@ class Notification(Base):
     message: Mapped[str] = mapped_column(String(200))
     # The app page it opens, like "/markets/12/orders/3".
     path: Mapped[str] = mapped_column(String(200), server_default="")
+    # How important it is, which sets its color (see app/signals.py).
+    level: Mapped[str] = mapped_column(String(10), server_default="info")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

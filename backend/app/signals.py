@@ -12,6 +12,7 @@ import json
 import logging
 from collections.abc import Iterable
 from functools import cache
+from typing import Literal
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -23,6 +24,11 @@ from app.config import settings
 from app.models import Membership, Notification, User
 
 log = logging.getLogger(__name__)
+
+# How important a message is. The app colors it to match:
+# "critical" red (disputes, cancellations, refusals), "warning" orange (missed or expired
+# deadlines), "good" green (done, paid, a new seller), and "info" blue (everything else).
+Level = Literal["info", "good", "warning", "critical"]
 
 
 @cache
@@ -37,7 +43,12 @@ def _client():
 
 
 def notify(
-    db: Session, firebase_uids: Iterable[str], reason: str, message: str = "", path: str = ""
+    db: Session,
+    firebase_uids: Iterable[str],
+    reason: str,
+    message: str = "",
+    path: str = "",
+    level: Level = "info",
 ) -> None:
     """Tells these people's apps that something changed.
 
@@ -49,7 +60,7 @@ def notify(
     uids = set(firebase_uids)
     if not uids:
         return
-    ids = save(db, uids, message, path) if message else {}
+    ids = save(db, uids, message, path, level) if message else {}
     try:
         client = _client()
         if client is None:
@@ -61,6 +72,7 @@ def notify(
                 "reason": reason,
                 "message": message,
                 "path": path,
+                "level": level,
                 # The saved notification, so tapping the banner can mark it read.
                 "id": ids.get(uid),
             }
@@ -70,12 +82,14 @@ def notify(
         log.exception("Couldn't send live updates (%s).", reason)
 
 
-def save(db: Session, uids: set[str], message: str, path: str) -> dict[str, int]:
+def save(db: Session, uids: set[str], message: str, path: str, level: Level) -> dict[str, int]:
     """Saves a notification for each of these people. Returns each one's ID by Firebase ID."""
     try:
         users = db.scalars(select(User).where(User.firebase_uid.in_(uids))).all()
         saved = {
-            u.firebase_uid: Notification(user_id=u.id, message=message[:200], path=path[:200])
+            u.firebase_uid: Notification(
+                user_id=u.id, message=message[:200], path=path[:200], level=level
+            )
             for u in users
         }
         db.add_all(saved.values())

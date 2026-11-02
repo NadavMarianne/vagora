@@ -7,7 +7,7 @@ import { Animated, PanResponder, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Tappable } from "@/components/tappable";
-import { colors } from "@/components/ui";
+import { colors, LEVEL_COLOR } from "@/components/ui";
 import { type Banner, useLive } from "@/lib/live";
 import { useNotifications } from "@/lib/notifications";
 
@@ -64,6 +64,7 @@ export function LiveBanner() {
       style={[
         styles.banner,
         {
+          backgroundColor: LEVEL_COLOR[banner.level ?? "info"],
           top: insets.top + 8,
           transform: [{ translateX: offset }],
           opacity: offset.interpolate({

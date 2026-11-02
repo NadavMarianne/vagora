@@ -2,7 +2,7 @@ import { type Href, router } from "expo-router";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { Body, Button, colors, Info, Screen } from "@/components/ui";
+import { Body, Button, colors, Info, LEVEL_COLOR, Screen } from "@/components/ui";
 import { useNotifications } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/types";
 
@@ -41,10 +41,10 @@ export default function NotificationsScreen() {
       )}
       {list.length === 0 && <Body>No notifications.</Body>}
       {list.map((n) => (
-        <View key={n.id} style={styles.row}>
+        <View key={n.id} style={[styles.row, { borderLeftColor: LEVEL_COLOR[n.level] }]}>
           <Tappable style={styles.text} onPress={() => open(n)} accessibilityRole="button">
             <View style={styles.titleLine}>
-              {!n.read && <View style={styles.dot} />}
+              {!n.read && <View style={[styles.dot, { backgroundColor: LEVEL_COLOR[n.level] }]} />}
               <Text style={[styles.message, !n.read && styles.unread]}>{n.message}</Text>
             </View>
             <Text style={styles.when}>{new Date(n.created_at).toLocaleString()}</Text>
@@ -71,12 +71,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingVertical: 10,
+    paddingLeft: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    // Colored by how important it is: red, orange, green, or blue.
+    borderLeftWidth: 4,
   },
   text: { flex: 1, gap: 2 },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+  dot: { width: 10, height: 10, borderRadius: 5 },
   message: { fontSize: 16, color: colors.text, flexShrink: 1 },
   unread: { fontWeight: "700" },
   when: { fontSize: 13, color: colors.muted },
