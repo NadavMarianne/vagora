@@ -26,18 +26,25 @@ function setUpFirestore(): Firestore {
 
 const db = setUpFirestore();
 
-/** A message to show, what it's about ("invite", or "market:12" for a market), and the page
- * it opens, like "/markets/12/orders/3". */
-export type Banner = { message: string; reason: string; path: string };
+/** A message to show, what it's about ("invite", or "market:12" for a market), the page it
+ * opens, like "/markets/12/orders/3", and the saved notification it is (if any). */
+export type Banner = { message: string; reason: string; path: string; id?: number };
 
 type Live = {
   /** Goes up by one each time something changes for you. Screens reload when it does. */
   version: number;
   banner: Banner | null;
   dismissBanner: () => void;
+  /** Shows a banner that didn't come live, like "You have 3 new notifications" on opening. */
+  showBanner: (banner: Banner) => void;
 };
 
-const Context = createContext<Live>({ version: 0, banner: null, dismissBanner: () => {} });
+const Context = createContext<Live>({
+  version: 0,
+  banner: null,
+  dismissBanner: () => {},
+  showBanner: () => {},
+});
 
 export function LiveProvider({ children }: { children: React.ReactNode }) {
   const { session } = useSession();
@@ -57,12 +64,13 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         setVersion((v) => v + 1);
-        const { message, reason, path } = snapshot.data() ?? {};
+        const { message, reason, path, id } = snapshot.data() ?? {};
         if (typeof message === "string" && message) {
           setBanner({
             message,
             reason: typeof reason === "string" ? reason : "",
             path: typeof path === "string" ? path : "",
+            id: typeof id === "number" ? id : undefined,
           });
         }
       },
@@ -71,8 +79,11 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   }, [uid]);
 
   const dismissBanner = useCallback(() => setBanner(null), []);
+  const showBanner = useCallback((shown: Banner) => setBanner(shown), []);
 
-  return <Context value={{ version, banner, dismissBanner }}>{children}</Context>;
+  return (
+    <Context value={{ version, banner, dismissBanner, showBanner }}>{children}</Context>
+  );
 }
 
 export function useLive(): Live {

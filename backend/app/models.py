@@ -422,3 +422,18 @@ class Order(Base):
     offer: Mapped[Offer] = relationship()
     buyer: Mapped[User] = relationship(foreign_keys=[buyer_id])
     seller: Mapped[User] = relationship(foreign_keys=[seller_id])
+
+
+class Notification(Base):
+    """A message for one person, kept so they can see it later in their list."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("notifications_by_user", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    message: Mapped[str] = mapped_column(String(200))
+    # The app page it opens, like "/markets/12/orders/3".
+    path: Mapped[str] = mapped_column(String(200), server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

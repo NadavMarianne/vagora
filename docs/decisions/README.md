@@ -29,3 +29,4 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0023](0023-reports-and-cases.md) | Reports and cases | Accepted |
 | [0024](0024-court.md) | The court: judge, verdict, punisher, and consequences | Accepted |
 | [0025](0025-extras.md) | Extras: mystery orders, auctions, bounties, streaks | Accepted |
+| [0026](0026-notifications-list.md) | The notifications list | Accepted |

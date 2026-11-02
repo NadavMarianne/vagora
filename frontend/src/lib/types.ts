@@ -262,3 +262,13 @@ export type Order = {
   refund_requested: boolean;
   ended_at: string | null;
 };
+
+/** A message you were sent, kept in your notifications list. Mirrors backend/app/notifications.py. */
+export type AppNotification = {
+  id: number;
+  message: string;
+  /** The page it opens, like "/markets/12/orders/3". */
+  path: string;
+  created_at: string;
+  read: boolean;
+};

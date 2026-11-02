@@ -117,7 +117,7 @@ def catch_up(db: Session, market_id: int, at: datetime) -> list[tuple[Order, str
     return changed
 
 
-def announce(changes: list[tuple[Order, str]]) -> None:
+def announce(db: Session, changes: list[tuple[Order, str]]) -> None:
     """Tells the buyer and the seller when an order's time ran out, with a banner that opens it.
     Call after committing."""
     for order, what in changes:
@@ -147,8 +147,8 @@ def announce(changes: list[tuple[Order, str]]) -> None:
         }[what]
         reason = f"market:{order.market_id}"
         path = f"/markets/{order.market_id}/orders/{order.id}"
-        signals.notify([order.buyer.firebase_uid], reason, buyer_news, path)
-        signals.notify([order.seller.firebase_uid], reason, seller_news, path)
+        signals.notify(db, [order.buyer.firebase_uid], reason, buyer_news, path)
+        signals.notify(db, [order.seller.firebase_uid], reason, seller_news, path)
 
 
 def miss(order: Order, at: datetime) -> None:

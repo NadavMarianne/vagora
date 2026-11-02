@@ -10,6 +10,7 @@ from app import (
     db,
     invites,
     markets,
+    notifications,
     offers,
     orders,
     owners,
@@ -24,6 +25,7 @@ app = FastAPI(title="vagora", version="0.0.1")
 app.include_router(users.router)
 app.include_router(markets.router)
 app.include_router(invites.router)
+app.include_router(notifications.router)
 app.include_router(products.router)
 app.include_router(offers.router)
 app.include_router(owners.router)

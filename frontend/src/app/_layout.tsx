@@ -2,9 +2,11 @@ import { Stack } from "expo-router";
 import { View } from "react-native";
 
 import { LiveBanner } from "@/components/live-banner";
+import { NotificationBell } from "@/components/notification-bell";
 import { Body, Button, Loading, Screen, Title } from "@/components/ui";
 import { warmUp } from "@/lib/api";
 import { LiveProvider } from "@/lib/live";
+import { NotificationsProvider } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
 
 // Wake the backend and database right away, while Firebase checks who is logged in.
@@ -14,10 +16,12 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <LiveProvider>
-        <View style={{ flex: 1 }}>
-          <Screens />
-          <LiveBanner />
-        </View>
+        <NotificationsProvider>
+          <View style={{ flex: 1 }}>
+            <Screens />
+            <LiveBanner />
+          </View>
+        </NotificationsProvider>
       </LiveProvider>
     </SessionProvider>
   );
@@ -40,7 +44,8 @@ function Screens() {
 
   const is = (state: typeof session.state) => session.state === state;
   return (
-    <Stack>
+    // The bell shows on every screen once you're logged in and set up.
+    <Stack screenOptions={{ headerRight: is("ready") ? () => <NotificationBell /> : undefined }}>
       <Stack.Protected guard={is("signed-out")}>
         <Stack.Screen name="sign-in" options={{ title: "Log in" }} />
         <Stack.Screen name="sign-up" options={{ title: "Sign up" }} />
@@ -54,6 +59,7 @@ function Screens() {
       </Stack.Protected>
       <Stack.Protected guard={is("ready")}>
         <Stack.Screen name="index" options={{ title: "vagora" }} />
+        <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
         <Stack.Screen name="markets/new" options={{ title: "Create a market" }} />
         <Stack.Screen name="markets/[id]/index" options={{ title: "Market" }} />
         <Stack.Screen name="markets/[id]/settings" options={{ title: "Market settings" }} />

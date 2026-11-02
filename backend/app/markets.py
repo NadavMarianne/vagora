@@ -138,7 +138,7 @@ def catch_up(db: Session, market: Market) -> None:
         # Balances or the store changed, so everyone's open screens should show it.
         signals.notify_market(db, market.id)
         # The buyer and seller of each order whose time ran out get a banner about it.
-        order_flow.announce(orders)
+        order_flow.announce(db, orders)
 
 
 def active_memberships():
@@ -319,7 +319,7 @@ def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     db.commit()
 
     uninvited = db.scalars(select(User.firebase_uid).where(User.id.in_(cancelled_for))).all()
-    signals.notify(uninvited, "invite")
+    signals.notify(db, uninvited, "invite")
     signals.notify_market(db, market_id, f"{user.display_name} left {market.name}")
 
 

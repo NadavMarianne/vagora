@@ -101,12 +101,12 @@ def conflict(message: str) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, message)
 
 
-def tell(order: Order, to: User, message: str) -> None:
+def tell(db: Session, order: Order, to: User, message: str) -> None:
     """Refreshes both sides' screens, with a banner for `to` that opens the order."""
     other = order.buyer if to.id == order.seller_id else order.seller
     reason = f"market:{order.market_id}"
-    signals.notify([other.firebase_uid], reason)
-    signals.notify([to.firebase_uid], reason, message, order_path(order))
+    signals.notify(db, [other.firebase_uid], reason)
+    signals.notify(db, [to.firebase_uid], reason, message, order_path(order))
 
 
 def order_path(order: Order) -> str:
@@ -160,7 +160,7 @@ def buy(market_id: int, offer_id: int, user: CurrentUser, db: DbSession) -> Orde
     db.add(order)
     db.commit()
     signals.notify_market(db, market_id)
-    tell(order, offer.seller, f"{user.display_name} bought {product.name}")
+    tell(db, order, offer.seller, f"{user.display_name} bought {product.name}")
     return order_view(order, user)
 
 
@@ -223,7 +223,7 @@ def mark_fulfilled(market_id: int, order_id: int, user: CurrentUser, db: DbSessi
     as_buyer(order, user, *order_flow.ACTIVE)
     order_flow.end(db, order, OrderStatus.COMPLETED, 0)
     db.commit()
-    tell(order, order.seller, f"{user.display_name} marked {order.product_name} as done")
+    tell(db, order, order.seller, f"{user.display_name} marked {order.product_name} as done")
     return order_view(order, user)
 
 
@@ -247,7 +247,7 @@ def claim_done(market_id: int, order_id: int, user: CurrentUser, db: DbSession) 
     order.new_deadline_asked_at = None
     order.new_deadline_answer_by = None
     db.commit()
-    tell(order, order.buyer, message)
+    tell(db, order, order.buyer, message)
     return order_view(order, user)
 
 
@@ -258,7 +258,7 @@ def dispute(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> 
     as_buyer(order, user, OrderStatus.DONE_CLAIMED)
     order.status = OrderStatus.DISPUTED
     db.commit()
-    tell(order, order.seller, f"{user.display_name} disputes {order.product_name}")
+    tell(db, order, order.seller, f"{user.display_name} disputes {order.product_name}")
     return order_view(order, user)
 
 
@@ -282,6 +282,7 @@ def cancel(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> O
         order.new_deadline_answer_by = None
         db.commit()
         tell(
+            db,
             order,
             order.seller,
             f"{user.display_name} cancels {order.product_name}. Contest it if it was done.",
@@ -295,7 +296,7 @@ def cancel(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> O
         db, order, OrderStatus.CANCELLED, order_flow.share(order.price, order.refund_percent)
     )
     db.commit()
-    tell(order, order.seller, f"{user.display_name} cancelled {order.product_name}")
+    tell(db, order, order.seller, f"{user.display_name} cancelled {order.product_name}")
     return order_view(order, user)
 
 
@@ -308,7 +309,7 @@ def discard(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> 
         raise conflict("This order is refundable, so cancel it instead.")
     order_flow.end(db, order, OrderStatus.DISCARDED, 0)
     db.commit()
-    tell(order, order.seller, f"{user.display_name} gave up {order.product_name}")
+    tell(db, order, order.seller, f"{user.display_name} gave up {order.product_name}")
     return order_view(order, user)
 
 
@@ -321,7 +322,7 @@ def request_refund(market_id: int, order_id: int, user: CurrentUser, db: DbSessi
         raise conflict("This order is refundable, so cancel it instead.")
     order.refund_requested = True
     db.commit()
-    tell(order, order.seller, f"{user.display_name} asks for a refund for {order.product_name}")
+    tell(db, order, order.seller, f"{user.display_name} asks for a refund for {order.product_name}")
     return order_view(order, user)
 
 
@@ -345,7 +346,7 @@ def refund(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> O
     )
     order_flow.end(db, order, ended_as, order.price)
     db.commit()
-    tell(order, order.buyer, f"{user.display_name} refunded {order.product_name}")
+    tell(db, order, order.buyer, f"{user.display_name} refunded {order.product_name}")
     return order_view(order, user)
 
 
@@ -357,7 +358,7 @@ def decline_refund(market_id: int, order_id: int, user: CurrentUser, db: DbSessi
         raise conflict("No refund was asked for.")
     order.refund_requested = False
     db.commit()
-    tell(order, order.buyer, f"{user.display_name} declined a refund for {order.product_name}")
+    tell(db, order, order.buyer, f"{user.display_name} declined a refund for {order.product_name}")
     return order_view(order, user)
 
 
@@ -370,7 +371,7 @@ def refused(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> 
         raise conflict("Only “on request” orders can be refused. Others miss their deadline.")
     order_flow.miss(order, at=store.now())
     db.commit()
-    tell(order, order.seller, f"{user.display_name} says you refused {order.product_name}")
+    tell(db, order, order.seller, f"{user.display_name} says you refused {order.product_name}")
     return order_view(order, user)
 
 
@@ -389,7 +390,10 @@ def propose_deadline(
     )
     db.commit()
     tell(
-        order, order.seller, f"{user.display_name} proposes a new deadline for {order.product_name}"
+        db,
+        order,
+        order.seller,
+        f"{user.display_name} proposes a new deadline for {order.product_name}",
     )
     return order_view(order, user)
 
@@ -408,7 +412,10 @@ def agree_deadline(market_id: int, order_id: int, user: CurrentUser, db: DbSessi
     order.new_deadline_answer_by = None
     db.commit()
     tell(
-        order, order.buyer, f"{user.display_name} agreed to a new deadline for {order.product_name}"
+        db,
+        order,
+        order.buyer,
+        f"{user.display_name} agreed to a new deadline for {order.product_name}",
     )
     return order_view(order, user)
 
@@ -421,7 +428,10 @@ def decline_deadline(market_id: int, order_id: int, user: CurrentUser, db: DbSes
     order_flow.back_to_choosing(order)
     db.commit()
     tell(
-        order, order.buyer, f"{user.display_name} declined a new deadline for {order.product_name}"
+        db,
+        order,
+        order.buyer,
+        f"{user.display_name} declined a new deadline for {order.product_name}",
     )
     return order_view(order, user)
 
@@ -435,6 +445,7 @@ def end_order(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -
     order_flow.end(db, order, OrderStatus.SELLER_ENDED, order.price)
     db.commit()
     tell(
+        db,
         order,
         order.buyer,
         f"{user.display_name} ended {order.product_name}. You got a full refund.",

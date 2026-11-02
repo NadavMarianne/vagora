@@ -333,6 +333,7 @@ def tell_sellers(db: Session, product: Product, sellers: list[User], by: User) -
     for proposal in product.proposals:
         if proposal.status == ProposalStatus.PENDING and proposal.seller_id in asked:
             signals.notify(
+                db,
                 [proposal.seller.firebase_uid],
                 f"market:{product.market_id}",
                 f"{by.display_name} asks you to sell {product.name}",
@@ -442,7 +443,7 @@ def tell_owners(db: Session, product: Product, request: ProductRequest, message:
     waiting = ownership.waiting_for(request) if request.status == RequestStatus.PENDING else set()
     if waiting:
         uids = db.scalars(select(User.firebase_uid).where(User.id.in_(waiting)))
-        signals.notify(uids, f"market:{product.market_id}", message, product_path(product))
+        signals.notify(db, uids, f"market:{product.market_id}", message, product_path(product))
 
 
 @router.post("/products/{product_id}/proposals", status_code=status.HTTP_201_CREATED)
@@ -521,6 +522,7 @@ def accept_proposal(
     db.commit()
     signals.notify_market(db, market_id)
     signals.notify(
+        db,
         [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} now sells {product.name}",
@@ -538,6 +540,7 @@ def decline_proposal(market_id: int, proposal_id: int, user: CurrentUser, db: Db
     product = proposal.product
     signals.notify_market(db, market_id)
     signals.notify(
+        db,
         [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} declined to sell {product.name}",
