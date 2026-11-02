@@ -10,4 +10,5 @@
 - Second round of design changes: time bars now drain smoothly, in the button's full color, with the title turning white where it's filled.
 - Notifications now open the exact page they're about (the order, the proposal, the product), not just the market. They can be swiped sideways to dismiss.
 - Explanations moved into highlighted boxes at the top of the store, product, orders, order, and proposal pages, in plainer words.
+- Found a crash: pressing "It wasn't done" froze and closed the app. The time bar was one animation lasting until the deadline (3 days), and the phone plans every frame of an animation ahead, about 15 million frames. Now the bar drains in 30-second steps. Also fixed the white title showing over the white part of timed buttons.
 - Next: the limits file, then the court.

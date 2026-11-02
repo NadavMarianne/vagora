@@ -186,6 +186,9 @@ function useNow() {
   return now;
 }
 
+// How long each step of a time bar's drain lasts. Short enough for the phone to plan easily.
+const DRAIN_STEP_MS = 30_000;
+
 /** "2d 4h left", "5m 10s left". */
 function timeLeft(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -213,17 +216,26 @@ export function TimedButton({
   const [progress] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    const at = Date.now();
-    progress.setValue(end > start ? Math.min(1, Math.max(0, (end - at) / (end - start))) : 0);
-    // One smooth, steady drain until the deadline, run by the phone's animation system.
-    const drain = Animated.timing(progress, {
-      toValue: 0,
-      duration: Math.max(0, end - at),
-      easing: Easing.linear,
-      useNativeDriver: true,
-    });
-    drain.start();
-    return () => drain.stop();
+    const share = (at: number) =>
+      end > start ? Math.min(1, Math.max(0, (end - at) / (end - start))) : 0;
+    progress.setValue(share(Date.now()));
+    // A steady drain, run by the phone's animation system in short steps. The phone works out
+    // every frame of a step in advance, so one step lasting days would freeze and crash the app.
+    let step: Animated.CompositeAnimation | null = null;
+    function next() {
+      const at = Date.now();
+      if (at >= end) return;
+      const stepEnd = Math.min(end, at + DRAIN_STEP_MS);
+      step = Animated.timing(progress, {
+        toValue: share(stepEnd),
+        duration: stepEnd - at,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      step.start(({ finished }) => finished && next());
+    }
+    next();
+    return () => step?.stop();
   }, [progress, start, end]);
 
   // The colored layer slides left as time runs out; its white title slides back so it stays put.
@@ -241,6 +253,7 @@ export function TimedButton({
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
+          styles.timedFill,
           { backgroundColor: color, transform: [{ translateX: fillShift }] },
         ]}
       >
@@ -329,8 +342,10 @@ const styles = StyleSheet.create({
   error: { color: colors.error, fontSize: 15 },
   button: { borderRadius: 8, paddingVertical: 14, alignItems: "center" },
   buttonPressed: { opacity: 0.7 },
-  buttonText: { fontSize: 16, fontWeight: "600" },
+  buttonText: { fontSize: 16, fontWeight: "700" },
   timed: { borderWidth: 2, borderRadius: 8, overflow: "hidden" },
+  // Clips the white title to the colored part, so the rest of the title stays dark.
+  timedFill: { overflow: "hidden" },
   timeLeft: { fontSize: 12, color: colors.text, marginTop: 2 },
   info: {
     backgroundColor: "#E6F4FE",
