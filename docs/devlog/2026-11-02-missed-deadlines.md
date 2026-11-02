@@ -11,4 +11,7 @@
 - Notifications now open the exact page they're about (the order, the proposal, the product), not just the market. They can be swiped sideways to dismiss.
 - Explanations moved into highlighted boxes at the top of the store, product, orders, order, and proposal pages, in plainer words.
 - Found a crash: pressing "It wasn't done" froze and closed the app. The time bar was one animation lasting until the deadline (3 days), and the phone plans every frame of an animation ahead, about 15 million frames. Now the bar drains in 30-second steps. Also fixed the white title showing over the white part of timed buttons.
+- More fixes from testing: errors now show under the section that caused them (for example a proposal sent without a price), with checks before sending. The proposals list shows only proposals still waiting, with their price and time left.
+- Product page: your own offer sits apart at the top, above "Other sellers". Buying again says "Buy again", and your open orders of that product are listed.
+- When a timer runs out, open screens reload by themselves, and both the buyer and the seller get a notification that opens the order. Without a scheduled job, this happens when someone has the app open at that moment, or the next time anyone opens the market.
 - Next: the limits file, then the court.

@@ -6,6 +6,18 @@ import { Tappable } from "@/components/tappable";
 import { colors } from "@/components/ui";
 import type { Order } from "@/lib/types";
 
+/** The moments this order changes by itself: its deadline, the 3 days after "I did it", the
+ * contest window, and the time to answer a new deadline. */
+export function timers(order: Order | undefined): (string | null)[] {
+  if (!order) return [];
+  return [
+    order.status === "open" ? order.due_at : null,
+    order.auto_complete_at,
+    order.contest_until,
+    order.new_deadline_answer_by,
+  ];
+}
+
 /** Where an order stands, in words, from your side. */
 export function orderState(order: Order): string {
   switch (order.status) {
@@ -48,12 +60,9 @@ export function OrderRow({
   marketId: string;
   currency: string;
 }) {
-  const late = [
-    "disputed",
-    "missed",
-    "new_deadline_asked",
-    "cancel_pending",
-  ].includes(order.status);
+  const late = ["disputed", "missed", "new_deadline_asked", "cancel_pending"].includes(
+    order.status,
+  );
   return (
     <Tappable
       style={styles.row}

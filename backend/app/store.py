@@ -162,11 +162,11 @@ def should_end(offer: Offer, at: datetime) -> bool:
     return due or offer.product.closed_at is not None
 
 
-def catch_up(db: Session, market_id: int) -> bool:
-    """Expires unanswered proposals, removes offers whose time is up, and ends orders whose
+def catch_up(db: Session, market_id: int) -> tuple[bool, list[tuple[Order, str]]]:
+    """Expires unanswered proposals, removes offers whose time is up, and moves orders whose
     time is up (see app/order_flow.py). The caller commits.
 
-    Returns whether anything changed.
+    Returns whether anything changed, and the orders that did (for `order_flow.announce`).
     """
     at = now()
     changed = False
@@ -183,9 +183,8 @@ def catch_up(db: Session, market_id: int) -> bool:
         if should_end(offer, at):
             offer.removed_at = at
             changed = True
-    if order_flow.catch_up(db, market_id, at):
-        changed = True
-    return changed
+    orders = order_flow.catch_up(db, market_id, at)
+    return changed or bool(orders), orders
 
 
 def end_offers_and_proposals(offers: list[Offer], proposals: list[Proposal]) -> None:

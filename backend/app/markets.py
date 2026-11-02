@@ -9,7 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app import allowance, ledger, ownership, signals, store
+from app import allowance, ledger, order_flow, ownership, signals, store
 from app.allowance import AllowanceIn, AllowanceView, allowance_view
 from app.models import EntryKind, Invite, InviteStatus, LedgerEntry, Market, Membership, User
 from app.users import CurrentUser, DbSession
@@ -131,12 +131,14 @@ def catch_up(db: Session, market: Market) -> None:
     """Pays any allowances that came due since the market was last used, and lets the store
     catch up on proposals, offers, and orders whose time is up."""
     paid = allowance.pay_due(db, market)
-    store_changed = store.catch_up(db, market.id)
+    store_changed, orders = store.catch_up(db, market.id)
     store_changed = ownership.expire(db, market.id) or store_changed
     if paid or store_changed:
         db.commit()
         # Balances or the store changed, so everyone's open screens should show it.
         signals.notify_market(db, market.id)
+        # The buyer and seller of each order whose time ran out get a banner about it.
+        order_flow.announce(orders)
 
 
 def active_memberships():

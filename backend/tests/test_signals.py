@@ -136,3 +136,32 @@ def test_banners_open_the_page_they_are_about(notes, member, home):
     offer = dana.get(f"/markets/{market_id}/products/{product['id']}").json()["offers"][0]
     order = dana.post(f"/markets/{market_id}/offers/{offer['id']}/buy").json()
     assert notes.paths["Dana_K bought Tea"] == f"/markets/{market_id}/orders/{order['id']}"
+
+
+def test_a_missed_deadline_tells_both_sides(notes, member, home, db):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.models import Order
+
+    dana, market_id = home
+    noa = member("noa_r")
+    noa.post(f"/invites/{invite(dana, market_id, 'noa_r')['id']}/accept")
+    product = dana.post(
+        f"/markets/{market_id}/products",
+        json={"name": "Tea", "coin_mode": "vanish", "price": 5, "sellers": ["noa_r"]},
+    ).json()
+    proposal = noa.get(f"/markets/{market_id}/proposals").json()[0]
+    terms = {"delivery": "deadline", "duration_seconds": 3600, "refundable": True}
+    noa.post(f"/markets/{market_id}/proposals/{proposal['id']}/accept", json=terms)
+    offer = dana.get(f"/markets/{market_id}/products/{product['id']}").json()["offers"][0]
+    order = dana.post(f"/markets/{market_id}/offers/{offer['id']}/buy").json()
+    db.execute(update(Order).values(due_at=datetime.now(UTC) - timedelta(seconds=1)))
+
+    dana.get(f"/markets/{market_id}")
+
+    path = f"/markets/{market_id}/orders/{order['id']}"
+    assert ("uid-dana_k", f"market:{market_id}", "The deadline for Tea passed") in notes
+    assert ("uid-noa_r", f"market:{market_id}", "You missed the deadline for Tea") in notes
+    assert notes.paths["The deadline for Tea passed"] == path

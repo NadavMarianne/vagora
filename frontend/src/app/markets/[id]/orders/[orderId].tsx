@@ -4,7 +4,7 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Foldable } from "@/components/controls";
 import { DurationPicker, formatDuration } from "@/components/duration-picker";
-import { orderState } from "@/components/order-row";
+import { orderState, timers } from "@/components/order-row";
 import {
   Body,
   Button,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Market, Order } from "@/lib/types";
-import { useLoad } from "@/lib/use-load";
+import { useLoad, useReloadAt } from "@/lib/use-load";
 
 type OrderPage = { market: Market; order: Order };
 
@@ -287,6 +287,9 @@ export default function OrderScreen() {
       return { market, order };
     }, [id, path]),
   );
+
+  // When one of the order's timers runs out, show what happened without waiting for a tap.
+  useReloadAt(timers(data?.order), reload);
 
   async function run(actionPath: string, body?: unknown) {
     setError("");

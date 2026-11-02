@@ -9,8 +9,10 @@ import {
   Keyboard,
   ScrollView,
   type ScrollViewInstance,
+  type StyleProp,
   StyleSheet,
   Text,
+  type TextStyle,
   TextInput,
   type TextInputProps,
   View,
@@ -144,6 +146,12 @@ export function Field({ label, onFocus, ...input }: { label: string } & TextInpu
       />
     </View>
   );
+}
+
+/** "2h 5m left" until a moment, kept up to date every second. */
+export function TimeLeft({ until, style }: { until: string; style?: StyleProp<TextStyle> }) {
+  const now = useNow();
+  return <Text style={style}>{timeLeft(Date.parse(until) - now)}</Text>;
 }
 
 /** A highlighted explanation: what a page is for, or what happens next. */
