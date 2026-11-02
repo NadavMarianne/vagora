@@ -2,7 +2,7 @@
 // it waits for, and Cancel for whoever asked.
 import { StyleSheet, Text, View } from "react-native";
 
-import { Body, Button, colors } from "@/components/ui";
+import { Body, Button, colors, TimedButton } from "@/components/ui";
 import type { ProductRequest } from "@/lib/types";
 
 const names = (people: { display_name: string }[]) => people.map((p) => p.display_name).join(", ");
@@ -52,10 +52,16 @@ export function RequestCard({
       {request.mine_to_answer && (
         <View style={styles.answers}>
           <View style={styles.answer}>
-            <Button title="Approve" onPress={() => onAnswer(true)} />
+            <TimedButton
+              title="Approve"
+              kind="good"
+              from={request.created_at}
+              until={request.expires_at}
+              onPress={() => onAnswer(true)}
+            />
           </View>
           <View style={styles.answer}>
-            <Button title="Decline" kind="secondary" onPress={() => onAnswer(false)} />
+            <Button title="Decline" kind="bad" onPress={() => onAnswer(false)} />
           </View>
         </View>
       )}

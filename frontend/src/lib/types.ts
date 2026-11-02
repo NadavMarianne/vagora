@@ -87,6 +87,7 @@ export type ReceivedInvite = {
   market_name: string;
   invited_by_username: string;
   invited_by_display_name: string;
+  created_at: string;
   expires_at: string;
 };
 
@@ -174,6 +175,7 @@ export type ProductRequest = {
   mine_to_answer: boolean;
   /** You asked for it. */
   mine: boolean;
+  created_at: string;
   expires_at: string;
 };
 
@@ -211,6 +213,7 @@ export type MyProposal = {
   coin_mode: CoinMode;
   creator_display_name: string;
   price: number;
+  created_at: string;
   expires_at: string;
 };
 
@@ -219,7 +222,6 @@ export type OrderStatus =
   | "done_claimed"
   | "disputed"
   | "missed"
-  | "late_accepted"
   | "new_deadline_asked"
   | "cancel_pending"
   | "completed"
@@ -247,10 +249,13 @@ export type Order = {
   /** The last missed deadline, and how many were missed. */
   missed_at: string | null;
   missed_count: number;
-  /** A proposed new deadline: how long, and until when the seller can answer. */
+  /** A proposed new deadline: how long, when it was asked, and until when the seller can answer. */
   new_deadline_seconds: number | null;
+  new_deadline_asked_at: string | null;
   new_deadline_answer_by: string | null;
-  /** When a cancellation after a missed deadline goes through, unless contested. */
+  /** A cancellation after a missed deadline: when it was made, and when it goes through
+   * unless contested. */
+  contest_from: string | null;
   contest_until: string | null;
   done_claimed_at: string | null;
   auto_complete_at: string | null;

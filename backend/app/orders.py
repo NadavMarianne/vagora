@@ -5,8 +5,8 @@ it completes after 3 days unless the buyer disputes. Refundable orders can be ca
 their deadline. Non-refundable ones can be discarded, or the buyer can ask the seller for a refund.
 
 After a missed deadline, the buyer chooses with no time limit: cancel (a full refund, which the
-seller can contest for a while), wait for it late, or propose a new deadline. Meanwhile the
-seller can end the order, which counts as refusing.
+seller can contest for a while) or propose a new deadline. Doing nothing is waiting for it late.
+Meanwhile the seller can end the order, which counts as refusing.
 """
 
 from datetime import datetime, timedelta
@@ -53,10 +53,13 @@ class OrderView(BaseModel):
     # The last missed deadline, and how many were missed.
     missed_at: datetime | None
     missed_count: int
-    # A proposed new deadline: how long, and until when the seller can answer.
+    # A proposed new deadline: how long, when it was asked, and until when the seller can answer.
     new_deadline_seconds: int | None
+    new_deadline_asked_at: datetime | None
     new_deadline_answer_by: datetime | None
-    # When a cancellation after a missed deadline goes through, unless contested.
+    # A cancellation after a missed deadline: when it was made, and when it goes through
+    # unless contested.
+    contest_from: datetime | None
     contest_until: datetime | None
     done_claimed_at: datetime | None
     auto_complete_at: datetime | None
@@ -83,7 +86,9 @@ def order_view(order: Order, user: User) -> OrderView:
         missed_at=order.missed_at,
         missed_count=order.missed_count,
         new_deadline_seconds=order.new_deadline_seconds,
+        new_deadline_asked_at=order.new_deadline_asked_at,
         new_deadline_answer_by=order.new_deadline_answer_by,
+        contest_from=order.contest_from,
         contest_until=order.contest_until,
         done_claimed_at=order.done_claimed_at,
         auto_complete_at=order_flow.auto_complete_at(order),
@@ -235,6 +240,7 @@ def claim_done(market_id: int, order_id: int, user: CurrentUser, db: DbSession) 
         message = f"{user.display_name} says {order.product_name} is done"
     order.refund_requested = False
     order.new_deadline_seconds = None
+    order.new_deadline_asked_at = None
     order.new_deadline_answer_by = None
     db.commit()
     tell(order, order.buyer, message)
@@ -265,8 +271,10 @@ def cancel(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> O
     if order.status in order_flow.MISSED:
         market = db.get(Market, market_id)
         order.status = OrderStatus.CANCEL_PENDING
-        order.contest_until = store.now() + timedelta(seconds=market.contest_window_seconds)
+        order.contest_from = store.now()
+        order.contest_until = order.contest_from + timedelta(seconds=market.contest_window_seconds)
         order.new_deadline_seconds = None
+        order.new_deadline_asked_at = None
         order.new_deadline_answer_by = None
         db.commit()
         tell(
@@ -362,27 +370,19 @@ def refused(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> 
     return order_view(order, user)
 
 
-@router.post("/orders/{order_id}/accept-late")
-def accept_late(market_id: int, order_id: int, user: CurrentUser, db: DbSession) -> OrderView:
-    """The buyer waits for it anyway. They can still cancel or propose a deadline later."""
-    order = get_order(db, user, market_id, order_id)
-    as_buyer(order, user, OrderStatus.MISSED)
-    order.status = OrderStatus.LATE_ACCEPTED
-    db.commit()
-    tell(order, order.seller, f"{user.display_name} will wait for {order.product_name}")
-    return order_view(order, user)
-
-
 @router.post("/orders/{order_id}/new-deadline")
 def propose_deadline(
     market_id: int, order_id: int, new: NewDeadline, user: CurrentUser, db: DbSession
 ) -> OrderView:
     """The buyer proposes a new deadline. If the seller agrees, the new timer starts then."""
     order = get_order(db, user, market_id, order_id)
-    as_buyer(order, user, OrderStatus.MISSED, OrderStatus.LATE_ACCEPTED)
+    as_buyer(order, user, OrderStatus.MISSED)
     order.status = OrderStatus.NEW_DEADLINE_ASKED
     order.new_deadline_seconds = new.deadline_seconds
-    order.new_deadline_answer_by = store.now() + timedelta(seconds=new.expires_in_seconds)
+    order.new_deadline_asked_at = store.now()
+    order.new_deadline_answer_by = order.new_deadline_asked_at + timedelta(
+        seconds=new.expires_in_seconds
+    )
     db.commit()
     tell(
         order, order.seller, f"{user.display_name} proposes a new deadline for {order.product_name}"
@@ -400,6 +400,7 @@ def agree_deadline(market_id: int, order_id: int, user: CurrentUser, db: DbSessi
     order.delivery = "deadline"
     order.due_at = store.now() + timedelta(seconds=order.new_deadline_seconds)
     order.new_deadline_seconds = None
+    order.new_deadline_asked_at = None
     order.new_deadline_answer_by = None
     db.commit()
     tell(

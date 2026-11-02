@@ -15,7 +15,6 @@ const ACTIVE: Order["status"][] = [
   "done_claimed",
   "disputed",
   "missed",
-  "late_accepted",
   "new_deadline_asked",
   "cancel_pending",
 ];
@@ -54,6 +53,9 @@ export default function OrdersScreen() {
 
   return (
     <Screen>
+      <Body>
+        Orders you sell and orders you bought. The coins of an open order stay held until it ends.
+      </Body>
       {sections.map((section) => (
         <SectionList key={section.title} title={section.title} empty={section.empty}>
           {section.list.map((order) => (

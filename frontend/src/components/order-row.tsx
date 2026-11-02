@@ -20,8 +20,6 @@ export function orderState(order: Order): string {
       return "Disputed";
     case "missed":
       return order.role === "buyer" ? "Deadline missed: your choice" : "Deadline missed";
-    case "late_accepted":
-      return "Late, still waiting";
     case "new_deadline_asked":
       return order.role === "buyer" ? "New deadline proposed" : "New deadline: your answer";
     case "cancel_pending":
@@ -53,7 +51,6 @@ export function OrderRow({
   const late = [
     "disputed",
     "missed",
-    "late_accepted",
     "new_deadline_asked",
     "cancel_pending",
   ].includes(order.status);

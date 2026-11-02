@@ -7,7 +7,7 @@ import {
   type TermsDraft,
   termsToSend,
 } from "@/components/offer-terms-form";
-import { Body, Button, ErrorText, Loading, Screen, Title } from "@/components/ui";
+import { Body, Button, ErrorText, Loading, Screen, TimedButton, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Market, MyProposal, Product } from "@/lib/types";
 
@@ -76,8 +76,14 @@ export default function ProposalScreen() {
       <Title>Your terms</Title>
       <OfferTermsForm draft={terms} onChange={setTerms} />
       <ErrorText>{error}</ErrorText>
-      <Button title="Accept" onPress={() => answer(true)} />
-      <Button title="Decline" kind="secondary" onPress={() => answer(false)} />
+      <TimedButton
+        title="Accept"
+        kind="good"
+        from={proposal.created_at}
+        until={proposal.expires_at}
+        onPress={() => answer(true)}
+      />
+      <Button title="Decline" kind="bad" onPress={() => answer(false)} />
     </Screen>
   );
 }

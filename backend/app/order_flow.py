@@ -17,8 +17,8 @@ from app.models import CoinMode, EntryKind, Membership, Order, OrderStatus
 # buyer disputes it first.
 AUTO_COMPLETE_AFTER = timedelta(days=3)
 
-# After a missed deadline: the buyer is choosing, waiting late, or asked for a new deadline.
-MISSED = (OrderStatus.MISSED, OrderStatus.LATE_ACCEPTED, OrderStatus.NEW_DEADLINE_ASKED)
+# After a missed deadline: the buyer is choosing (or simply waiting), or asked for a new deadline.
+MISSED = (OrderStatus.MISSED, OrderStatus.NEW_DEADLINE_ASKED)
 
 # Orders that haven't ended yet. The coins are still held.
 ACTIVE = (
@@ -125,4 +125,5 @@ def back_to_choosing(order: Order) -> None:
     """A proposed new deadline was declined or not answered: the buyer chooses again."""
     order.status = OrderStatus.MISSED
     order.new_deadline_seconds = None
+    order.new_deadline_asked_at = None
     order.new_deadline_answer_by = None

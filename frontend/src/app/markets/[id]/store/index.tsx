@@ -107,6 +107,10 @@ export default function StoreScreen() {
       )}
 
       <Text style={styles.heading}>Products</Text>
+      <Body>
+        Anyone can add a product and ask members to sell it. Each seller sets their own terms.
+        Open a product to see its sellers and buy.
+      </Body>
       {products.length === 0 && <Body>Nothing here yet. Add the first product.</Body>}
       {products.map((product) => (
         <Tappable

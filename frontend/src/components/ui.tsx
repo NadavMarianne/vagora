@@ -24,6 +24,9 @@ export const colors = {
   border: "#CCCCCC",
   error: "#C62828",
   background: "#FFFFFF",
+  // Buttons that agree or admit, and buttons that contest or dispute.
+  good: "#2E7D32",
+  bad: "#C62828",
 };
 
 // Lets parts of a page ask it to scroll something into view.
@@ -146,14 +149,70 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
   return <Text style={styles.error}>{children}</Text>;
 }
 
+type ButtonKind = "primary" | "secondary" | "good" | "bad";
+
+const BUTTON_COLOR: Record<ButtonKind, string> = {
+  primary: colors.primary,
+  secondary: colors.primary,
+  good: colors.good,
+  bad: colors.bad,
+};
+
+type ButtonProps = {
+  title: string;
+  onPress: () => Promise<void> | void;
+  kind?: ButtonKind;
+};
+
+/** The current time, updated every second. */
+function useNow() {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/** "2d 4h left", "5m 10s left". */
+function timeLeft(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const [d, h, m] = [Math.floor(s / 86400), Math.floor(s / 3600) % 24, Math.floor(s / 60) % 60];
+  if (d > 0) return `${d}d ${h}h left`;
+  if (h > 0) return `${h}h ${m}m left`;
+  if (m > 0) return `${m}m ${s % 60}s left`;
+  return `${s}s left`;
+}
+
+/** A button with a deadline. Its color fills it like a progress bar, and drains as the time
+ * between `from` and `until` runs out. */
+export function TimedButton({
+  from,
+  until,
+  kind = "primary",
+  ...button
+}: ButtonProps & { from: string; until: string }) {
+  const now = useNow();
+  const start = Date.parse(from);
+  const end = Date.parse(until);
+  const left = end > start ? Math.min(1, Math.max(0, (end - now) / (end - start))) : 0;
+  const color = BUTTON_COLOR[kind];
+  return (
+    <View style={[styles.timed, { borderColor: color }]}>
+      <View style={[styles.timedFill, { width: `${left * 100}%`, backgroundColor: color }]} />
+      <Button {...button} kind={kind} timed={timeLeft(end - now)} />
+    </View>
+  );
+}
+
 export function Button({
   title,
   onPress,
   kind = "primary",
-}: {
-  title: string;
-  onPress: () => Promise<void> | void;
-  kind?: "primary" | "secondary";
+  timed,
+}: ButtonProps & {
+  /** Set by TimedButton: the time left, shown under the title over its time bar. */
+  timed?: string;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -167,21 +226,29 @@ export function Button({
     }
   }
 
-  const primary = kind === "primary";
+  const filled = kind !== "secondary";
+  const color = BUTTON_COLOR[kind];
+  // A timed button's color is drawn behind it as a time bar, so the button itself is clear.
+  const background = timed !== undefined ? "transparent" : filled ? color : colors.background;
+  const textColor = timed !== undefined ? colors.text : filled ? colors.background : color;
   return (
     <Tappable
       onPress={press}
       disabled={busy}
       style={({ pressed }) => [
         styles.button,
-        primary ? styles.buttonPrimary : styles.buttonSecondary,
+        { backgroundColor: background },
+        !filled && timed === undefined && { borderWidth: 1, borderColor: color },
         (pressed || busy) && styles.buttonPressed,
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? colors.background : colors.primary} />
+        <ActivityIndicator color={textColor} />
       ) : (
-        <Text style={[styles.buttonText, !primary && styles.buttonTextSecondary]}>{title}</Text>
+        <>
+          <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+          {timed !== undefined && <Text style={styles.timeLeft}>{timed}</Text>}
+        </>
       )}
     </Tappable>
   );
@@ -213,11 +280,12 @@ const styles = StyleSheet.create({
   },
   error: { color: colors.error, fontSize: 15 },
   button: { borderRadius: 8, paddingVertical: 14, alignItems: "center" },
-  buttonPrimary: { backgroundColor: colors.primary },
-  buttonSecondary: { borderWidth: 1, borderColor: colors.primary },
   buttonPressed: { opacity: 0.7 },
-  buttonText: { color: colors.background, fontSize: 16, fontWeight: "600" },
-  buttonTextSecondary: { color: colors.primary },
+  buttonText: { fontSize: 16, fontWeight: "600" },
+  timed: { borderWidth: 2, borderRadius: 8, overflow: "hidden" },
+  // Light enough that the dark title stays readable over it.
+  timedFill: { position: "absolute", top: 0, bottom: 0, left: 0, opacity: 0.35 },
+  timeLeft: { fontSize: 12, color: colors.text, marginTop: 2 },
   loading: {
     flex: 1,
     alignItems: "center",

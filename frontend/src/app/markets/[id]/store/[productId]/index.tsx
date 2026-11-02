@@ -120,6 +120,13 @@ export default function ProductScreen() {
       </Text>
 
       <Text style={styles.heading}>Sellers</Text>
+      {product.offers.some((o) => !o.is_mine) && (
+        <Body>
+          Buying takes the price from your balance right away. It’s held until the order ends, then
+          {product.coin_mode === "to_seller" ? " goes to the seller" : " vanishes"} (or comes back
+          to you if it’s refunded).
+        </Body>
+      )}
       {offers.length === 0 && <Body>No one sells this yet.</Body>}
       {offers.length > 1 && (
         <Chips

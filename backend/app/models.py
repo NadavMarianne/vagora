@@ -363,9 +363,8 @@ class OrderStatus(StrEnum):
     DONE_CLAIMED = "done_claimed"  # the seller said "I did it"; the buyer confirms or disputes
     DISPUTED = "disputed"  # the two sides disagree; coins held until it's settled
     # A missed deadline: the time ran out, or the buyer said the seller refused. The buyer
-    # chooses what happens next, with no time limit.
+    # chooses what happens next, with no time limit. Doing nothing is waiting for it late.
     MISSED = "missed"
-    LATE_ACCEPTED = "late_accepted"  # the buyer chose to wait for it anyway
     NEW_DEADLINE_ASKED = "new_deadline_asked"  # the buyer proposed a new deadline
     # The buyer cancelled after a missed deadline. The seller can contest it for a while.
     CANCEL_PENDING = "cancel_pending"
@@ -410,11 +409,13 @@ class Order(Base):
     missed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     missed_count: Mapped[int] = mapped_column(server_default="0")
     # A new deadline the buyer proposed: how long, counted from when the seller agrees, and
-    # until when the seller can answer.
+    # when it was asked and until when the seller can answer.
     new_deadline_seconds: Mapped[int | None] = mapped_column(BigInteger)
+    new_deadline_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     new_deadline_answer_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # While cancelling after a missed deadline: the refund goes through at this moment unless
-    # the seller contests it first.
+    # While cancelling after a missed deadline: when the buyer cancelled, and when the refund
+    # goes through unless the seller contests it first.
+    contest_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     contest_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

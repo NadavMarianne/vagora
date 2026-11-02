@@ -91,6 +91,7 @@ class MyProposalView(BaseModel):
     coin_mode: str
     creator_display_name: str
     price: int
+    created_at: datetime
     expires_at: datetime
 
 
@@ -117,6 +118,7 @@ class RequestView(BaseModel):
     # Whether it waits for your answer, and whether you asked for it.
     mine_to_answer: bool
     mine: bool
+    created_at: datetime
     expires_at: datetime
 
 
@@ -199,6 +201,7 @@ def request_view(db: Session, request: ProductRequest, user: User) -> RequestVie
         waiting_for=people(waiting),
         mine_to_answer=user.id in waiting,
         mine=request.requested_by_id == user.id,
+        created_at=request.created_at,
         expires_at=request.expires_at,
     )
 
@@ -471,6 +474,7 @@ def my_proposals(market_id: int, user: CurrentUser, db: DbSession) -> list[MyPro
             coin_mode=p.product.coin_mode,
             creator_display_name=p.product.creator.display_name,
             price=p.price,
+            created_at=p.created_at,
             expires_at=p.expires_at,
         )
         for p in proposals

@@ -124,20 +124,25 @@ def test_seller_accepts_the_cancellation(missed):
     assert balance(dana, market_id) == 100
 
 
-def test_accept_late_then_done(missed):
+def test_late_work_then_done(missed):
     dana, noa, market_id, order_id = missed
 
-    assert act(dana, market_id, order_id, "accept-late").json()["status"] == "late_accepted"
+    # The buyer just waits; the seller does it late.
     assert act(noa, market_id, order_id, "done").json()["status"] == "done_claimed"
     assert act(dana, market_id, order_id, "fulfilled").json()["status"] == "completed"
     assert balance(noa, market_id) == 130
 
 
-def test_late_accepted_can_still_cancel(missed):
+def test_cancel_while_a_new_deadline_waits(missed):
     dana, _, market_id, order_id = missed
-    act(dana, market_id, order_id, "accept-late")
+    act(dana, market_id, order_id, "new-deadline", deadline_seconds=DAY)
 
-    assert act(dana, market_id, order_id, "cancel").json()["status"] == "cancel_pending"
+    pending = act(dana, market_id, order_id, "cancel").json()
+
+    assert pending["status"] == "cancel_pending"
+    assert pending["new_deadline_seconds"] is None
+    assert pending["new_deadline_asked_at"] is None
+    assert pending["contest_from"] is not None
 
 
 def test_new_deadline_agreed(missed, db):
@@ -193,7 +198,7 @@ def test_on_request_new_deadline_becomes_fixed(home, db):
     assert agreed["delivery"] == "deadline"
 
 
-@pytest.mark.parametrize("step", [None, "accept-late", "new-deadline"])
+@pytest.mark.parametrize("step", [None, "new-deadline"])
 def test_seller_ends_the_order(missed, step):
     dana, noa, market_id, order_id = missed
     if step:
@@ -223,7 +228,6 @@ def test_buyer_choices_only_after_a_miss(home):
     dana, _, market_id = home
     order_id = buy(home)
 
-    assert act(dana, market_id, order_id, "accept-late").status_code == 409
     assert act(dana, market_id, order_id, "new-deadline", deadline_seconds=DAY).status_code == 409
 
 
