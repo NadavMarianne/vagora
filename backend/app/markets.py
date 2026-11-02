@@ -122,10 +122,13 @@ def set_allowances(market: Market, wanted: list[AllowanceIn]) -> None:
 
 
 def catch_up(db: Session, market: Market) -> None:
-    """Pays any allowances that came due since the market was last used."""
-    if allowance.pay_due(db, market):
+    """Pays any allowances that came due since the market was last used, and lets the store
+    catch up on proposals, offers, and orders whose time is up."""
+    paid = allowance.pay_due(db, market)
+    store_changed = store.catch_up(db, market.id)
+    if paid or store_changed:
         db.commit()
-        # Everyone's balance changed, so their open screens should show it.
+        # Balances or the store changed, so everyone's open screens should show it.
         signals.notify_market(db, market.id)
 
 

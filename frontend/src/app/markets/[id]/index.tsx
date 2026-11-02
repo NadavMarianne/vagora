@@ -5,7 +5,14 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { Tappable } from "@/components/tappable";
 import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { LedgerEntry, Market, Member, MyProposal, PendingInvite } from "@/lib/types";
+import type {
+  LedgerEntry,
+  Market,
+  Member,
+  MyProposal,
+  Order,
+  PendingInvite,
+} from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type MarketPage = {
@@ -14,6 +21,7 @@ type MarketPage = {
   members: Member[];
   invites: PendingInvite[];
   proposals: MyProposal[];
+  orders: Order[];
 };
 
 export default function MarketScreen() {
@@ -24,13 +32,14 @@ export default function MarketScreen() {
     useCallback(async (): Promise<MarketPage> => {
       // The market first: opening it pays any allowance that came due.
       const market = await api<Market>(`/markets/${id}`);
-      const [entries, members, invites, proposals] = await Promise.all([
+      const [entries, members, invites, proposals, orders] = await Promise.all([
         api<LedgerEntry[]>(`/markets/${id}/ledger`),
         api<Member[]>(`/markets/${id}/members`),
         api<PendingInvite[]>(`/markets/${id}/invites`),
         api<MyProposal[]>(`/markets/${id}/proposals`),
+        api<Order[]>(`/markets/${id}/orders`),
       ]);
-      return { market, entries, members, invites, proposals };
+      return { market, entries, members, invites, proposals, orders };
     }, [id]),
   );
 
@@ -75,7 +84,13 @@ export default function MarketScreen() {
       </Screen>
     );
   }
-  const { market, entries, members, invites, proposals } = data;
+  const { market, entries, members, invites, proposals, orders } = data;
+  // Orders waiting for you: to deliver as a seller, or to confirm as a buyer.
+  const waiting = orders.filter(
+    (o) =>
+      (o.role === "seller" && o.status === "open") ||
+      (o.role === "buyer" && o.status === "done_claimed"),
+  ).length;
 
   return (
     <Screen>
@@ -88,6 +103,11 @@ export default function MarketScreen() {
       </View>
 
       <Button title="Store" onPress={() => router.push(`/markets/${id}/store`)} />
+      <Button
+        title={waiting > 0 ? `Orders (${waiting} waiting for you)` : "Orders"}
+        kind="secondary"
+        onPress={() => router.push(`/markets/${id}/orders`)}
+      />
       {proposals.length > 0 && (
         <Body>
           {proposals.length === 1

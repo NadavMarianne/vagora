@@ -173,3 +173,35 @@ export type MyProposal = {
   price: number;
   expires_at: string;
 };
+
+export type OrderStatus =
+  | "open"
+  | "done_claimed"
+  | "disputed"
+  | "completed"
+  | "cancelled"
+  | "discarded"
+  | "expired";
+
+/** One purchase, as its buyer or seller sees it. Mirrors backend/app/orders.py. */
+export type Order = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  role: "buyer" | "seller";
+  other_display_name: string;
+  price: number;
+  coin_mode: CoinMode;
+  delivery: OfferTerms["delivery"];
+  refundable: boolean;
+  refund_percent: number;
+  status: OrderStatus;
+  created_at: string;
+  due_at: string;
+  /** A fixed deadline that passed while the order was still open. */
+  late: boolean;
+  done_claimed_at: string | null;
+  auto_complete_at: string | null;
+  refund_requested: boolean;
+  ended_at: string | null;
+};

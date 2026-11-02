@@ -12,7 +12,8 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Offer, Product, Proposal, ProposalStatus
+from app import order_flow
+from app.models import Offer, Order, Product, Proposal, ProposalStatus
 
 # Whole coins, at least 1. The upper limit keeps totals far from the database's number limits.
 Price = Annotated[int, Field(ge=1, le=1_000_000_000)]
@@ -162,7 +163,8 @@ def should_end(offer: Offer, at: datetime) -> bool:
 
 
 def catch_up(db: Session, market_id: int) -> bool:
-    """Expires unanswered proposals and removes offers whose time is up. The caller commits.
+    """Expires unanswered proposals, removes offers whose time is up, and ends orders whose
+    time is up (see app/order_flow.py). The caller commits.
 
     Returns whether anything changed.
     """
@@ -181,6 +183,8 @@ def catch_up(db: Session, market_id: int) -> bool:
         if should_end(offer, at):
             offer.removed_at = at
             changed = True
+    if order_flow.catch_up(db, market_id, at):
+        changed = True
     return changed
 
 
@@ -197,9 +201,21 @@ def end_offers_and_proposals(offers: list[Offer], proposals: list[Proposal]) -> 
 def leave_store(db: Session, market_id: int, user_id: int) -> None:
     """Called when someone leaves a market. The caller commits.
 
-    Refuses if they have committed offers (decision 0021, section 8). Otherwise their offers are
-    removed and proposals waiting for them are declined.
+    Refuses if they have committed offers or open orders as a seller (decision 0021, section 8).
+    Otherwise their offers are removed and proposals waiting for them are declined. Their orders
+    as a buyer keep going.
     """
+    selling = db.scalar(
+        select(Order.id).where(
+            Order.market_id == market_id,
+            Order.seller_id == user_id,
+            Order.status.in_(order_flow.ACTIVE),
+        )
+    )
+    if selling is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "You can't leave while you have orders to deliver."
+        )
     offers = db.scalars(
         active_offers()
         .join(Product)

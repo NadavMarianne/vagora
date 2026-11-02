@@ -34,7 +34,7 @@ export function offerDetails(offer: Offer): string[] {
       : `On request, within ${formatDuration(offer.duration_seconds)} of buying`,
     offer.refundable ? `Refundable (${offer.refund_percent}% back)` : "Not refundable",
   ];
-  if (offer.stock !== null) details.push(`${offer.stock} left`);
+  if (offer.stock !== null) details.push(offer.stock > 0 ? `${offer.stock} left` : "Sold out");
   if (offer.remove_at) details.push(`Available until ${when(offer.remove_at)}`);
   return details;
 }

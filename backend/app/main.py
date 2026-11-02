@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 
-from app import cleanup, db, invites, markets, offers, products, time_zones, users
+from app import cleanup, db, invites, markets, offers, orders, products, time_zones, users
 
 log = logging.getLogger(__name__)
 
@@ -15,6 +15,7 @@ app.include_router(markets.router)
 app.include_router(invites.router)
 app.include_router(products.router)
 app.include_router(offers.router)
+app.include_router(orders.router)
 app.include_router(time_zones.router)
 
 

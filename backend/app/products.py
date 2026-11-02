@@ -150,11 +150,8 @@ def product_view(product: Product, user: User) -> ProductView:
 
 
 def open_store(db: Session, user: User, market_id: int) -> Membership:
-    """Your membership, after the store has caught up on anything whose time is up."""
-    membership = get_membership(db, user, market_id)
-    if store.catch_up(db, market_id):
-        db.commit()
-    return membership
+    """Your membership. Getting it catches the market up on anything whose time is up."""
+    return get_membership(db, user, market_id)
 
 
 def get_product(db: Session, market_id: int, product_id: int) -> Product:

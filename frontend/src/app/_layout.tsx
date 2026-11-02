@@ -68,6 +68,8 @@ function Screens() {
           name="markets/[id]/proposals/[proposalId]"
           options={{ title: "Asked to sell" }}
         />
+        <Stack.Screen name="markets/[id]/orders/index" options={{ title: "Orders" }} />
+        <Stack.Screen name="markets/[id]/orders/[orderId]" options={{ title: "Order" }} />
       </Stack.Protected>
     </Stack>
   );
