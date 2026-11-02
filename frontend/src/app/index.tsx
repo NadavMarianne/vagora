@@ -8,7 +8,7 @@ import { Body, Button, colors, ErrorText, Loading, Screen, Title } from "@/compo
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import { useSession } from "@/lib/session";
-import type { Market, ReceivedInvite } from "@/lib/types";
+import type { LeftMarket, Market, ReceivedInvite } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 export default function Home() {
@@ -19,7 +19,11 @@ export default function Home() {
   const { data: invites, reload: reloadInvites } = useLoad(
     useCallback(() => api<ReceivedInvite[]>("/invites"), []),
   );
+  const { data: left, reload: reloadLeft } = useLoad(
+    useCallback(() => api<LeftMarket[]>("/markets/left"), []),
+  );
   const [inviteError, setInviteError] = useState("");
+  const [rejoinError, setRejoinError] = useState("");
   if (session.state !== "ready") return null;
   const { profile } = session;
 
@@ -32,6 +36,18 @@ export default function Home() {
     } catch (e) {
       setInviteError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
       await reloadInvites();
+    }
+  }
+
+  async function rejoin(market: LeftMarket) {
+    setRejoinError("");
+    try {
+      await api(`/markets/${market.id}/rejoin`, { method: "POST" });
+      await Promise.all([reloadLeft(), reloadMarkets()]);
+      router.push(`/markets/${market.id}`);
+    } catch (e) {
+      setRejoinError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      await reloadLeft();
     }
   }
 
@@ -85,6 +101,23 @@ export default function Home() {
       ))}
 
       <Button title="Create a market" onPress={() => router.push("/markets/new")} />
+
+      {left && left.length > 0 && (
+        <>
+          <Text style={styles.heading}>Markets you left</Text>
+          {left.map((market) => (
+            <View key={market.id} style={styles.left}>
+              <Text style={styles.cardTitle}>{market.name}</Text>
+              <Text style={styles.muted}>
+                {market.my_balance.toLocaleString()} {market.currency_name} waiting for you. You
+                can rejoin until {new Date(market.rejoin_until).toLocaleString()}.
+              </Text>
+              <Button title="Rejoin" kind="secondary" onPress={() => rejoin(market)} />
+            </View>
+          ))}
+          <ErrorText>{rejoinError}</ErrorText>
+        </>
+      )}
       <View style={styles.spacer} />
       <Button title="Log out" kind="secondary" onPress={() => signOut(auth)} />
     </Screen>
@@ -112,6 +145,7 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
+  left: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 16, gap: 8 },
   bold: { fontWeight: "700" },
   muted: { fontSize: 13, color: colors.muted },
   answers: { flexDirection: "row", gap: 12 },

@@ -6,6 +6,7 @@
 - **Database: Neon** (free), region Frankfurt. Real PostgreSQL. It sleeps after 5 minutes unused and wakes by itself in a fraction of a second. Branches it archives after a while also come back by themselves on the next connection.
 - **Backend: Vercel** (free Hobby plan), region Frankfurt (`fra1`), as its own Vercel project with `backend/` as its root folder. Every merge to `main` goes live, and every pull request gets its own preview link.
 - **Separate databases per Vercel environment:** Production uses Neon's main branch, pull request previews use a permanent Neon `preview` branch. Both are still the development stage (with Firebase `vagora-dev`). Real production gets its own Neon project, Firebase project, and Vercel setup when vagora goes live (decision 0012).
+- **Preview links are open** (Vercel's Deployment Protection is off, 2026-10-31), so the phones can test a pull request before it's merged: start Expo with `EXPO_PUBLIC_API_URL` set to the pull request's preview link. Everything except `/health` still needs a Firebase login. Turn protection back on before going live.
 - **Migrations run on every deploy,** as Vercel's build step (`[tool.vercel.scripts]` in `pyproject.toml`), before the new version goes live. A failed migration is undone by PostgreSQL and stops the deploy, so the old version keeps running.
 - **The app sends a warm-up request** (to `/health`) as soon as it opens, so the backend is awake by the time login finishes.
 - A web frontend can later be a second, separate Vercel project from the same repo.
