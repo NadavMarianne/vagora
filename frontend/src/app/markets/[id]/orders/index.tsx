@@ -2,19 +2,26 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import { StyleSheet, Text } from "react-native";
 
-import { OrderRow } from "@/components/order-row";
-import { Body, colors, ErrorText, Loading, Screen } from "@/components/ui";
+import { OrderRow, timers } from "@/components/order-row";
+import { Body, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, Order } from "@/lib/types";
-import { useLoad } from "@/lib/use-load";
+import { useLoad, useReloadAt } from "@/lib/use-load";
 
 type OrdersPage = { market: Market; orders: Order[] };
 
-const ACTIVE: Order["status"][] = ["open", "done_claimed", "disputed"];
+const ACTIVE: Order["status"][] = [
+  "open",
+  "done_claimed",
+  "disputed",
+  "missed",
+  "new_deadline_asked",
+  "cancel_pending",
+];
 
 export default function OrdersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, error } = useLoad(
+  const { data, error, reload } = useLoad(
     useCallback(async (): Promise<OrdersPage> => {
       const [market, orders] = await Promise.all([
         api<Market>(`/markets/${id}`),
@@ -23,6 +30,9 @@ export default function OrdersScreen() {
       return { market, orders };
     }, [id]),
   );
+
+  // When any order's timer runs out, show what happened without waiting for a tap.
+  useReloadAt(data?.orders.flatMap(timers) ?? [], reload);
 
   if (!data) {
     return (
@@ -46,6 +56,10 @@ export default function OrdersScreen() {
 
   return (
     <Screen>
+      <Info title="Your orders">
+        Tap an order to see what happened and what to do next. While an order is open, its price is
+        held: nobody has it until the order ends.
+      </Info>
       {sections.map((section) => (
         <SectionList key={section.title} title={section.title} empty={section.empty}>
           {section.list.map((order) => (

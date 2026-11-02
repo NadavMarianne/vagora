@@ -7,7 +7,16 @@ import {
   type TermsDraft,
   termsToSend,
 } from "@/components/offer-terms-form";
-import { Body, Button, ErrorText, Loading, Screen, Title } from "@/components/ui";
+import {
+  Body,
+  Button,
+  ErrorText,
+  Info,
+  Loading,
+  Screen,
+  TimedButton,
+  Title,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import type { Market, MyProposal, Product } from "@/lib/types";
 
@@ -69,15 +78,21 @@ export default function ProposalScreen() {
         {currency}. When an order is done, the coins{" "}
         {proposal.coin_mode === "to_seller" ? "go to you" : "vanish"}.
       </Body>
-      <Body>
-        Accepting is a promise: you can’t refuse an order placed on your offer. Answer by{" "}
-        {new Date(proposal.expires_at).toLocaleString()}.
-      </Body>
+      <Info title="Before you accept">
+        Accepting is a promise: once someone buys, you must do it. Set your terms below, then
+        accept by {new Date(proposal.expires_at).toLocaleString()}.
+      </Info>
       <Title>Your terms</Title>
       <OfferTermsForm draft={terms} onChange={setTerms} />
       <ErrorText>{error}</ErrorText>
-      <Button title="Accept" onPress={() => answer(true)} />
-      <Button title="Decline" kind="secondary" onPress={() => answer(false)} />
+      <TimedButton
+        title="Accept"
+        kind="good"
+        from={proposal.created_at}
+        until={proposal.expires_at}
+        onPress={() => answer(true)}
+      />
+      <Button title="Decline" kind="bad" onPress={() => answer(false)} />
     </Screen>
   );
 }

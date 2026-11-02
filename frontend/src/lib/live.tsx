@@ -26,8 +26,9 @@ function setUpFirestore(): Firestore {
 
 const db = setUpFirestore();
 
-/** A message to show, and what it's about: "invite", or "market:12" for a market. */
-export type Banner = { message: string; reason: string };
+/** A message to show, what it's about ("invite", or "market:12" for a market), and the page
+ * it opens, like "/markets/12/orders/3". */
+export type Banner = { message: string; reason: string; path: string };
 
 type Live = {
   /** Goes up by one each time something changes for you. Screens reload when it does. */
@@ -56,9 +57,13 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         setVersion((v) => v + 1);
-        const { message, reason } = snapshot.data() ?? {};
+        const { message, reason, path } = snapshot.data() ?? {};
         if (typeof message === "string" && message) {
-          setBanner({ message, reason: typeof reason === "string" ? reason : "" });
+          setBanner({
+            message,
+            reason: typeof reason === "string" ? reason : "",
+            path: typeof path === "string" ? path : "",
+          });
         }
       },
       (error) => console.warn("Live updates stopped:", error.message),

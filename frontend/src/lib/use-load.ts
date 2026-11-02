@@ -40,3 +40,26 @@ export function useLoad<T>(load: () => Promise<T>) {
 
   return { data, error, reload };
 }
+
+// setTimeout can't wait longer than about 24 days.
+const LONGEST_WAIT_MS = 2 ** 31 - 1;
+
+/** Reloads when the next of these moments comes, like a deadline running out, so the screen
+ * shows what happened without anyone touching it. */
+export function useReloadAt(moments: (string | null | undefined)[], reload: () => void) {
+  // One string, so the effect only restarts when the moments really change.
+  const key = moments.filter(Boolean).join("|");
+  useEffect(() => {
+    const now = Date.now();
+    const next = key
+      .split("|")
+      .filter(Boolean)
+      .map((m) => Date.parse(m))
+      .filter((t) => t > now)
+      .sort((a, b) => a - b)[0];
+    if (next === undefined) return;
+    // A second late, so the backend sees the time as passed.
+    const timer = setTimeout(reload, Math.min(next - now + 1000, LONGEST_WAIT_MS));
+    return () => clearTimeout(timer);
+  }, [key, reload]);
+}

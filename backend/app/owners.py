@@ -31,6 +31,7 @@ from app.products import (
     get_my_product,
     get_product,
     open_store,
+    product_path,
     product_view,
     tell_owners,
 )
@@ -230,7 +231,9 @@ def approve(market_id: int, request_id: int, user: CurrentUser, db: DbSession) -
     db.commit()
     product = request.product
     if done:
-        signals.notify_market(db, market_id, f"{product.name} was changed", but=user)
+        signals.notify_market(
+            db, market_id, f"{product.name} was changed", but=user, path=product_path(product)
+        )
     else:
         signals.notify_market(db, market_id)
     return product_view(product, user, db)
@@ -247,6 +250,7 @@ def decline(market_id: int, request_id: int, user: CurrentUser, db: DbSession) -
         [request.requested_by.firebase_uid],
         f"market:{market_id}",
         f"{user.display_name} declined your request for {request.product.name}",
+        product_path(request.product),
     )
     signals.notify_market(db, market_id)
     return product_view(request.product, user, db)

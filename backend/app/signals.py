@@ -35,10 +35,11 @@ def _client():
     return firestore.client(app)
 
 
-def notify(firebase_uids: Iterable[str], reason: str, message: str = "") -> None:
+def notify(firebase_uids: Iterable[str], reason: str, message: str = "", path: str = "") -> None:
     """Tells these people's apps that something changed.
 
-    `reason` says what, like "invite" or "market:12". `message` is shown as a banner when set.
+    `reason` says what, like "invite" or "market:12". `message` is shown as a banner when set,
+    and tapping the banner opens `path`, the app page it's about, like "/markets/12/orders/3".
     """
     uids = set(firebase_uids)
     if not uids:
@@ -49,7 +50,12 @@ def notify(firebase_uids: Iterable[str], reason: str, message: str = "") -> None
             return
         batch = client.batch()
         for uid in uids:
-            note = {"at": firestore.SERVER_TIMESTAMP, "reason": reason, "message": message}
+            note = {
+                "at": firestore.SERVER_TIMESTAMP,
+                "reason": reason,
+                "message": message,
+                "path": path,
+            }
             batch.set(client.collection("signals").document(uid), note)
         batch.commit(timeout=5)
     except Exception:
@@ -67,12 +73,15 @@ def market_members(db: Session, market_id: int) -> list[str]:
     )
 
 
-def notify_market(db: Session, market_id: int, message: str = "", but: User | None = None) -> None:
+def notify_market(
+    db: Session, market_id: int, message: str = "", but: User | None = None, path: str = ""
+) -> None:
     """Tells everyone in a market that something in it changed.
 
     `but` leaves out the person who made the change, so they get no banner about their own action.
+    The banner opens `path`, or the market's page if there's none.
     """
     members = market_members(db, market_id)
     if but is not None:
         members = [uid for uid in members if uid != but.firebase_uid]
-    notify(members, f"market:{market_id}", message)
+    notify(members, f"market:{market_id}", message, path or f"/markets/{market_id}")

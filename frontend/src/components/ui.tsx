@@ -2,13 +2,17 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
+  Easing,
   type HostInstance,
   Keyboard,
   ScrollView,
   type ScrollViewInstance,
+  type StyleProp,
   StyleSheet,
   Text,
+  type TextStyle,
   TextInput,
   type TextInputProps,
   View,
@@ -24,6 +28,9 @@ export const colors = {
   border: "#CCCCCC",
   error: "#C62828",
   background: "#FFFFFF",
+  // Buttons that agree or admit, and buttons that contest or dispute.
+  good: "#2E7D32",
+  bad: "#C62828",
 };
 
 // Lets parts of a page ask it to scroll something into view.
@@ -141,19 +148,140 @@ export function Field({ label, onFocus, ...input }: { label: string } & TextInpu
   );
 }
 
+/** "2h 5m left" until a moment, kept up to date every second. */
+export function TimeLeft({ until, style }: { until: string; style?: StyleProp<TextStyle> }) {
+  const now = useNow();
+  return <Text style={style}>{timeLeft(Date.parse(until) - now)}</Text>;
+}
+
+/** A highlighted explanation: what a page is for, or what happens next. */
+export function Info({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.info}>
+      {title && <Text style={styles.infoTitle}>{title}</Text>}
+      <Text style={styles.infoText}>{children}</Text>
+    </View>
+  );
+}
+
 export function ErrorText({ children }: { children: React.ReactNode }) {
   if (!children) return null;
   return <Text style={styles.error}>{children}</Text>;
+}
+
+type ButtonKind = "primary" | "secondary" | "good" | "bad";
+
+const BUTTON_COLOR: Record<ButtonKind, string> = {
+  primary: colors.primary,
+  secondary: colors.primary,
+  good: colors.good,
+  bad: colors.bad,
+};
+
+type ButtonProps = {
+  title: string;
+  onPress: () => Promise<void> | void;
+  kind?: ButtonKind;
+};
+
+/** The current time, updated every second. */
+function useNow() {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+// How long each step of a time bar's drain lasts. Short enough for the phone to plan easily.
+const DRAIN_STEP_MS = 30_000;
+
+/** "2d 4h left", "5m 10s left". */
+function timeLeft(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const [d, h, m] = [Math.floor(s / 86400), Math.floor(s / 3600) % 24, Math.floor(s / 60) % 60];
+  if (d > 0) return `${d}d ${h}h left`;
+  if (h > 0) return `${h}h ${m}m left`;
+  if (m > 0) return `${m}m ${s % 60}s left`;
+  return `${s}s left`;
+}
+
+/** A button with a deadline. Its color fills it like a progress bar and drains smoothly as the
+ * time between `from` and `until` runs out. Where it's filled, the title shows in white. */
+export function TimedButton({
+  from,
+  until,
+  kind = "primary",
+  ...button
+}: ButtonProps & { from: string; until: string }) {
+  const now = useNow();
+  const start = Date.parse(from);
+  const end = Date.parse(until);
+  const color = BUTTON_COLOR[kind];
+  const [width, setWidth] = useState(0);
+  // 1 when the time starts, 0 when it's up.
+  const [progress] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    const share = (at: number) =>
+      end > start ? Math.min(1, Math.max(0, (end - at) / (end - start))) : 0;
+    progress.setValue(share(Date.now()));
+    // A steady drain, run by the phone's animation system in short steps. The phone works out
+    // every frame of a step in advance, so one step lasting days would freeze and crash the app.
+    let step: Animated.CompositeAnimation | null = null;
+    function next() {
+      const at = Date.now();
+      if (at >= end) return;
+      const stepEnd = Math.min(end, at + DRAIN_STEP_MS);
+      step = Animated.timing(progress, {
+        toValue: share(stepEnd),
+        duration: stepEnd - at,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      step.start(({ finished }) => finished && next());
+    }
+    next();
+    return () => step?.stop();
+  }, [progress, start, end]);
+
+  // The colored layer slides left as time runs out; its white title slides back so it stays put.
+  const fillShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-width, 0] });
+  const titleShift = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
+  const left = timeLeft(end - now);
+
+  return (
+    <View
+      style={[styles.timed, { borderColor: color }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      <Button {...button} kind={kind} timed={left} />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          styles.timedFill,
+          { backgroundColor: color, transform: [{ translateX: fillShift }] },
+        ]}
+      >
+        <Animated.View style={[styles.button, { transform: [{ translateX: titleShift }] }]}>
+          <Text style={[styles.buttonText, { color: colors.background }]}>{button.title}</Text>
+          <Text style={[styles.timeLeft, { color: colors.background }]}>{left}</Text>
+        </Animated.View>
+      </Animated.View>
+    </View>
+  );
 }
 
 export function Button({
   title,
   onPress,
   kind = "primary",
-}: {
-  title: string;
-  onPress: () => Promise<void> | void;
-  kind?: "primary" | "secondary";
+  timed,
+}: ButtonProps & {
+  /** Set by TimedButton: the time left, shown under the title over its time bar. */
+  timed?: string;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -167,21 +295,29 @@ export function Button({
     }
   }
 
-  const primary = kind === "primary";
+  const filled = kind !== "secondary";
+  const color = BUTTON_COLOR[kind];
+  // A timed button's color is drawn behind it as a time bar, so the button itself is clear.
+  const background = timed !== undefined ? "transparent" : filled ? color : colors.background;
+  const textColor = timed !== undefined ? colors.text : filled ? colors.background : color;
   return (
     <Tappable
       onPress={press}
       disabled={busy}
       style={({ pressed }) => [
         styles.button,
-        primary ? styles.buttonPrimary : styles.buttonSecondary,
+        { backgroundColor: background },
+        !filled && timed === undefined && { borderWidth: 1, borderColor: color },
         (pressed || busy) && styles.buttonPressed,
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? colors.background : colors.primary} />
+        <ActivityIndicator color={textColor} />
       ) : (
-        <Text style={[styles.buttonText, !primary && styles.buttonTextSecondary]}>{title}</Text>
+        <>
+          <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+          {timed !== undefined && <Text style={styles.timeLeft}>{timed}</Text>}
+        </>
       )}
     </Tappable>
   );
@@ -213,11 +349,22 @@ const styles = StyleSheet.create({
   },
   error: { color: colors.error, fontSize: 15 },
   button: { borderRadius: 8, paddingVertical: 14, alignItems: "center" },
-  buttonPrimary: { backgroundColor: colors.primary },
-  buttonSecondary: { borderWidth: 1, borderColor: colors.primary },
   buttonPressed: { opacity: 0.7 },
-  buttonText: { color: colors.background, fontSize: 16, fontWeight: "600" },
-  buttonTextSecondary: { color: colors.primary },
+  buttonText: { fontSize: 16, fontWeight: "700" },
+  timed: { borderWidth: 2, borderRadius: 8, overflow: "hidden" },
+  // Clips the white title to the colored part, so the rest of the title stays dark.
+  timedFill: { overflow: "hidden" },
+  timeLeft: { fontSize: 12, color: colors.text, marginTop: 2 },
+  info: {
+    backgroundColor: "#E6F4FE",
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  infoTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
+  infoText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   loading: {
     flex: 1,
     alignItems: "center",

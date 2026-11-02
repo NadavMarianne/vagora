@@ -4,7 +4,16 @@ import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { Body, Button, colors, ErrorText, Loading, Screen, Title } from "@/components/ui";
+import {
+  Body,
+  Button,
+  colors,
+  ErrorText,
+  Loading,
+  Screen,
+  TimedButton,
+  Title,
+} from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import { useSession } from "@/lib/session";
@@ -70,10 +79,16 @@ export default function Home() {
               </Text>
               <View style={styles.answers}>
                 <View style={styles.answer}>
-                  <Button title="Accept" onPress={() => answer(invite, true)} />
+                  <TimedButton
+                    title="Accept"
+                    kind="good"
+                    from={invite.created_at}
+                    until={invite.expires_at}
+                    onPress={() => answer(invite, true)}
+                  />
                 </View>
                 <View style={styles.answer}>
-                  <Button title="Decline" kind="secondary" onPress={() => answer(invite, false)} />
+                  <Button title="Decline" kind="bad" onPress={() => answer(invite, false)} />
                 </View>
               </View>
             </View>

@@ -6,11 +6,22 @@ import { Tappable } from "@/components/tappable";
 import { colors } from "@/components/ui";
 import type { Order } from "@/lib/types";
 
+/** The moments this order changes by itself: its deadline, the 3 days after "I did it", the
+ * contest window, and the time to answer a new deadline. */
+export function timers(order: Order | undefined): (string | null)[] {
+  if (!order) return [];
+  return [
+    order.status === "open" ? order.due_at : null,
+    order.auto_complete_at,
+    order.contest_until,
+    order.new_deadline_answer_by,
+  ];
+}
+
 /** Where an order stands, in words, from your side. */
 export function orderState(order: Order): string {
   switch (order.status) {
     case "open":
-      if (order.late) return "Deadline passed";
       if (order.refund_requested) return "Refund asked for";
       return order.delivery === "deadline"
         ? `Due ${new Date(order.due_at).toLocaleString()}`
@@ -19,6 +30,16 @@ export function orderState(order: Order): string {
       return order.role === "buyer" ? "The seller says it’s done" : "Waiting for the buyer";
     case "disputed":
       return "Disputed";
+    case "missed":
+      return order.role === "buyer" ? "Deadline missed: your choice" : "Deadline missed";
+    case "new_deadline_asked":
+      return order.role === "buyer" ? "New deadline proposed" : "New deadline: your answer";
+    case "cancel_pending":
+      return order.role === "buyer" ? "Cancelling" : "Cancelled: contest it?";
+    case "not_delivered":
+      return "Not delivered";
+    case "seller_ended":
+      return "Ended by the seller";
     case "completed":
       return "Done";
     case "cancelled":
@@ -39,7 +60,9 @@ export function OrderRow({
   marketId: string;
   currency: string;
 }) {
-  const late = order.late || order.status === "disputed";
+  const late = ["disputed", "missed", "new_deadline_asked", "cancel_pending"].includes(
+    order.status,
+  );
   return (
     <Tappable
       style={styles.row}

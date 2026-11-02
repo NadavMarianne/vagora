@@ -28,6 +28,7 @@ export default function MarketSettingsScreen() {
             starting_amount: market.starting_amount,
             time_zone: market.time_zone,
             transfers_enabled: market.transfers_enabled,
+            contest_window_seconds: market.contest_window_seconds,
             allowances: market.allowances,
           }),
         );

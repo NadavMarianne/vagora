@@ -44,6 +44,8 @@ class Market(Base):
     currency_name: Mapped[str] = mapped_column(String(20))
     starting_amount: Mapped[int] = mapped_column(BigInteger)
     transfers_enabled: Mapped[bool] = mapped_column(server_default="false")
+    # After a buyer cancels a missed order, how long the seller has to contest the refund.
+    contest_window_seconds: Mapped[int] = mapped_column(server_default="86400")
     # A time zone name like "Asia/Jerusalem". Schedules use it.
     time_zone: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -359,11 +361,19 @@ class Offer(Base):
 class OrderStatus(StrEnum):
     OPEN = "open"  # bought, waiting for the seller
     DONE_CLAIMED = "done_claimed"  # the seller said "I did it"; the buyer confirms or disputes
-    DISPUTED = "disputed"  # the buyer disputed "I did it"; coins held until it's settled
+    DISPUTED = "disputed"  # the two sides disagree; coins held until it's settled
+    # A missed deadline: the time ran out, or the buyer said the seller refused. The buyer
+    # chooses what happens next, with no time limit. Doing nothing is waiting for it late.
+    MISSED = "missed"
+    NEW_DEADLINE_ASKED = "new_deadline_asked"  # the buyer proposed a new deadline
+    # The buyer cancelled after a missed deadline. The seller can contest it for a while.
+    CANCEL_PENDING = "cancel_pending"
     COMPLETED = "completed"
-    CANCELLED = "cancelled"  # the buyer cancelled, or a refund was given
+    CANCELLED = "cancelled"  # the buyer cancelled in time, or a refund was given
     DISCARDED = "discarded"  # the buyer gave it up without a refund
     EXPIRED = "expired"  # an "on request" order that was never asked for
+    NOT_DELIVERED = "not_delivered"  # cancelled after a missed deadline, fully refunded
+    SELLER_ENDED = "seller_ended"  # the seller ended it after a missed deadline (counts as refused)
 
 
 class Order(Base):
@@ -395,6 +405,18 @@ class Order(Base):
     done_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # A non-refundable order whose buyer asked the seller for a refund.
     refund_requested: Mapped[bool] = mapped_column(server_default="false")
+    # When the last deadline was missed, and how many times one was.
+    missed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    missed_count: Mapped[int] = mapped_column(server_default="0")
+    # A new deadline the buyer proposed: how long, counted from when the seller agrees, and
+    # when it was asked and until when the seller can answer.
+    new_deadline_seconds: Mapped[int | None] = mapped_column(BigInteger)
+    new_deadline_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    new_deadline_answer_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # While cancelling after a missed deadline: when the buyer cancelled, and when the refund
+    # goes through unless the seller contests it first.
+    contest_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    contest_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     offer: Mapped[Offer] = relationship()

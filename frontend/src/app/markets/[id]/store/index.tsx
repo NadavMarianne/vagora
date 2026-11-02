@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { STATUS_LABELS } from "@/components/offer-card";
 import { Tappable } from "@/components/tappable";
-import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
+import { Body, Button, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, MyProposal, ProductSummary, WaitingRequest } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
@@ -59,6 +59,10 @@ export default function StoreScreen() {
 
   return (
     <Screen>
+      <Info title="How the store works">
+        Anyone can add a product and ask members to sell it. Each seller sets their own terms. To
+        buy, open a product and pick a seller.
+      </Info>
       {requests.length > 0 && (
         <>
           <Text style={styles.heading}>Waiting for your answer</Text>

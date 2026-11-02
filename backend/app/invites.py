@@ -42,6 +42,7 @@ class ReceivedInviteView(BaseModel):
     market_name: str
     invited_by_username: str
     invited_by_display_name: str
+    created_at: datetime
     expires_at: datetime
 
 
@@ -61,6 +62,7 @@ def received_view(invite: Invite) -> ReceivedInviteView:
         market_name=invite.market.name,
         invited_by_username=invite.invited_by.username,
         invited_by_display_name=invite.invited_by.display_name,
+        created_at=invite.created_at,
         expires_at=invite.expires_at,
     )
 
@@ -120,7 +122,7 @@ def send_invite(
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have an invite.") from error
     market_name = membership.market.name
     signals.notify(
-        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}"
+        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}", "/"
     )
     signals.notify_market(db, market_id)
     return pending_view(invite)
