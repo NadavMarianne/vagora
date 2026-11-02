@@ -7,7 +7,8 @@ import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
 import { SellerPicker } from "@/components/seller-picker";
 import { Body, Button, colors, ErrorText, Field, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { Market, Member, Product, Proposal } from "@/lib/types";
+import { formatDuration } from "@/components/duration-picker";
+import type { Market, Member, Offer, Order, Product, Proposal } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type ProductPage = { market: Market; product: Product; members: Member[] };
@@ -82,6 +83,33 @@ export default function ProductScreen() {
     ]);
   }
 
+  function buy(offer: Offer) {
+    const when =
+      offer.delivery === "deadline"
+        ? `It's due within ${formatDuration(offer.duration_seconds)}.`
+        : `You can ask for it within ${formatDuration(offer.duration_seconds)}.`;
+    const refund = offer.refundable
+      ? `You can cancel before then and get ${offer.refund_percent}% back.`
+      : "It isn't refundable.";
+    Alert.alert(
+      `Buy from ${offer.seller_display_name}?`,
+      `${offer.price.toLocaleString()} ${market.currency_name} leave your balance now and are held until the order ends. ${when} ${refund}`,
+      [
+        { text: "Not now", style: "cancel" },
+        {
+          text: "Buy",
+          onPress: () =>
+            act(async () => {
+              const order = await api<Order>(`/markets/${id}/offers/${offer.id}/buy`, {
+                method: "POST",
+              });
+              router.push(`/markets/${id}/orders/${order.id}`);
+            }),
+        },
+      ],
+    );
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: product.name }} />
@@ -106,7 +134,15 @@ export default function ProductScreen() {
         />
       )}
       {offers.map((offer) => (
-        <OfferCard key={offer.id} offer={offer} currency={market.currency_name} />
+        <View key={offer.id} style={styles.buttons}>
+          <OfferCard offer={offer} currency={market.currency_name} />
+          {!offer.is_mine && offer.stock !== 0 && (
+            <Button
+              title={`Buy for ${offer.price.toLocaleString()} ${market.currency_name}`}
+              onPress={() => buy(offer)}
+            />
+          )}
+        </View>
       ))}
       {mine && (
         <View style={styles.buttons}>

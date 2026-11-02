@@ -150,6 +150,9 @@ class EntryKind(StrEnum):
 
     STARTING_AMOUNT = "starting_amount"
     ALLOWANCE = "allowance"
+    PURCHASE = "purchase"  # the price leaves the buyer and is held
+    SALE = "sale"  # held coins reach the seller
+    REFUND = "refund"  # held coins return to the buyer
 
 
 class LedgerEntry(Base):
@@ -277,3 +280,49 @@ class Offer(Base):
 
     product: Mapped[Product] = relationship(back_populates="offers")
     seller: Mapped[User] = relationship()
+
+
+class OrderStatus(StrEnum):
+    OPEN = "open"  # bought, waiting for the seller
+    DONE_CLAIMED = "done_claimed"  # the seller said "I did it"; the buyer confirms or disputes
+    DISPUTED = "disputed"  # the buyer disputed "I did it"; coins held until it's settled
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"  # the buyer cancelled, or a refund was given
+    DISCARDED = "discarded"  # the buyer gave it up without a refund
+    EXPIRED = "expired"  # an "on request" order that was never asked for
+
+
+class Order(Base):
+    """One purchase. It keeps the price and terms it was bought with, whatever the offer does."""
+
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint("price > 0", name="order_price_positive"),
+        Index("orders_by_market_and_status", "market_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"))
+    offer_id: Mapped[int] = mapped_column(ForeignKey("offers.id"), index=True)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # Copied from the product and offer at the time of buying.
+    product_name: Mapped[str] = mapped_column(String(50))
+    coin_mode: Mapped[str] = mapped_column(String(20))
+    price: Mapped[int] = mapped_column(BigInteger)
+    delivery: Mapped[str] = mapped_column(String(20))
+    refundable: Mapped[bool] = mapped_column()
+    refund_percent: Mapped[int] = mapped_column()
+    status: Mapped[str] = mapped_column(String(20), server_default=OrderStatus.OPEN)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # The deadline ("deadline") or the end of the validity ("on_request").
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # When the seller said "I did it". It completes on its own a while later unless disputed.
+    done_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A non-refundable order whose buyer asked the seller for a refund.
+    refund_requested: Mapped[bool] = mapped_column(server_default="false")
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    offer: Mapped[Offer] = relationship()
+    buyer: Mapped[User] = relationship(foreign_keys=[buyer_id])
+    seller: Mapped[User] = relationship(foreign_keys=[seller_id])
