@@ -30,6 +30,8 @@ CurrencyName = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 # Whole coins only. The upper limit keeps totals far from the database's number limits.
 Coins = Annotated[int, Field(ge=0, le=1_000_000_000)]
 TimeZone = Annotated[str, AfterValidator(known_time_zone)]
+# How long a seller has to contest a refund after a missed deadline: 10 seconds to 30 days.
+ContestWindow = Annotated[int, Field(ge=10, le=30 * 24 * 3600)]
 
 
 class MarketCreate(BaseModel):
@@ -39,6 +41,7 @@ class MarketCreate(BaseModel):
     # The app sends the creator's time zone, like "Asia/Jerusalem".
     time_zone: TimeZone
     transfers_enabled: bool = False
+    contest_window_seconds: ContestWindow = 24 * 3600
     allowances: list[AllowanceIn] = []
 
 
@@ -54,6 +57,7 @@ class MarketUpdate(BaseModel):
     starting_amount: Coins | None = None
     time_zone: TimeZone | None = None
     transfers_enabled: bool | None = None
+    contest_window_seconds: ContestWindow | None = None
     allowances: list[AllowanceIn] | None = None
 
 
@@ -64,6 +68,7 @@ class MarketView(BaseModel):
     starting_amount: int
     time_zone: str
     transfers_enabled: bool
+    contest_window_seconds: int
     allowances: list[AllowanceView]
     my_balance: int
 
@@ -109,6 +114,7 @@ def view(membership: Membership) -> MarketView:
         starting_amount=market.starting_amount,
         time_zone=market.time_zone,
         transfers_enabled=market.transfers_enabled,
+        contest_window_seconds=market.contest_window_seconds,
         allowances=[allowance_view(a) for a in market.allowances],
         my_balance=membership.balance,
     )

@@ -17,7 +17,17 @@ from app.models import CoinMode, EntryKind, Membership, Order, OrderStatus
 # buyer disputes it first.
 AUTO_COMPLETE_AFTER = timedelta(days=3)
 
-ACTIVE = (OrderStatus.OPEN, OrderStatus.DONE_CLAIMED, OrderStatus.DISPUTED)
+# After a missed deadline: the buyer is choosing, waiting late, or asked for a new deadline.
+MISSED = (OrderStatus.MISSED, OrderStatus.LATE_ACCEPTED, OrderStatus.NEW_DEADLINE_ASKED)
+
+# Orders that haven't ended yet. The coins are still held.
+ACTIVE = (
+    OrderStatus.OPEN,
+    OrderStatus.DONE_CLAIMED,
+    OrderStatus.DISPUTED,
+    *MISSED,
+    OrderStatus.CANCEL_PENDING,
+)
 
 
 def membership(db: Session, order: Order, user_id: int) -> Membership:
@@ -59,19 +69,28 @@ def auto_complete_at(order: Order) -> datetime | None:
 
 
 def catch_up(db: Session, market_id: int, at: datetime) -> list[Order]:
-    """Ends orders whose time is up. The caller commits. Returns the orders that ended.
+    """Moves orders on whose time is up. The caller commits. Returns the orders that changed.
 
     - "I did it" with no dispute for 3 days: completed.
     - "On request" never asked for before its validity ended: expired. A refundable one gives
       back its refund percentage.
-    Fixed deadlines that pass are handled with missed deadlines (decision 0021, step 3).
+    - A fixed deadline that passed: missed, and the buyer chooses what happens next.
+    - A new deadline the seller didn't answer in time: missed again, back to choosing.
+    - A cancellation after a missed deadline that the seller didn't contest: fully refunded.
     """
-    ended = []
+    changed = []
     orders = db.scalars(
         select(Order)
         .where(
             Order.market_id == market_id,
-            Order.status.in_([OrderStatus.OPEN, OrderStatus.DONE_CLAIMED]),
+            Order.status.in_(
+                [
+                    OrderStatus.OPEN,
+                    OrderStatus.DONE_CLAIMED,
+                    OrderStatus.NEW_DEADLINE_ASKED,
+                    OrderStatus.CANCEL_PENDING,
+                ]
+            ),
         )
         .with_for_update(skip_locked=True)
     )
@@ -79,13 +98,31 @@ def catch_up(db: Session, market_id: int, at: datetime) -> list[Order]:
         completes = auto_complete_at(order)
         if completes is not None and completes <= at:
             end(db, order, OrderStatus.COMPLETED, 0, at=completes)
-            ended.append(order)
-        elif (
-            order.status == OrderStatus.OPEN
-            and order.delivery == "on_request"
-            and order.due_at <= at
-        ):
-            refund = share(order.price, order.refund_percent) if order.refundable else 0
-            end(db, order, OrderStatus.EXPIRED, refund, at=order.due_at)
-            ended.append(order)
-    return ended
+        elif order.status == OrderStatus.OPEN and order.due_at <= at:
+            if order.delivery == "on_request":
+                refund = share(order.price, order.refund_percent) if order.refundable else 0
+                end(db, order, OrderStatus.EXPIRED, refund, at=order.due_at)
+            else:
+                miss(order, at=order.due_at)
+        elif order.status == OrderStatus.NEW_DEADLINE_ASKED and order.new_deadline_answer_by <= at:
+            back_to_choosing(order)
+        elif order.status == OrderStatus.CANCEL_PENDING and order.contest_until <= at:
+            end(db, order, OrderStatus.NOT_DELIVERED, order.price, at=order.contest_until)
+        else:
+            continue
+        changed.append(order)
+    return changed
+
+
+def miss(order: Order, at: datetime) -> None:
+    """The deadline was missed: the time ran out, or the buyer said the seller refused."""
+    order.status = OrderStatus.MISSED
+    order.missed_at = at
+    order.missed_count += 1
+
+
+def back_to_choosing(order: Order) -> None:
+    """A proposed new deadline was declined or not answered: the buyer chooses again."""
+    order.status = OrderStatus.MISSED
+    order.new_deadline_seconds = None
+    order.new_deadline_answer_by = None

@@ -10,7 +10,15 @@ import { useLoad } from "@/lib/use-load";
 
 type OrdersPage = { market: Market; orders: Order[] };
 
-const ACTIVE: Order["status"][] = ["open", "done_claimed", "disputed"];
+const ACTIVE: Order["status"][] = [
+  "open",
+  "done_claimed",
+  "disputed",
+  "missed",
+  "late_accepted",
+  "new_deadline_asked",
+  "cancel_pending",
+];
 
 export default function OrdersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

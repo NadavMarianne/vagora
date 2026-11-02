@@ -30,6 +30,8 @@ export type MarketSettings = {
   starting_amount: number;
   time_zone: string;
   transfers_enabled: boolean;
+  /** After a missed deadline, how long a seller has to contest a cancellation. */
+  contest_window_seconds: number;
   allowances: Allowance[];
 };
 
@@ -216,10 +218,16 @@ export type OrderStatus =
   | "open"
   | "done_claimed"
   | "disputed"
+  | "missed"
+  | "late_accepted"
+  | "new_deadline_asked"
+  | "cancel_pending"
   | "completed"
   | "cancelled"
   | "discarded"
-  | "expired";
+  | "expired"
+  | "not_delivered"
+  | "seller_ended";
 
 /** One purchase, as its buyer or seller sees it. Mirrors backend/app/orders.py. */
 export type Order = {
@@ -236,8 +244,14 @@ export type Order = {
   status: OrderStatus;
   created_at: string;
   due_at: string;
-  /** A fixed deadline that passed while the order was still open. */
-  late: boolean;
+  /** The last missed deadline, and how many were missed. */
+  missed_at: string | null;
+  missed_count: number;
+  /** A proposed new deadline: how long, and until when the seller can answer. */
+  new_deadline_seconds: number | null;
+  new_deadline_answer_by: string | null;
+  /** When a cancellation after a missed deadline goes through, unless contested. */
+  contest_until: string | null;
   done_claimed_at: string | null;
   auto_complete_at: string | null;
   refund_requested: boolean;

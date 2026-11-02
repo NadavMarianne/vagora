@@ -80,9 +80,18 @@ Before buying, the buyer sees:
 **Missed deadline.** On a fixed deadline, the timer ran out. On client's request, the buyer tapped Refused. The buyer can then choose, with **no time limit**:
 1. **Cancel:** the coins are returned in full, and the order is marked "not delivered".
 2. **Accept late:** wait for the work, or accept work already done, then mark it fulfilled. The seller can still tap I did it.
-3. **Propose a new deadline:** if the seller agrees, a new timer starts. If the seller declines, the buyer can propose another one or cancel (as in 1).
+3. **Propose a new deadline:** if the seller agrees, a new timer starts. If the seller declines, the buyer can propose another one or cancel (as in 1). The buyer picks how long the seller has to answer (10 seconds to 30 days); no answer in time means back to choosing. An agreed new deadline is a fixed deadline, even on an "on request" order. Missing it again is another miss, which is more severe if reported.
 
-While the buyer hasn't chosen, or is accepting late, **the seller can end the order**. That counts as a cancelled order, with a full refund to the buyer. This prevents orders lingering for years.
+While the buyer hasn't chosen, is accepting late, or has proposed a new deadline, **the seller can end the order**: a full refund to the buyer, and it **counts as refusing**. This prevents orders lingering for years.
+
+**Cancelling after a missed deadline can be contested** (added 2026-11-02). The app can't see what happened in person: a buyer could tap Refused, or cancel, right after being served. So a refund the buyer triggers with a claim doesn't pay out at once. The seller first gets a **contest window** (a market setting, **1 day** by default):
+- **The seller does nothing:** the full refund goes through when the window ends.
+- **The seller says it was done:** it becomes a **dispute**. The coins stay held until it's settled in court, where a false claim can bring a counter punishment (decision 0024).
+- **The seller agrees:** the full refund goes through at once.
+
+Cancelling a refundable order **before** its deadline is the buyer's right, not a claim, so it stays instant. So does the seller ending an order, since they're the side losing coins.
+
+Accepting late doesn't stop the buyer reporting it; the judge takes the late work into account.
 
 A missed deadline always lets the buyer cancel with a full refund, even on non-refundable offers.
 

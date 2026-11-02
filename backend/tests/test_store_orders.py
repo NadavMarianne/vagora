@@ -189,12 +189,14 @@ def test_cancel_gives_the_refund_percentage(home):
     assert balance(noa, market_id) == 115
 
 
-def test_cancel_only_before_the_deadline(home, db):
+def test_cancel_after_the_deadline_waits_for_the_seller(home, db):
     dana, _, market_id = home
     order = buy(home).json()
     db.execute(update(Order).values(due_at=datetime.now(UTC) - timedelta(seconds=1)))
 
-    assert act(dana, market_id, order["id"], "cancel").status_code == 409
+    # Past the deadline, cancelling is a claim the seller can contest (test_store_missed.py).
+    assert act(dana, market_id, order["id"], "cancel").json()["status"] == "cancel_pending"
+    assert balance(dana, market_id) == 70
 
 
 def test_non_refundable_cant_be_cancelled(home):
@@ -252,15 +254,15 @@ def test_on_request_expires_with_refund(home, db):
     assert balance(noa, market_id) == 106
 
 
-def test_late_deadline_is_shown(home, db):
+def test_passed_deadline_is_missed(home, db):
     dana, _, market_id = home
     order = buy(home).json()
     db.execute(update(Order).values(due_at=datetime.now(UTC) - timedelta(seconds=1)))
 
     seen = dana.get(f"/markets/{market_id}/orders/{order['id']}").json()
 
-    assert seen["late"] is True
-    assert seen["status"] == "open"
+    assert seen["status"] == "missed"
+    assert seen["missed_count"] == 1
 
 
 def test_ended_orders_cant_end_again(home):

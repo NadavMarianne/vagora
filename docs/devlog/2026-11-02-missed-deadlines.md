@@ -1,0 +1,7 @@
+# 2026-11-02: Store, step 3 (missed deadlines)
+
+- Merged PR #34 (product owners).
+- Built missed deadlines. A fixed deadline that passes, or an "on request" order the buyer marks as refused, becomes a missed deadline. The buyer then chooses, with no time limit: cancel, wait for it anyway, or propose a new deadline (with an answer time they pick). Missing a new deadline is another miss.
+- The seller can end a missed order at any point: a full refund, counted as refusing.
+- Spotted a loophole: a buyer could tap Refused right after being served and get a refund. Decided a refund triggered by the buyer's claim waits for a contest window (a market setting, 1 day by default). If the seller says it was done, it becomes a dispute for the court, where lying can bring a counter punishment. Recorded in decision 0021.
+- Next: try it on the phones. Then the limits file, then the court.

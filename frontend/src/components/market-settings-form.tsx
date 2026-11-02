@@ -4,6 +4,7 @@ import { getCalendars } from "expo-localization";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chips, Foldable, Toggle } from "@/components/controls";
+import { DurationPicker } from "@/components/duration-picker";
 import { Tappable } from "@/components/tappable";
 import { TimeZonePicker } from "@/components/time-zone-picker";
 import { Body, Button, colors, Field, useRevealFocused } from "@/components/ui";
@@ -25,6 +26,7 @@ export function defaultSettings(): MarketSettings {
     starting_amount: 0,
     time_zone: phoneTimeZone(),
     transfers_enabled: false,
+    contest_window_seconds: 86400,
     allowances: [],
   };
 }
@@ -242,6 +244,20 @@ export function MarketSettingsForm({
           />
         ))}
         <Button title="+ Add an allowance" kind="secondary" onPress={addAllowance} />
+      </Foldable>
+
+      <Foldable title="Store">
+        <DurationPicker
+          label="Time to contest a cancellation"
+          seconds={value.contest_window_seconds}
+          onChange={(contest_window_seconds) => set({ contest_window_seconds })}
+          min={10}
+          max={30 * 86400}
+        />
+        <Body>
+          When a buyer cancels after a missed deadline, the seller has this long to say it was done.
+          Then it goes to court. If they don’t, the buyer gets a full refund.
+        </Body>
       </Foldable>
     </Foldable>
   );

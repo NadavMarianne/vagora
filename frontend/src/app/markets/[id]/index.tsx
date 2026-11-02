@@ -88,8 +88,8 @@ export default function MarketScreen() {
   // Orders waiting for you: to deliver as a seller, or to confirm as a buyer.
   const waiting = orders.filter(
     (o) =>
-      (o.role === "seller" && o.status === "open") ||
-      (o.role === "buyer" && o.status === "done_claimed"),
+      (o.role === "seller" && ["open", "new_deadline_asked", "cancel_pending"].includes(o.status)) ||
+      (o.role === "buyer" && ["done_claimed", "missed"].includes(o.status)),
   ).length;
 
   return (
