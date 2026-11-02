@@ -194,10 +194,84 @@ class Product(Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     creator: Mapped[User] = relationship()
+    owners: Mapped[list["ProductOwner"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", order_by="ProductOwner.added_at"
+    )
+    requests: Mapped[list["ProductRequest"]] = relationship(
+        back_populates="product", order_by="ProductRequest.id"
+    )
     proposals: Mapped[list["Proposal"]] = relationship(
         back_populates="product", order_by="Proposal.id"
     )
     offers: Mapped[list["Offer"]] = relationship(back_populates="product", order_by="Offer.id")
+
+
+class ProductOwner(Base):
+    """Someone who owns a product. With several owners, changes need all of them to approve."""
+
+    __tablename__ = "product_owners"
+    __table_args__ = (UniqueConstraint("product_id", "user_id", name="one_ownership_per_person"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    product: Mapped["Product"] = relationship(back_populates="owners")
+    user: Mapped[User] = relationship()
+
+
+class RequestKind(StrEnum):
+    EDIT = "edit"  # change the name or description
+    CLOSE = "close"
+    ADD_OWNER = "add_owner"
+    REMOVE_OWNER = "remove_owner"
+
+
+class RequestStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"  # everyone approved, and the change was made
+    DECLINED = "declined"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
+class ProductRequest(Base):
+    """A change to a product that every owner must approve (see app/ownership.py)."""
+
+    __tablename__ = "product_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    requested_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # The person to add or remove as an owner.
+    member_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # For an edit: the new values. Empty means unchanged.
+    new_name: Mapped[str | None] = mapped_column(String(50))
+    new_description: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), server_default=RequestStatus.PENDING)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    product: Mapped["Product"] = relationship(back_populates="requests")
+    requested_by: Mapped[User] = relationship(foreign_keys=[requested_by_id])
+    member: Mapped[User | None] = relationship(foreign_keys=[member_id])
+    approvals: Mapped[list["RequestApproval"]] = relationship(cascade="all, delete-orphan")
+
+
+class RequestApproval(Base):
+    """One person's yes to a product request."""
+
+    __tablename__ = "request_approvals"
+    __table_args__ = (UniqueConstraint("request_id", "user_id", name="one_approval_per_person"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("product_requests.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship()
 
 
 class ProposalStatus(StrEnum):

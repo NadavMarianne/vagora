@@ -2,24 +2,18 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
-import { Chips, Foldable } from "@/components/controls";
-import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
-import { SellerPicker } from "@/components/seller-picker";
-import { Body, Button, colors, ErrorText, Field, Loading, Screen } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
+import { Chips } from "@/components/controls";
 import { formatDuration } from "@/components/duration-picker";
-import type { Market, Member, Offer, Order, Product, Proposal } from "@/lib/types";
+import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
+import { OwnerTools } from "@/components/owner-tools";
+import { RequestCard } from "@/components/request-card";
+import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
+import { api, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import type { Market, Member, Offer, Order, Product } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type ProductPage = { market: Market; product: Product; members: Member[] };
-
-const PROPOSAL_STATUS: Record<Proposal["status"], string> = {
-  pending: "Waiting",
-  accepted: "Accepted",
-  declined: "Declined",
-  expired: "Expired",
-  cancelled: "Cancelled",
-};
 
 export default function ProductScreen() {
   const { id, productId } = useLocalSearchParams<{
@@ -27,6 +21,8 @@ export default function ProductScreen() {
     productId: string;
   }>();
   const path = `/markets/${id}/products/${productId}`;
+  const { session } = useSession();
+  const me = session.state === "ready" ? session.profile.username : "";
   const [order, setOrder] = useState<"cheapest" | "priciest">("cheapest");
   const [error, setError] = useState("");
   const {
@@ -115,8 +111,10 @@ export default function ProductScreen() {
       <Stack.Screen options={{ title: product.name }} />
       {product.description !== "" && <Body>{product.description}</Body>}
       <Text style={styles.small}>
-        {STATUS_LABELS[product.status]} · by{" "}
-        {product.is_mine ? "you" : product.creator_display_name}
+        {STATUS_LABELS[product.status]} · owned by{" "}
+        {product.owners.length === 0
+          ? "no one"
+          : product.owners.map((o) => (o.username === me ? "you" : o.display_name)).join(", ")}
         {" · "}
         {product.coin_mode === "to_seller" ? "the coins go to the seller" : "the coins vanish"}
       </Text>
@@ -157,119 +155,40 @@ export default function ProductScreen() {
         </View>
       )}
 
-      <ErrorText>{error}</ErrorText>
-      {product.is_mine && (
-        <CreatorTools product={product} members={members} path={path} act={act} />
-      )}
-    </Screen>
-  );
-}
-
-/** What the product's creator can do: edit it, see proposals, ask more sellers, close it. */
-function CreatorTools({
-  product,
-  members,
-  path,
-  act,
-}: {
-  product: Product;
-  members: Member[];
-  path: string;
-  act: (action: () => Promise<unknown>) => Promise<void>;
-}) {
-  const [name, setName] = useState(product.name);
-  const [description, setDescription] = useState(product.description);
-  const [sellers, setSellers] = useState<string[]>([]);
-  const [price, setPrice] = useState(String(product.offers[0]?.price ?? ""));
-
-  // Members who don't sell it already and have no proposal waiting.
-  const busy = new Set([
-    product.creator_username,
-    ...product.offers.map((o) => o.seller_username),
-    ...product.proposals.filter((p) => p.status === "pending").map((p) => p.seller_username),
-  ]);
-  const canAsk = members.filter((m) => !busy.has(m.username));
-  const closed = product.status === "closed";
-
-  function close() {
-    Alert.alert(
-      "Close this product?",
-      "No new proposals, and offers without a commitment are removed. Committed offers stay until their commitment ends.",
-      [
-        { text: "Keep it open", style: "cancel" },
-        {
-          text: "Close",
-          style: "destructive",
-          onPress: () => act(() => api(`${path}/close`, { method: "POST" })),
-        },
-      ],
-    );
-  }
-
-  return (
-    <>
-      <Text style={styles.heading}>Your product</Text>
-      <Foldable title="Name and description">
-        <Field label="Name" value={name} onChangeText={setName} />
-        <Field label="Description" value={description} onChangeText={setDescription} multiline />
-        <Button
-          title="Save"
-          onPress={() =>
+      {product.requests.length > 0 && <Text style={styles.heading}>Waiting for approval</Text>}
+      {product.requests.map((request) => (
+        <RequestCard
+          key={request.id}
+          request={request}
+          forMe={request.kind === "add_owner" && request.member?.username === me}
+          onAnswer={(approve) =>
             act(() =>
-              api(path, {
-                method: "PATCH",
-                body: { name, description },
+              api(`/markets/${id}/product-requests/${request.id}/${approve ? "approve" : "decline"}`, {
+                method: "POST",
               }),
             )
           }
+          onCancel={() =>
+            act(() => api(`/markets/${id}/product-requests/${request.id}`, { method: "DELETE" }))
+          }
         />
-      </Foldable>
+      ))}
 
-      <Foldable title={`Proposals (${product.proposals.length})`}>
-        {product.proposals.length === 0 && <Body>None sent.</Body>}
-        {product.proposals.map((p) => (
-          <View key={p.id} style={styles.row}>
-            <Text style={styles.rowText}>
-              {p.seller_display_name}, {p.price.toLocaleString()}
-            </Text>
-            <Text style={styles.small}>{PROPOSAL_STATUS[p.status]}</Text>
-          </View>
-        ))}
-      </Foldable>
-
-      {!closed && (
-        <Foldable title="Ask more sellers">
-          <SellerPicker members={canAsk} selected={sellers} onChange={setSellers} />
-          {canAsk.length > 0 && (
-            <>
-              <Field
-                label="Price"
-                value={price}
-                onChangeText={(text) => setPrice(text.replace(/\D/g, ""))}
-                keyboardType="number-pad"
-              />
-              <Button
-                title="Send proposals"
-                onPress={() =>
-                  act(async () => {
-                    await api(`${path}/proposals`, {
-                      method: "POST",
-                      body: {
-                        sellers,
-                        price: Number(price),
-                      },
-                    });
-                    setSellers([]);
-                  })
-                }
-              />
-            </>
-          )}
-        </Foldable>
+      {product.can_claim && (
+        <>
+          <Body>This product has no owners left. As one of its sellers, you can take it over.</Body>
+          <Button
+            title="Become its owner"
+            onPress={() => act(() => api(`${path}/claim`, { method: "POST" }))}
+          />
+        </>
       )}
 
-      {!closed && <Button title="Close product" kind="secondary" onPress={close} />}
-    </>
+      <ErrorText>{error}</ErrorText>
+      {product.is_mine && (
+        <OwnerTools product={product} members={members} me={me} path={path} act={act} />
+      )}
+    </Screen>
   );
 }
 

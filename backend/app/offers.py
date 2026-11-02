@@ -89,7 +89,7 @@ def change_offer(
         change_free(offer, change)
     db.commit()
     signals.notify_market(db, market_id)
-    return product_view(offer.product, user)
+    return product_view(offer.product, user, db)
 
 
 @router.delete("/{offer_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -2,6 +2,7 @@
 
 Any member creates a product and proposes it to sellers at a price. Each seller accepts (with
 their own terms, which makes an offer) or declines. The product is live once it has an offer.
+A product can have several owners (see app/ownership.py and app/owners.py).
 """
 
 from datetime import datetime
@@ -13,9 +14,21 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import signals, store
+from app import ownership, signals, store
 from app.markets import get_membership
-from app.models import CoinMode, Membership, Offer, Product, Proposal, ProposalStatus, User
+from app.models import (
+    CoinMode,
+    Membership,
+    Offer,
+    Product,
+    ProductOwner,
+    ProductRequest,
+    Proposal,
+    ProposalStatus,
+    RequestKind,
+    RequestStatus,
+    User,
+)
 from app.store import OfferTerms, OfferView, Price
 from app.users import CurrentUser, DbSession, Username
 
@@ -23,8 +36,9 @@ router = APIRouter(prefix="/markets/{market_id}", tags=["store"])
 
 ProductName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
 Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
-# How long sellers have to answer: 10 seconds to 30 days.
-ProposalExpiry = Annotated[int, Field(ge=10, le=30 * 24 * 3600)]
+# How long people have to answer a proposal or a request: 10 seconds to 30 days.
+AnswerTime = Annotated[int, Field(ge=10, le=30 * 24 * 3600)]
+THREE_DAYS = 3 * 24 * 3600
 
 
 class ProductCreate(BaseModel):
@@ -32,7 +46,7 @@ class ProductCreate(BaseModel):
     description: Description = ""
     coin_mode: CoinMode
     price: Price
-    proposal_expiry_seconds: ProposalExpiry = 3 * 24 * 3600
+    proposal_expiry_seconds: AnswerTime = THREE_DAYS
     # Who gets a proposal. The creator sells it too by sending `my_offer` (their own terms).
     sellers: list[Username] = []
     my_offer: OfferTerms | None = None
@@ -41,11 +55,19 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: ProductName | None = None
     description: Description | None = None
+    # With several owners, how long the others have to approve.
+    expires_in_seconds: AnswerTime = THREE_DAYS
+
+
+class CloseRequest(BaseModel):
+    expires_in_seconds: AnswerTime = THREE_DAYS
 
 
 class ProposalsCreate(BaseModel):
     sellers: list[Username] = Field(min_length=1)
     price: Price
+    # How long they have to answer. Without it, the time chosen when the product was created.
+    expires_in_seconds: AnswerTime | None = None
 
 
 class ProposalView(BaseModel):
@@ -75,6 +97,29 @@ class MyProposalView(BaseModel):
 ProductStatus = Literal["waiting", "live", "no_sellers", "closed"]
 
 
+class PersonView(BaseModel):
+    username: str
+    display_name: str
+
+
+class RequestView(BaseModel):
+    """A change waiting for approval. Owners see these, and so does someone being added."""
+
+    id: int
+    kind: str
+    requested_by: PersonView
+    # Who's being added or removed.
+    member: PersonView | None
+    new_name: str | None
+    new_description: str | None
+    approved: list[PersonView]
+    waiting_for: list[PersonView]
+    # Whether it waits for your answer, and whether you asked for it.
+    mine_to_answer: bool
+    mine: bool
+    expires_at: datetime
+
+
 class ProductSummary(BaseModel):
     id: int
     name: str
@@ -83,6 +128,7 @@ class ProductSummary(BaseModel):
     status: ProductStatus
     creator_username: str
     creator_display_name: str
+    # Whether you own it.
     is_mine: bool
     offer_count: int
     lowest_price: int | None
@@ -91,8 +137,12 @@ class ProductSummary(BaseModel):
 class ProductView(ProductSummary):
     proposal_expiry_seconds: int
     offers: list[OfferView]
-    # Only the creator sees the proposals.
+    owners: list[PersonView]
+    # Only owners see the proposals.
     proposals: list[ProposalView]
+    requests: list[RequestView]
+    # A seller can claim a product that has no owners left.
+    can_claim: bool
 
 
 def live_offers(product: Product) -> list[Offer]:
@@ -121,18 +171,52 @@ def summary_fields(product: Product, user: User) -> dict:
         "status": product_status(product, offers),
         "creator_username": product.creator.username,
         "creator_display_name": product.creator.display_name,
-        "is_mine": product.creator_id == user.id,
+        "is_mine": ownership.is_owner(product, user),
         "offer_count": len(offers),
         "lowest_price": offers[0].price if offers else None,
     }
 
 
-def product_view(product: Product, user: User) -> ProductView:
-    is_creator = product.creator_id == user.id
+def person(user: User) -> PersonView:
+    return PersonView(username=user.username, display_name=user.display_name)
+
+
+def request_view(db: Session, request: ProductRequest, user: User) -> RequestView:
+    def people(ids: set[int]) -> list[PersonView]:
+        if not ids:
+            return []
+        return [person(u) for u in db.scalars(select(User).where(User.id.in_(ids)))]
+
+    waiting = ownership.waiting_for(request)
+    return RequestView(
+        id=request.id,
+        kind=request.kind,
+        requested_by=person(request.requested_by),
+        member=person(request.member) if request.member else None,
+        new_name=request.new_name,
+        new_description=request.new_description,
+        approved=people(ownership.approved_by(request)),
+        waiting_for=people(waiting),
+        mine_to_answer=user.id in waiting,
+        mine=request.requested_by_id == user.id,
+        expires_at=request.expires_at,
+    )
+
+
+def product_view(product: Product, user: User, db: Session) -> ProductView:
+    is_owner = ownership.is_owner(product, user)
+    offers = live_offers(product)
     return ProductView(
         **summary_fields(product, user),
         proposal_expiry_seconds=product.proposal_expiry_seconds,
-        offers=[store.offer_view(o, user.id) for o in live_offers(product)],
+        offers=[store.offer_view(o, user.id) for o in offers],
+        owners=[person(o.user) for o in product.owners],
+        requests=[
+            request_view(db, r, user)
+            for r in ownership.pending(product)
+            if is_owner or user.id in ownership.approvers(r)
+        ],
+        can_claim=not product.owners and any(o.seller_id == user.id for o in offers),
         proposals=[
             ProposalView(
                 id=p.id,
@@ -144,7 +228,7 @@ def product_view(product: Product, user: User) -> ProductView:
             )
             for p in reversed(product.proposals)
         ]
-        if is_creator
+        if is_owner
         else [],
     )
 
@@ -164,14 +248,26 @@ def get_product(db: Session, market_id: int, product_id: int) -> Product:
 
 
 def get_my_product(db: Session, user: User, market_id: int, product_id: int) -> Product:
-    product = get_product(db, market_id, product_id)
-    if product.creator_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the product's creator can do this.")
+    """A product you own. Locked, so two changes to it can't happen at once."""
+    product = db.scalar(
+        select(Product)
+        .where(Product.id == product_id, Product.market_id == market_id)
+        .with_for_update()
+    )
+    if product is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found.")
+    if not ownership.is_owner(product, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the product's owners can do this.")
     return product
 
 
 def propose(
-    db: Session, product: Product, usernames: list[str], price: int, by: User
+    db: Session,
+    product: Product,
+    usernames: list[str],
+    price: int,
+    by: User,
+    expires_in: int | None = None,
 ) -> list[User]:
     """Sends proposals to these members. Refuses anyone who already sells it or has one waiting.
 
@@ -216,7 +312,7 @@ def propose(
                 product=product,
                 seller=seller,
                 price=price,
-                expires_at=store.expires_in(product.proposal_expiry_seconds),
+                expires_at=store.expires_in(expires_in or product.proposal_expiry_seconds),
             )
         )
         sellers.append(seller)
@@ -250,6 +346,7 @@ def create_product(
         coin_mode=new.coin_mode,
         proposal_expiry_seconds=new.proposal_expiry_seconds,
     )
+    product.owners.append(ProductOwner(user=user))
     db.add(product)
     if new.my_offer is not None:
         offer = Offer(product=product, seller=user, price=new.price)
@@ -258,7 +355,7 @@ def create_product(
     sellers = propose(db, product, new.sellers, new.price, by=user)
     db.commit()
     tell_sellers(db, product, sellers, by=user)
-    return product_view(product, user)
+    return product_view(product, user, db)
 
 
 @router.get("/products")
@@ -277,55 +374,82 @@ def get_product_details(
 ) -> ProductView:
     """A product with its offers, cheapest first."""
     open_store(db, user, market_id)
-    return product_view(get_product(db, market_id, product_id), user)
+    return product_view(get_product(db, market_id, product_id), user, db)
 
 
 @router.patch("/products/{product_id}")
 def change_product(
     market_id: int, product_id: int, changes: ProductUpdate, user: CurrentUser, db: DbSession
 ) -> ProductView:
-    """The creator can change the name and description."""
+    """Changes the name or description. With several owners, the others must approve first."""
     open_store(db, user, market_id)
     product = get_my_product(db, user, market_id, product_id)
-    for field, value in changes.model_dump(exclude_unset=True, exclude_none=True).items():
-        setattr(product, field, value)
+    if changes.name is None and changes.description is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Nothing to change.")
+    request = ownership.ask(
+        db,
+        product,
+        user,
+        RequestKind.EDIT,
+        changes.expires_in_seconds,
+        new_name=changes.name,
+        new_description=changes.description,
+    )
     db.commit()
-    signals.notify_market(db, market_id)
-    return product_view(product, user)
+    tell_owners(db, product, request, f"{user.display_name} wants to edit {product.name}")
+    return product_view(product, user, db)
 
 
 @router.post("/products/{product_id}/close")
-def close_product(market_id: int, product_id: int, user: CurrentUser, db: DbSession) -> ProductView:
+def close_product(
+    market_id: int,
+    product_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    close: CloseRequest | None = None,
+) -> ProductView:
     """Stops new proposals and removes offers without a commitment. Committed offers stay until
-    their commitment is released."""
+    their commitment is released. With several owners, the others must approve first."""
     open_store(db, user, market_id)
     product = get_my_product(db, user, market_id, product_id)
-    if product.closed_at is None:
-        product.closed_at = store.now()
-        store.end_offers_and_proposals(
-            [o for o in product.offers if o.removed_at is None],
-            [p for p in product.proposals if p.status == ProposalStatus.PENDING],
-        )
-        db.commit()
-        signals.notify_market(db, market_id)
-    return product_view(product, user)
+    if product.closed_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This product is already closed.")
+    if any(r.kind == RequestKind.CLOSE for r in ownership.pending(product)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Closing it is already waiting for approval.")
+    expires_in = (close or CloseRequest()).expires_in_seconds
+    request = ownership.ask(db, product, user, RequestKind.CLOSE, expires_in)
+    db.commit()
+    tell_owners(db, product, request, f"{user.display_name} wants to close {product.name}")
+    return product_view(product, user, db)
+
+
+def tell_owners(db: Session, product: Product, request: ProductRequest, message: str) -> None:
+    """Refreshes everyone's screens. If the request still waits, the people it waits for get a
+    banner."""
+    signals.notify_market(db, product.market_id)
+    waiting = ownership.waiting_for(request) if request.status == RequestStatus.PENDING else set()
+    if waiting:
+        uids = db.scalars(select(User.firebase_uid).where(User.id.in_(waiting)))
+        signals.notify(uids, f"market:{product.market_id}", message)
 
 
 @router.post("/products/{product_id}/proposals", status_code=status.HTTP_201_CREATED)
 def send_proposals(
     market_id: int, product_id: int, new: ProposalsCreate, user: CurrentUser, db: DbSession
 ) -> ProductView:
-    """The creator proposes the product to more sellers, or again to one who declined."""
+    """Any owner proposes the product to more sellers, or again to one who declined."""
     open_store(db, user, market_id)
     product = get_my_product(db, user, market_id, product_id)
-    sellers = propose(db, product, new.sellers, new.price, by=user)
+    sellers = propose(
+        db, product, new.sellers, new.price, by=user, expires_in=new.expires_in_seconds
+    )
     try:
         db.commit()
     except IntegrityError as error:
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have a proposal.") from error
     tell_sellers(db, product, sellers, by=user)
-    return product_view(product, user)
+    return product_view(product, user, db)
 
 
 @router.get("/proposals")
@@ -384,11 +508,11 @@ def accept_proposal(
     db.commit()
     signals.notify_market(db, market_id)
     signals.notify(
-        [product.creator.firebase_uid],
+        [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} now sells {product.name}",
     )
-    return product_view(product, user)
+    return product_view(product, user, db)
 
 
 @router.post("/proposals/{proposal_id}/decline", status_code=status.HTTP_204_NO_CONTENT)
@@ -400,7 +524,7 @@ def decline_proposal(market_id: int, proposal_id: int, user: CurrentUser, db: Db
     product = proposal.product
     signals.notify_market(db, market_id)
     signals.notify(
-        [product.creator.firebase_uid],
+        [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} declined to sell {product.name}",
     )

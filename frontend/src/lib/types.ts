@@ -155,11 +155,49 @@ export type Proposal = {
   expires_at: string;
 };
 
+export type Person = { username: string; display_name: string };
+
+/** A change to a product that every owner must approve. */
+export type ProductRequest = {
+  id: number;
+  kind: "edit" | "close" | "add_owner" | "remove_owner";
+  requested_by: Person;
+  /** Who's being added or removed as an owner. */
+  member: Person | null;
+  new_name: string | null;
+  new_description: string | null;
+  approved: Person[];
+  waiting_for: Person[];
+  /** It waits for your answer. */
+  mine_to_answer: boolean;
+  /** You asked for it. */
+  mine: boolean;
+  expires_at: string;
+};
+
 export type Product = ProductSummary & {
   proposal_expiry_seconds: number;
   offers: Offer[];
-  /** Only the creator gets these. */
+  owners: Person[];
+  /** Only owners get these. */
   proposals: Proposal[];
+  /** Owners see these, and so does someone asked to co-own. */
+  requests: ProductRequest[];
+  /** A seller can claim a product that has no owners left. */
+  can_claim: boolean;
+};
+
+/** A product request in the market waiting for your answer. */
+export type WaitingRequest = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  kind: ProductRequest["kind"];
+  requested_by_display_name: string;
+  member_display_name: string | null;
+  /** You're the one asked to co-own it. */
+  asks_you_to_own: boolean;
+  expires_at: string;
 };
 
 /** A proposal waiting for your answer. */

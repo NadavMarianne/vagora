@@ -6,25 +6,44 @@ import { STATUS_LABELS } from "@/components/offer-card";
 import { Tappable } from "@/components/tappable";
 import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { Market, MyProposal, ProductSummary } from "@/lib/types";
+import type { Market, MyProposal, ProductSummary, WaitingRequest } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type StorePage = {
   market: Market;
   proposals: MyProposal[];
   products: ProductSummary[];
+  requests: WaitingRequest[];
 };
+
+/** A request waiting for your answer, in words. */
+function describeWaiting(request: WaitingRequest): string {
+  const by = request.requested_by_display_name;
+  switch (request.kind) {
+    case "edit":
+      return `${by} wants to edit it`;
+    case "close":
+      return `${by} wants to close it`;
+    case "add_owner":
+      return !request.asks_you_to_own
+        ? `${by} wants ${request.member_display_name} to co-own it`
+        : `${by} asks you to co-own it`;
+    case "remove_owner":
+      return `${by} wants to remove ${request.member_display_name} as an owner`;
+  }
+}
 
 export default function StoreScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, error } = useLoad(
     useCallback(async (): Promise<StorePage> => {
-      const [market, proposals, products] = await Promise.all([
+      const [market, proposals, products, requests] = await Promise.all([
         api<Market>(`/markets/${id}`),
         api<MyProposal[]>(`/markets/${id}/proposals`),
         api<ProductSummary[]>(`/markets/${id}/products`),
+        api<WaitingRequest[]>(`/markets/${id}/product-requests`),
       ]);
-      return { market, proposals, products };
+      return { market, proposals, products, requests };
     }, [id]),
   );
 
@@ -36,10 +55,32 @@ export default function StoreScreen() {
       </Screen>
     );
   }
-  const { market, proposals, products } = data;
+  const { market, proposals, products, requests } = data;
 
   return (
     <Screen>
+      {requests.length > 0 && (
+        <>
+          <Text style={styles.heading}>Waiting for your answer</Text>
+          {requests.map((request) => (
+            <Tappable
+              key={request.id}
+              style={styles.row}
+              accessibilityRole="button"
+              onPress={() => router.push(`/markets/${id}/store/${request.product_id}`)}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.name}>{request.product_name}</Text>
+                <Text style={styles.small}>
+                  {describeWaiting(request)}. Expires{" "}
+                  {new Date(request.expires_at).toLocaleString()}
+                </Text>
+              </View>
+            </Tappable>
+          ))}
+        </>
+      )}
+
       {proposals.length > 0 && (
         <>
           <Text style={styles.heading}>Asked to sell</Text>
