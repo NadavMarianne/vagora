@@ -61,6 +61,7 @@ export function OwnerTools({
   const [terms, setTerms] = useState<TermsDraft>(defaultTerms);
   const [newOwner, setNewOwner] = useState<string[]>([]);
   const [answerTime, setAnswerTime] = useState(3 * DAY);
+  const [proposalTime, setProposalTime] = useState(product.proposal_expiry_seconds);
 
   const shared = product.owners.length > 1;
   const closed = product.status === "closed";
@@ -187,13 +188,14 @@ export function OwnerTools({
                 onChangeText={(text) => setPrice(text.replace(/\D/g, ""))}
                 keyboardType="number-pad"
               />
+              <AnswerTime seconds={proposalTime} onChange={setProposalTime} />
               <Button
                 title="Send proposals"
                 onPress={() =>
                   act(async () => {
                     await api(`${path}/proposals`, {
                       method: "POST",
-                      body: { sellers, price: Number(price) },
+                      body: { sellers, price: Number(price), expires_in_seconds: proposalTime },
                     });
                     setSellers([]);
                   })

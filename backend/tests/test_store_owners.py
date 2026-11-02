@@ -228,6 +228,22 @@ def test_owners_propose(home):
     )
 
 
+def test_more_sellers_get_their_own_answer_time(home):
+    dana, _, tal, market_id, path = home
+
+    sent = dana.post(
+        f"{path}/proposals", json={"sellers": ["tal_b"], "price": 30, "expires_in_seconds": 60}
+    )
+    assert sent.status_code == 201
+    expires = datetime.fromisoformat(
+        tal.get(f"/markets/{market_id}/proposals").json()[0]["expires_at"]
+    )
+    assert expires - datetime.now(UTC) < timedelta(seconds=61)
+
+    too_short = {"sellers": ["tal_b"], "price": 30, "expires_in_seconds": 9}
+    assert dana.post(f"{path}/proposals", json=too_short).status_code == 422
+
+
 def test_sell_it_myself(home):
     dana, noa, _, _, path = home
     new = {"price": 25, "terms": TERMS}

@@ -66,6 +66,8 @@ class CloseRequest(BaseModel):
 class ProposalsCreate(BaseModel):
     sellers: list[Username] = Field(min_length=1)
     price: Price
+    # How long they have to answer. Without it, the time chosen when the product was created.
+    expires_in_seconds: AnswerTime | None = None
 
 
 class ProposalView(BaseModel):
@@ -260,7 +262,12 @@ def get_my_product(db: Session, user: User, market_id: int, product_id: int) -> 
 
 
 def propose(
-    db: Session, product: Product, usernames: list[str], price: int, by: User
+    db: Session,
+    product: Product,
+    usernames: list[str],
+    price: int,
+    by: User,
+    expires_in: int | None = None,
 ) -> list[User]:
     """Sends proposals to these members. Refuses anyone who already sells it or has one waiting.
 
@@ -305,7 +312,7 @@ def propose(
                 product=product,
                 seller=seller,
                 price=price,
-                expires_at=store.expires_in(product.proposal_expiry_seconds),
+                expires_at=store.expires_in(expires_in or product.proposal_expiry_seconds),
             )
         )
         sellers.append(seller)
@@ -433,7 +440,9 @@ def send_proposals(
     """Any owner proposes the product to more sellers, or again to one who declined."""
     open_store(db, user, market_id)
     product = get_my_product(db, user, market_id, product_id)
-    sellers = propose(db, product, new.sellers, new.price, by=user)
+    sellers = propose(
+        db, product, new.sellers, new.price, by=user, expires_in=new.expires_in_seconds
+    )
     try:
         db.commit()
     except IntegrityError as error:
