@@ -4,6 +4,7 @@ import { FirebaseError } from "firebase/app";
 const messages: Record<string, string> = {
   "auth/invalid-email": "That email address doesn't look right.",
   "auth/missing-password": "Enter your password.",
+  "auth/missing-email": "Enter your email.",
   "auth/invalid-credential": "Wrong email or password.",
   "auth/email-already-in-use": "There's already an account with this email. Try logging in.",
   "auth/password-does-not-meet-requirements":
