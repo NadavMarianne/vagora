@@ -25,3 +25,7 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0019](0019-expo-app.md) | The app is built with Expo | Accepted |
 | [0020](0020-live-updates.md) | Live updates through Firestore | Accepted |
 | [0021](0021-store.md) | The store: products, offers, buying, and orders | Accepted |
+| [0022](0022-limits-file.md) | The limits file | Accepted |
+| [0023](0023-reports-and-cases.md) | Reports and cases | Accepted |
+| [0024](0024-court.md) | The court: judge, verdict, punisher, and consequences | Accepted |
+| [0025](0025-extras.md) | Extras: mystery orders, auctions, bounties, streaks | Accepted |
