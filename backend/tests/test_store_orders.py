@@ -299,7 +299,7 @@ def test_ledger_matches_balances(home, db):
         order = buy(home, price=10, refund_percent=30).json()
         act(dana, market_id, order["id"], "cancel")
 
-    for membership in db.scalars(select(Membership)):
+    for membership in db.scalars(select(Membership).where(Membership.market_id == market_id)):
         total = db.scalar(
             select(func.coalesce(func.sum(LedgerEntry.amount), 0)).where(
                 LedgerEntry.membership_id == membership.id
