@@ -44,6 +44,7 @@ function Screens() {
       <Stack.Protected guard={is("signed-out")}>
         <Stack.Screen name="sign-in" options={{ title: "Log in" }} />
         <Stack.Screen name="sign-up" options={{ title: "Sign up" }} />
+        <Stack.Screen name="forgot-password" options={{ title: "Forgot password" }} />
       </Stack.Protected>
       <Stack.Protected guard={is("unverified")}>
         <Stack.Screen name="verify-email" options={{ title: "Verify your email" }} />

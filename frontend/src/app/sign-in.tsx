@@ -41,6 +41,13 @@ export default function SignIn() {
       />
       <ErrorText>{error}</ErrorText>
       <Button title="Log in" onPress={logIn} />
+      <Button
+        title="Forgot password?"
+        kind="secondary"
+        onPress={() =>
+          router.push({ pathname: "/forgot-password", params: { email: email.trim() } })
+        }
+      />
       <Body>New here?</Body>
       <Button title="Create an account" kind="secondary" onPress={() => router.push("/sign-up")} />
     </Screen>
