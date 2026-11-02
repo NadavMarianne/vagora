@@ -10,6 +10,7 @@ import {
   Button,
   colors,
   ErrorText,
+  Info,
   Loading,
   Screen,
   TimedButton,
@@ -217,30 +218,30 @@ function next(order: Order, currency: string): string {
     case "open":
       if (order.delivery === "on_request") {
         return buyer
-          ? `Ask the seller in person, any time until ${when(order.due_at)}. When it’s done, tap “It’s done”. If they refuse, tap “They refused”.`
-          : `The buyer can ask you for it any time until ${when(order.due_at)}. When it’s done, tap “I did it”.`;
+          ? `Ask the seller for it in person, any time until ${when(order.due_at)}. After they do it, tap “It’s done”. If they say no, tap “They refused”.`
+          : `The buyer can ask you for it any time until ${when(order.due_at)}. After you do it, tap “I did it”.`;
       }
       return buyer
-        ? `The seller should do it by ${when(order.due_at)}. When it’s done, tap “It’s done”.`
-        : `Do it by ${when(order.due_at)}, then tap “I did it”. If the time runs out, the deadline is missed.`;
+        ? `The seller has until ${when(order.due_at)}. After they do it, tap “It’s done”.`
+        : `You have until ${when(order.due_at)}. After you do it, tap “I did it”. If the time runs out, the deadline is missed.`;
     case "done_claimed":
       return buyer
-        ? `The seller says it’s done. If you don’t answer, it counts as done on ${when(order.auto_complete_at!)} and they’re paid.`
-        : `Waiting for the buyer. If they don’t answer, it counts as done on ${when(order.auto_complete_at!)}.`;
+        ? `The seller says it’s done. Confirm, or say it wasn’t. If you do nothing, it counts as done on ${when(order.auto_complete_at!)}.`
+        : `Waiting for the buyer to confirm. If they do nothing, it counts as done on ${when(order.auto_complete_at!)}.`;
     case "disputed":
-      return `You disagree about whether it was done, so the ${order.price} ${currency} stay held until it’s settled in court. Either side can give up.`;
+      return `You disagree about whether it was done. The ${order.price} ${currency} stay held until it’s settled in court, or one of you gives up.`;
     case "missed":
       return buyer
-        ? "Doing nothing means you’re still waiting for it, for as long as you like. You can also cancel for the full price back, or propose a new deadline. You can report it either way; accepting it late makes it softer."
-        : "The buyer chooses what happens next. Meanwhile you can still do it, or end the order (a full refund, counted as refusing).";
+        ? "The deadline passed. You don’t have to do anything: you’re simply still waiting, for as long as you like. Or cancel to get the full price back, or propose a new deadline. Either way, you can report it later."
+        : "The deadline passed. The buyer decides what happens next. You can still do it and tap “I did it”, or end the order (they get the full price back, and it counts as refusing).";
     case "new_deadline_asked":
       return buyer
-        ? `You proposed a new deadline: ${formatDuration(order.new_deadline_seconds!)} from when the seller agrees. They can answer until ${when(order.new_deadline_answer_by!)}. If they don’t, you’re back to choosing.`
-        : `The buyer proposes a new deadline: ${formatDuration(order.new_deadline_seconds!)} from when you agree. Answer by ${when(order.new_deadline_answer_by!)}.`;
+        ? `You asked for a new deadline: ${formatDuration(order.new_deadline_seconds!)}, starting when the seller agrees. They have until ${when(order.new_deadline_answer_by!)} to answer. If they don’t, you choose again.`
+        : `The buyer asks for a new deadline: ${formatDuration(order.new_deadline_seconds!)}, starting when you agree. Answer by ${when(order.new_deadline_answer_by!)}.`;
     case "cancel_pending":
       return buyer
-        ? `You get the full price back on ${when(order.contest_until!)}, unless the seller says it was done. Then it goes to court.`
-        : `The buyer cancelled. If it really wasn’t done, admit it and they get the full price back now. If it was done, contest it before ${when(order.contest_until!)}, and it goes to court. If you do nothing, they get the full price back then.`;
+        ? `You cancelled. You get the full price back on ${when(order.contest_until!)}, unless the seller says it was done. Then it goes to court.`
+        : `The buyer cancelled. If it wasn’t done, admit it and they get the full price back now. If it was done, contest it before ${when(order.contest_until!)} and it goes to court. If you do nothing, they get the full price back then.`;
     default:
       return "This order is over.";
   }
@@ -322,6 +323,7 @@ export default function OrderScreen() {
     <Screen>
       <Stack.Screen options={{ title: order.product_name }} />
       <Title>{orderState(order)}</Title>
+      <Info title="What happens next">{next(order, currency)}</Info>
       <View style={styles.facts}>
         <Fact label={buyer ? "Seller" : "Buyer"} value={order.other_display_name} />
         <Fact label="Price" value={`${order.price.toLocaleString()} ${currency}`} />
@@ -345,9 +347,6 @@ export default function OrderScreen() {
           {line}
         </Text>
       ))}
-
-      <Text style={styles.heading}>What happens next</Text>
-      <Body>{next(order, currency)}</Body>
 
       {actionsFor(order, currency, market.contest_window_seconds).map((action) =>
         action.timer ? (

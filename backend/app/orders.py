@@ -102,11 +102,15 @@ def conflict(message: str) -> HTTPException:
 
 
 def tell(order: Order, to: User, message: str) -> None:
-    """Refreshes both sides' screens, with a banner for `to`."""
+    """Refreshes both sides' screens, with a banner for `to` that opens the order."""
     other = order.buyer if to.id == order.seller_id else order.seller
     reason = f"market:{order.market_id}"
     signals.notify([other.firebase_uid], reason)
-    signals.notify([to.firebase_uid], reason, message)
+    signals.notify([to.firebase_uid], reason, message, order_path(order))
+
+
+def order_path(order: Order) -> str:
+    return f"/markets/{order.market_id}/orders/{order.id}"
 
 
 @router.post("/offers/{offer_id}/buy", status_code=status.HTTP_201_CREATED)

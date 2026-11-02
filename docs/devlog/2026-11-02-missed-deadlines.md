@@ -7,4 +7,7 @@
 - Tried it on the phone. Removed the "wait for it anyway" button: waiting is what doing nothing means, and the order page now says so.
 - The order page now shows "What happened" (the order's story) and "What happens next" for both sides. Added short explanations to the store, product, and orders pages.
 - Buttons got colors: green to agree or admit, red to contest or dispute. Every button with a deadline shows a time bar that drains as its time runs out (cancelling before a deadline, "I did it", disputing, agreeing to a new deadline, admitting or contesting a cancellation, accepting invites and proposals, approving requests).
+- Second round of design changes: time bars now drain smoothly, in the button's full color, with the title turning white where it's filled.
+- Notifications now open the exact page they're about (the order, the proposal, the product), not just the market. They can be swiped sideways to dismiss.
+- Explanations moved into highlighted boxes at the top of the store, product, orders, order, and proposal pages, in plainer words.
 - Next: the limits file, then the court.

@@ -122,7 +122,7 @@ def send_invite(
         raise HTTPException(status.HTTP_409_CONFLICT, "They already have an invite.") from error
     market_name = membership.market.name
     signals.notify(
-        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}"
+        [invited.firebase_uid], "invite", f"{user.display_name} invited you to {market_name}", "/"
     )
     signals.notify_market(db, market_id)
     return pending_view(invite)

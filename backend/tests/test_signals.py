@@ -12,11 +12,21 @@ NEW_MARKET = {
 
 @pytest.fixture
 def notes(monkeypatch):
-    """Records live-update notes instead of sending them: (firebase uid, reason, message)."""
-    sent: list[tuple[str, str, str]] = []
+    """Records live-update notes instead of sending them: (firebase uid, reason, message).
 
-    def record(firebase_uids, reason, message=""):
+    `notes.paths` maps each banner message to the page it opens.
+    """
+
+    class Sent(list):
+        paths: dict[str, str] = {}
+
+    sent = Sent()
+    sent.paths = {}
+
+    def record(firebase_uids, reason, message="", path=""):
         sent.extend((uid, reason, message) for uid in sorted(set(firebase_uids)))
+        if message:
+            sent.paths[message] = path
 
     monkeypatch.setattr(signals, "notify", record)
     return sent
@@ -101,3 +111,28 @@ def test_a_failing_note_never_breaks_the_action(monkeypatch):
     monkeypatch.setattr(signals, "_client", broken)
 
     signals.notify(["uid-anyone"], "invite", "hello")
+
+
+def test_banners_open_the_page_they_are_about(notes, member, home):
+    dana, market_id = home
+    noa = member("noa_r")
+    noa.post(f"/invites/{invite(dana, market_id, 'noa_r')['id']}/accept")
+    assert notes.paths["Dana_K invited you to Home"] == "/"
+    assert notes.paths["Noa_R joined Home"] == f"/markets/{market_id}"
+
+    product = dana.post(
+        f"/markets/{market_id}/products",
+        json={"name": "Tea", "coin_mode": "vanish", "price": 5, "sellers": ["noa_r"]},
+    ).json()
+    proposal = noa.get(f"/markets/{market_id}/proposals").json()[0]
+    assert notes.paths["Dana_K asks you to sell Tea"] == (
+        f"/markets/{market_id}/proposals/{proposal['id']}"
+    )
+
+    terms = {"delivery": "deadline", "duration_seconds": 3600, "refundable": True}
+    noa.post(f"/markets/{market_id}/proposals/{proposal['id']}/accept", json=terms)
+    assert notes.paths["Noa_R now sells Tea"] == f"/markets/{market_id}/store/{product['id']}"
+
+    offer = dana.get(f"/markets/{market_id}/products/{product['id']}").json()["offers"][0]
+    order = dana.post(f"/markets/{market_id}/offers/{offer['id']}/buy").json()
+    assert notes.paths["Dana_K bought Tea"] == f"/markets/{market_id}/orders/{order['id']}"

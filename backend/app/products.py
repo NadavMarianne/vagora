@@ -322,13 +322,22 @@ def propose(
     return sellers
 
 
+def product_path(product: Product) -> str:
+    return f"/markets/{product.market_id}/store/{product.id}"
+
+
 def tell_sellers(db: Session, product: Product, sellers: list[User], by: User) -> None:
+    """Refreshes everyone's screens. Each new seller gets a banner that opens their proposal."""
     signals.notify_market(db, product.market_id)
-    signals.notify(
-        [s.firebase_uid for s in sellers],
-        f"market:{product.market_id}",
-        f"{by.display_name} asks you to sell {product.name}",
-    )
+    asked = {s.id for s in sellers}
+    for proposal in product.proposals:
+        if proposal.status == ProposalStatus.PENDING and proposal.seller_id in asked:
+            signals.notify(
+                [proposal.seller.firebase_uid],
+                f"market:{product.market_id}",
+                f"{by.display_name} asks you to sell {product.name}",
+                f"/markets/{product.market_id}/proposals/{proposal.id}",
+            )
 
 
 @router.post("/products", status_code=status.HTTP_201_CREATED)
@@ -433,7 +442,7 @@ def tell_owners(db: Session, product: Product, request: ProductRequest, message:
     waiting = ownership.waiting_for(request) if request.status == RequestStatus.PENDING else set()
     if waiting:
         uids = db.scalars(select(User.firebase_uid).where(User.id.in_(waiting)))
-        signals.notify(uids, f"market:{product.market_id}", message)
+        signals.notify(uids, f"market:{product.market_id}", message, product_path(product))
 
 
 @router.post("/products/{product_id}/proposals", status_code=status.HTTP_201_CREATED)
@@ -515,6 +524,7 @@ def accept_proposal(
         [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} now sells {product.name}",
+        product_path(product),
     )
     return product_view(product, user, db)
 
@@ -531,4 +541,5 @@ def decline_proposal(market_id: int, proposal_id: int, user: CurrentUser, db: Db
         [o.user.firebase_uid for o in product.owners],
         f"market:{market_id}",
         f"{user.display_name} declined to sell {product.name}",
+        product_path(product),
     )

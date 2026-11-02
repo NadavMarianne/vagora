@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { StyleSheet, Text } from "react-native";
 
 import { OrderRow } from "@/components/order-row";
-import { Body, colors, ErrorText, Loading, Screen } from "@/components/ui";
+import { Body, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, Order } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
@@ -53,9 +53,10 @@ export default function OrdersScreen() {
 
   return (
     <Screen>
-      <Body>
-        Orders you sell and orders you bought. The coins of an open order stay held until it ends.
-      </Body>
+      <Info title="Your orders">
+        Tap an order to see what happened and what to do next. While an order is open, its price is
+        held: nobody has it until the order ends.
+      </Info>
       {sections.map((section) => (
         <SectionList key={section.title} title={section.title} empty={section.empty}>
           {section.list.map((order) => (

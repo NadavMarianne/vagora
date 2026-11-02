@@ -2,7 +2,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
+  Easing,
   type HostInstance,
   Keyboard,
   ScrollView,
@@ -144,6 +146,16 @@ export function Field({ label, onFocus, ...input }: { label: string } & TextInpu
   );
 }
 
+/** A highlighted explanation: what a page is for, or what happens next. */
+export function Info({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.info}>
+      {title && <Text style={styles.infoTitle}>{title}</Text>}
+      <Text style={styles.infoText}>{children}</Text>
+    </View>
+  );
+}
+
 export function ErrorText({ children }: { children: React.ReactNode }) {
   if (!children) return null;
   return <Text style={styles.error}>{children}</Text>;
@@ -184,8 +196,8 @@ function timeLeft(ms: number): string {
   return `${s}s left`;
 }
 
-/** A button with a deadline. Its color fills it like a progress bar, and drains as the time
- * between `from` and `until` runs out. */
+/** A button with a deadline. Its color fills it like a progress bar and drains smoothly as the
+ * time between `from` and `until` runs out. Where it's filled, the title shows in white. */
 export function TimedButton({
   from,
   until,
@@ -195,12 +207,48 @@ export function TimedButton({
   const now = useNow();
   const start = Date.parse(from);
   const end = Date.parse(until);
-  const left = end > start ? Math.min(1, Math.max(0, (end - now) / (end - start))) : 0;
   const color = BUTTON_COLOR[kind];
+  const [width, setWidth] = useState(0);
+  // 1 when the time starts, 0 when it's up.
+  const [progress] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    const at = Date.now();
+    progress.setValue(end > start ? Math.min(1, Math.max(0, (end - at) / (end - start))) : 0);
+    // One smooth, steady drain until the deadline, run by the phone's animation system.
+    const drain = Animated.timing(progress, {
+      toValue: 0,
+      duration: Math.max(0, end - at),
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    drain.start();
+    return () => drain.stop();
+  }, [progress, start, end]);
+
+  // The colored layer slides left as time runs out; its white title slides back so it stays put.
+  const fillShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-width, 0] });
+  const titleShift = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
+  const left = timeLeft(end - now);
+
   return (
-    <View style={[styles.timed, { borderColor: color }]}>
-      <View style={[styles.timedFill, { width: `${left * 100}%`, backgroundColor: color }]} />
-      <Button {...button} kind={kind} timed={timeLeft(end - now)} />
+    <View
+      style={[styles.timed, { borderColor: color }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      <Button {...button} kind={kind} timed={left} />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: color, transform: [{ translateX: fillShift }] },
+        ]}
+      >
+        <Animated.View style={[styles.button, { transform: [{ translateX: titleShift }] }]}>
+          <Text style={[styles.buttonText, { color: colors.background }]}>{button.title}</Text>
+          <Text style={[styles.timeLeft, { color: colors.background }]}>{left}</Text>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -283,9 +331,17 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.7 },
   buttonText: { fontSize: 16, fontWeight: "600" },
   timed: { borderWidth: 2, borderRadius: 8, overflow: "hidden" },
-  // Light enough that the dark title stays readable over it.
-  timedFill: { position: "absolute", top: 0, bottom: 0, left: 0, opacity: 0.35 },
   timeLeft: { fontSize: 12, color: colors.text, marginTop: 2 },
+  info: {
+    backgroundColor: "#E6F4FE",
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  infoTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
+  infoText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   loading: {
     flex: 1,
     alignItems: "center",

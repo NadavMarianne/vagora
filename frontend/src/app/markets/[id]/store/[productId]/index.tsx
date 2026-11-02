@@ -7,7 +7,7 @@ import { formatDuration } from "@/components/duration-picker";
 import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
 import { OwnerTools } from "@/components/owner-tools";
 import { RequestCard } from "@/components/request-card";
-import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
+import { Body, Button, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import type { Market, Member, Offer, Order, Product } from "@/lib/types";
@@ -119,14 +119,14 @@ export default function ProductScreen() {
         {product.coin_mode === "to_seller" ? "the coins go to the seller" : "the coins vanish"}
       </Text>
 
-      <Text style={styles.heading}>Sellers</Text>
       {product.offers.some((o) => !o.is_mine) && (
-        <Body>
-          Buying takes the price from your balance right away. It’s held until the order ends, then
-          {product.coin_mode === "to_seller" ? " goes to the seller" : " vanishes"} (or comes back
-          to you if it’s refunded).
-        </Body>
+        <Info title="How buying works">
+          The price leaves your balance as soon as you buy, and is held. When the order is done it{" "}
+          {product.coin_mode === "to_seller" ? "goes to the seller" : "vanishes"}. If it’s
+          refunded, it comes back to you.
+        </Info>
       )}
+      <Text style={styles.heading}>Sellers</Text>
       {offers.length === 0 && <Body>No one sells this yet.</Body>}
       {offers.length > 1 && (
         <Chips
