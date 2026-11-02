@@ -25,8 +25,10 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 - Counter proposals: a seller answers a proposal with a different price.
 - Availability windows on offers ("only during this week").
 - Reviews of sellers, and sorting offers by them.
-- Penalties decided through reports: reducing an allowance, a fine, a period where the person can't buy, or something the other side decides. Grouped into severity levels, each market defining its levels and how judgement works (both sides agree, a market member as judge, a platform judge, or an AI). See decision 0021.
-- A time limit on disputes.
+
+## Court
+- A member acting as judge, chosen when a market is created, instead of the AI (decision 0024).
+- Appeals, and a human judge from outside the market.
 
 ## Time
 - A clock in each market showing the market's time.

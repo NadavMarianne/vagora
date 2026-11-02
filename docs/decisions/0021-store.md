@@ -79,7 +79,7 @@ While the buyer hasn't chosen, or is accepting late, **the seller can end the or
 
 A missed deadline always lets the buyer cancel with a full refund, even on non-refundable offers.
 
-**Reports are never automatic.** After any outcome, the side that was hurt has **3 days** to file a report against the other, and may choose not to.
+**Reports are never automatic.** After any outcome, the side that was hurt has **3 days** to file a report against the other, and may choose not to. Reports, disputes, and the court are decisions 0023 and 0024.
 
 ## 6. Refunds
 - **Refundable:** the buyer can cancel before the deadline (or validity) ends, and gets the offer's refund percentage back.
@@ -90,18 +90,10 @@ A missed deadline always lets the buyer cancel with a full refund, even on non-r
 - A cancellation caused by the seller (a missed deadline, or the seller ending the order) always refunds **100%**, whatever the percentage. Otherwise a seller could profit from missing deadlines.
 
 ## 7. Disputes and reports
-- If the buyer disputes an I did it, the coins stay held. There's no time limit for now (**Open**).
-- Either side can give up at any time:
-  - **The seller gives up:** the buyer is refunded in full, and can file a more severe report.
-  - **The buyer gives up:** the seller is paid, there's no refund, and the seller may file a counter report.
-- **Reports, version 1:** a table of reports linked to members. A report records:
-  - who filed it, and against whom
-  - the order
-  - what happened
-  - the written text, and one written reply from the other side
-  - a severity
-  - whether it's marked **"left"**: the accused person left the market while it was open, or before it was filed
-- A report doesn't do anything yet. Later it puts the person "on trial" and decides a penalty, if any.
+Replaced by decisions 0023 (reports and cases) and 0024 (the court), 2026-11-02. In short:
+- If the buyer disputes an I did it, the coins stay held, and the dispute is a case.
+- Giving up is a settlement: the side giving up accepts the other side's outcome.
+- Nothing is given or taken outside a verdict or a settlement.
 
 ## 8. Leaving a market (completes decision 0015)
 - **You can't leave** while you have committed offers, or open orders as a seller. No exploits.
@@ -114,15 +106,11 @@ A missed deadline always lets the buyer cancel with a full refund, even on non-r
 - **Disputes** you have open are lost: the other side wins, and can still file a report.
 - **Reports against you** (in progress, or filed within the 3 days after you left) are marked **"left"**. A report in progress counts as giving up. Marked reports are treated with extra severity when you return, but only if you're found guilty: an unjustified report costs you nothing.
 
-## Open
-- What a report is and does: the trial, who judges, the penalties.
-- A time limit on disputes.
-
 ## Later
 - Counter proposals.
 - Availability windows ("only during this week").
 - Reviews, and sorting sellers by them.
-- **Penalties:** reducing an allowance, fines, a period where the person can't buy, or something the other side decides. Grouped into severity levels, with the penalty given by the severity of the act. Each market defines its severity levels and how judgement works (both sides agree, a market member acting as judge, a judge from the platform, or an AI). See `docs/ideas.md`.
+- Penalties and judging are decided in decisions 0022 to 0024.
 
 ## Why
 - **Offers made through proposals** mean nobody sells something they didn't agree to, and accepting is the promise.
@@ -136,4 +124,5 @@ Four steps, each tested on the phones before the next:
 1. products, proposals, offers, closing
 2. buying, held coins, completing orders, refunds, stock, the leaving rules
 3. missed deadlines, new deadlines, sellers ending late orders
-4. disputes and the reports table
+
+Reports and disputes are built later, together with the court (decision 0024).
