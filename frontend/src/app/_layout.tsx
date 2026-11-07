@@ -76,6 +76,11 @@ function Screens() {
           options={{ title: "Asked to sell" }}
         />
         <Stack.Screen name="markets/[id]/orders/index" options={{ title: "Orders" }} />
+        <Stack.Screen name="markets/[id]/members/[username]" options={{ title: "Member" }} />
+        <Stack.Screen
+          name="markets/[id]/limits-setup"
+          options={{ title: "Your limits", headerBackVisible: false }}
+        />
         <Stack.Screen name="markets/[id]/orders/[orderId]" options={{ title: "Order" }} />
       </Stack.Protected>
     </Stack>

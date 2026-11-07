@@ -27,6 +27,7 @@ export function defaultSettings(): MarketSettings {
     time_zone: phoneTimeZone(),
     transfers_enabled: false,
     contest_window_seconds: 86400,
+    limits_edit_price: 0,
     allowances: [],
   };
 }
@@ -257,6 +258,19 @@ export function MarketSettingsForm({
         <Body>
           When a buyer cancels after a missed deadline, the seller has this long to say it was done.
           Then it goes to court. If they don’t, the buyer gets a full refund.
+        </Body>
+      </Foldable>
+
+      <Foldable title="Limits">
+        <CoinsField
+          label="Price to edit limits"
+          value={value.limits_edit_price}
+          onChange={(limits_edit_price) => set({ limits_edit_price })}
+        />
+        <Body>
+          Each member lists what’s never allowed for them. Setting it the first time and the first
+          edit after that are free. After that, each edit that adds or changes something costs this
+          much, and the coins vanish. Removing lines is always free.
         </Body>
       </Foldable>
     </Foldable>

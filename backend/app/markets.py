@@ -42,6 +42,7 @@ class MarketCreate(BaseModel):
     time_zone: TimeZone
     transfers_enabled: bool = False
     contest_window_seconds: ContestWindow = 24 * 3600
+    limits_edit_price: Coins = 0
     allowances: list[AllowanceIn] = []
 
 
@@ -58,6 +59,7 @@ class MarketUpdate(BaseModel):
     time_zone: TimeZone | None = None
     transfers_enabled: bool | None = None
     contest_window_seconds: ContestWindow | None = None
+    limits_edit_price: Coins | None = None
     allowances: list[AllowanceIn] | None = None
 
 
@@ -69,8 +71,11 @@ class MarketView(BaseModel):
     time_zone: str
     transfers_enabled: bool
     contest_window_seconds: int
+    limits_edit_price: int
     allowances: list[AllowanceView]
     my_balance: int
+    # Whether you've set your limits file here yet. New members do it as their first step.
+    my_limits_set: bool
 
 
 class EntryView(BaseModel):
@@ -115,8 +120,10 @@ def view(membership: Membership) -> MarketView:
         time_zone=market.time_zone,
         transfers_enabled=market.transfers_enabled,
         contest_window_seconds=market.contest_window_seconds,
+        limits_edit_price=market.limits_edit_price,
         allowances=[allowance_view(a) for a in market.allowances],
         my_balance=membership.balance,
+        my_limits_set=membership.limits_set_at is not None,
     )
 
 
