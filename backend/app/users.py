@@ -1,6 +1,6 @@
-"""Profile endpoints: "who am I?" and first-time profile setup."""
+"""Profile endpoints: "who am I?", first-time profile setup, and changing your profile."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, StringConstraints
@@ -25,14 +25,30 @@ Username = Annotated[
 DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]
 
 
+# The app's looks, in the order the app shows them. Night is the default.
+Theme = Literal["night", "clean", "warm", "velvet", "neon", "paper", "pop"]
+
+
 class ProfileSetup(BaseModel):
     username: Username
     display_name: DisplayName
 
 
+class ProfileUpdate(BaseModel):
+    """What to change. Leave out anything that stays the same."""
+
+    display_name: DisplayName | None = None
+    theme: Theme | None = None
+
+
 class Profile(BaseModel):
     username: str
     display_name: str
+    theme: str
+
+
+def profile(user: User) -> Profile:
+    return Profile(username=user.username, display_name=user.display_name, theme=user.theme)
 
 
 def find_user(db: Session, firebase_uid: str) -> User | None:
@@ -56,7 +72,7 @@ def get_me(login: CurrentLogin, db: DbSession) -> Profile:
     user = find_user(db, login.uid)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not set up yet.")
-    return Profile(username=user.username, display_name=user.display_name)
+    return profile(user)
 
 
 @router.post("/me", status_code=status.HTTP_201_CREATED)
@@ -75,4 +91,13 @@ def set_up_profile(setup: ProfileSetup, login: CurrentLogin, db: DbSession) -> P
         if find_user(db, login.uid) is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, "Profile already set up.") from error
         raise HTTPException(status.HTTP_409_CONFLICT, "Username is taken.") from error
-    return Profile(username=user.username, display_name=user.display_name)
+    return profile(user)
+
+
+@router.patch("/me")
+def change_profile(update: ProfileUpdate, user: CurrentUser, db: DbSession) -> Profile:
+    """Changes your display name or the app's look. Your username stays the same."""
+    for field, value in update.model_dump(exclude_unset=True, exclude_none=True).items():
+        setattr(user, field, value)
+    db.commit()
+    return profile(user)

@@ -4,10 +4,12 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { STATUS_LABELS } from "@/components/offer-card";
 import { Tappable } from "@/components/tappable";
-import { Body, Button, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
+import { Body, Button, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, MyProposal, ProductSummary, WaitingRequest } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
+import type { Theme } from "@/lib/themes";
+import { useStyles } from "@/lib/theme";
 
 type StorePage = {
   market: Market;
@@ -34,6 +36,7 @@ function describeWaiting(request: WaitingRequest): string {
 }
 
 export default function StoreScreen() {
+  const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, error } = useLoad(
     useCallback(async (): Promise<StorePage> => {
@@ -141,24 +144,25 @@ export default function StoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  heading: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-    marginTop: 8,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  rowText: { flexShrink: 1, gap: 2 },
-  name: { fontSize: 16, fontWeight: "600", color: colors.text },
-  small: { fontSize: 13, color: colors.muted },
-  price: { fontSize: 16, fontWeight: "600", color: colors.text },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    heading: {
+      fontSize: 18,
+      fontFamily: t.fonts.bold,
+      color: t.colors.text,
+      marginTop: 8,
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
+    },
+    rowText: { flexShrink: 1, gap: 2 },
+    name: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+    small: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    price: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+  });

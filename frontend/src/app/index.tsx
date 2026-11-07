@@ -1,30 +1,24 @@
 import { router } from "expo-router";
-import { signOut } from "firebase/auth";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import {
-  Body,
-  Button,
-  colors,
-  ErrorText,
-  Loading,
-  Screen,
-  TimedButton,
-  Title,
-} from "@/components/ui";
+import { Body, Button, ErrorText, Loading, Screen, TimedButton, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { auth } from "@/lib/firebase";
 import { useSession } from "@/lib/session";
 import type { LeftMarket, Market, ReceivedInvite } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
+import type { Theme } from "@/lib/themes";
+import { useStyles } from "@/lib/theme";
 
 export default function Home() {
+  const styles = useStyles(makeStyles);
   const { session } = useSession();
-  const { data: markets, error, reload: reloadMarkets } = useLoad(
-    useCallback(() => api<Market[]>("/markets"), []),
-  );
+  const {
+    data: markets,
+    error,
+    reload: reloadMarkets,
+  } = useLoad(useCallback(() => api<Market[]>("/markets"), []));
   const { data: invites, reload: reloadInvites } = useLoad(
     useCallback(() => api<ReceivedInvite[]>("/invites"), []),
   );
@@ -124,8 +118,8 @@ export default function Home() {
             <View key={market.id} style={styles.left}>
               <Text style={styles.cardTitle}>{market.name}</Text>
               <Text style={styles.muted}>
-                {market.my_balance.toLocaleString()} {market.currency_name} waiting for you. You
-                can rejoin until {new Date(market.rejoin_until).toLocaleString()}.
+                {market.my_balance.toLocaleString()} {market.currency_name} waiting for you. You can
+                rejoin until {new Date(market.rejoin_until).toLocaleString()}.
               </Text>
               <Button title="Rejoin" kind="secondary" onPress={() => rejoin(market)} />
             </View>
@@ -133,36 +127,34 @@ export default function Home() {
           <ErrorText>{rejoinError}</ErrorText>
         </>
       )}
-      <View style={styles.spacer} />
-      <Button title="Log out" kind="secondary" onPress={() => signOut(auth)} />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardTitle: { fontSize: 17, fontWeight: "600", color: colors.text, flexShrink: 1 },
-  cardBalance: { fontSize: 16, color: colors.primary, fontWeight: "600" },
-  spacer: { height: 8 },
-  invite: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    padding: 16,
-    gap: 8,
-  },
-  left: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 16, gap: 8 },
-  bold: { fontWeight: "700" },
-  muted: { fontSize: 13, color: colors.muted },
-  answers: { flexDirection: "row", gap: 12 },
-  answer: { flex: 1 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+    card: {
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      padding: 16,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    cardTitle: { fontSize: 17, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
+    cardBalance: { fontSize: 16, color: t.colors.primary, fontFamily: t.fonts.bold },
+    invite: {
+      borderWidth: 1,
+      borderColor: t.colors.primary,
+      borderRadius: 8,
+      padding: 16,
+      gap: 8,
+    },
+    left: { borderWidth: 1, borderColor: t.colors.border, borderRadius: 8, padding: 16, gap: 8 },
+    bold: { fontFamily: t.fonts.bold },
+    muted: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    answers: { flexDirection: "row", gap: 12 },
+    answer: { flex: 1 },
+  });

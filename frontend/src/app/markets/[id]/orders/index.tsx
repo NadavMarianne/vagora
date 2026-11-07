@@ -3,10 +3,12 @@ import { useCallback } from "react";
 import { StyleSheet, Text } from "react-native";
 
 import { OrderRow, timers } from "@/components/order-row";
-import { Body, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
+import { Body, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, Order } from "@/lib/types";
 import { useLoad, useReloadAt } from "@/lib/use-load";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 type OrdersPage = { market: Market; orders: Order[] };
 
@@ -80,6 +82,7 @@ function SectionList({
   empty: string;
   children: React.ReactNode[];
 }) {
+  const styles = useStyles(makeStyles);
   return (
     <>
       <Text style={styles.heading}>{title}</Text>
@@ -88,6 +91,7 @@ function SectionList({
   );
 }
 
-const styles = StyleSheet.create({
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+  });

@@ -3,10 +3,12 @@ import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { colors } from "@/components/ui";
 import { useNotifications } from "@/lib/notifications";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 export function NotificationBell() {
+  const styles = useStyles(makeStyles);
   const { unread } = useNotifications();
   return (
     <Tappable
@@ -21,18 +23,19 @@ export function NotificationBell() {
   );
 }
 
-const styles = StyleSheet.create({
-  bell: { padding: 6 },
-  icon: { fontSize: 20 },
-  dot: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    borderWidth: 1.5,
-    borderColor: colors.background,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    bell: { padding: 6 },
+    icon: { fontFamily: t.fonts.regular, fontSize: 20 },
+    dot: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: t.colors.primary,
+      borderWidth: 1.5,
+      borderColor: t.colors.surface,
+    },
+  });

@@ -30,6 +30,8 @@ class User(Base):
     # Stored in lowercase, so "Nadav" and "nadav" are the same username.
     username: Mapped[str] = mapped_column(String(20), unique=True)
     display_name: Mapped[str] = mapped_column(String(30))
+    # The app's look this person picked (see frontend/src/lib/themes.ts).
+    theme: Mapped[str] = mapped_column(String(20), server_default="night")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { FlatList, Modal, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { Button, colors, ErrorText } from "@/components/ui";
+import { Button, ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { TimeZone } from "@/lib/types";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 let cached: TimeZone[] | null = null;
 
@@ -21,6 +23,8 @@ export function TimeZonePicker({
   value: string;
   onChange: (id: string) => void;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const [zones, setZones] = useState<TimeZone[] | null>(cached);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -59,7 +63,7 @@ export function TimeZonePicker({
           <TextInput
             style={styles.search}
             placeholder="Search a city, like Jerusalem"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={t.colors.muted}
             value={search}
             onChangeText={setSearch}
             autoFocus
@@ -88,29 +92,31 @@ export function TimeZonePicker({
   );
 }
 
-const styles = StyleSheet.create({
-  block: { gap: 6 },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
-  current: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-  },
-  currentText: { fontSize: 16, color: colors.text, flexShrink: 1 },
-  change: { fontSize: 16, color: colors.primary, fontWeight: "600" },
-  modal: { flex: 1, padding: 24, paddingTop: 60, gap: 12, backgroundColor: colors.background },
-  search: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-  },
-  row: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  rowOn: { backgroundColor: "#E6F4FE" },
-  rowText: { fontSize: 16, color: colors.text },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    block: { gap: 6 },
+    label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
+    current: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      padding: 12,
+    },
+    currentText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },
+    change: { fontSize: 16, color: t.colors.primary, fontFamily: t.fonts.bold },
+    modal: { flex: 1, padding: 24, paddingTop: 60, gap: 12, backgroundColor: t.colors.background },
+    search: {
+      fontFamily: t.fonts.regular,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: t.colors.text,
+    },
+    row: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.colors.border },
+    rowOn: { backgroundColor: t.colors.surfaceAlt },
+    rowText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text },
+  });

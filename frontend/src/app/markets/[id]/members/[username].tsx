@@ -9,15 +9,18 @@ import {
   LimitsEditor,
   toDraft,
 } from "@/components/limits-editor";
-import { Body, Button, colors, ErrorText, Info, Loading, Screen, Title } from "@/components/ui";
+import { Body, Button, ErrorText, Info, Loading, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, MemberPage } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
 import { useLoad } from "@/lib/use-load";
+import type { Theme } from "@/lib/themes";
+import { useStyles } from "@/lib/theme";
 
 type Page = { market: Market; member: MemberPage };
 
 export default function MemberScreen() {
+  const styles = useStyles(makeStyles);
   const { id, username } = useLocalSearchParams<{ id: string; username: string }>();
   const { data, error, reload } = useLoad(
     useCallback(async (): Promise<Page> => {
@@ -128,9 +131,10 @@ function MyLimits({
   );
 }
 
-const styles = StyleSheet.create({
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
-  line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
-  number: { fontSize: 16, color: colors.muted, width: 24 },
-  lineText: { fontSize: 16, color: colors.text, flexShrink: 1 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+    line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
+    number: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.muted, width: 24 },
+    lineText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },
+  });

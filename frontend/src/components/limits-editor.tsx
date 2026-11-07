@@ -2,7 +2,9 @@
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { Button, colors, useRevealFocused } from "@/components/ui";
+import { Button, useRevealFocused } from "@/components/ui";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 /** Lines being edited carry a key, so each keeps its place while others are added or removed. */
 export type DraftLine = { key: string; text: string };
@@ -29,6 +31,8 @@ export function LimitsEditor({
   value: DraftLine[];
   onChange: (value: DraftLine[]) => void;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const reveal = useRevealFocused();
   return (
     <View style={styles.editor}>
@@ -44,7 +48,7 @@ export function LimitsEditor({
             onFocus={reveal}
             maxLength={100}
             placeholder="Something that’s never allowed for you"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={t.colors.muted}
           />
           <Tappable
             onPress={() => onChange(value.filter((l) => l.key !== line.key))}
@@ -65,20 +69,22 @@ export function LimitsEditor({
   );
 }
 
-const styles = StyleSheet.create({
-  editor: { gap: 8 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  number: { fontSize: 15, color: colors.muted, width: 24 },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
-  remove: { padding: 8 },
-  removeText: { fontSize: 18, color: colors.muted },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    editor: { gap: 8 },
+    row: { flexDirection: "row", alignItems: "center", gap: 8 },
+    number: { fontFamily: t.fonts.regular, fontSize: 15, color: t.colors.muted, width: 24 },
+    input: {
+      fontFamily: t.fonts.regular,
+      flex: 1,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      color: t.colors.text,
+    },
+    remove: { padding: 8 },
+    removeText: { fontFamily: t.fonts.regular, fontSize: 18, color: t.colors.muted },
+  });

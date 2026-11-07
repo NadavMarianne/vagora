@@ -13,10 +13,12 @@ import {
   termsToSend,
 } from "@/components/offer-terms-form";
 import { SellerPicker } from "@/components/seller-picker";
-import { Body, Button, colors, ErrorText, Field, TimeLeft } from "@/components/ui";
+import { Body, Button, ErrorText, Field, TimeLeft } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Member, Product } from "@/lib/types";
 import { Mistake, useAction } from "@/lib/use-action";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 const DAY = 86400;
 
@@ -56,6 +58,7 @@ export function OwnerTools({
   path: string;
   reload: () => Promise<void> | void;
 }) {
+  const styles = useStyles(makeStyles);
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description);
   const [sellers, setSellers] = useState<string[]>([]);
@@ -282,8 +285,9 @@ export function OwnerTools({
   );
 }
 
-const styles = StyleSheet.create({
-  small: { fontSize: 13, color: colors.muted },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
-  rowText: { fontSize: 15, color: colors.text, flexShrink: 1 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    small: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+    rowText: { fontFamily: t.fonts.regular, fontSize: 15, color: t.colors.text, flexShrink: 1 },
+  });

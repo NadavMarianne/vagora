@@ -2,8 +2,9 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatDuration } from "@/components/duration-picker";
-import { colors } from "@/components/ui";
 import type { Offer, ProductStatus } from "@/lib/types";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 export const STATUS_LABELS: Record<ProductStatus, string> = {
   waiting: "Waiting for sellers",
@@ -40,6 +41,7 @@ export function offerDetails(offer: Offer): string[] {
 }
 
 export function OfferCard({ offer, currency }: { offer: Offer; currency: string }) {
+  const styles = useStyles(makeStyles);
   const badge = commitmentBadge(offer);
   return (
     <View style={styles.card}>
@@ -59,22 +61,23 @@ export function OfferCard({ offer, currency }: { offer: Offer; currency: string 
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    gap: 4,
-  },
-  top: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
-  seller: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text,
-    flexShrink: 1,
-  },
-  price: { fontSize: 16, fontWeight: "700", color: colors.text },
-  detail: { fontSize: 14, color: colors.muted },
-  badge: { fontSize: 14, fontWeight: "600", color: "#2E7D32" },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    card: {
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      padding: 12,
+      gap: 4,
+    },
+    top: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+    seller: {
+      fontSize: 16,
+      fontFamily: t.fonts.bold,
+      color: t.colors.text,
+      flexShrink: 1,
+    },
+    price: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+    detail: { fontFamily: t.fonts.regular, fontSize: 14, color: t.colors.muted },
+    badge: { fontSize: 14, fontFamily: t.fonts.accent, color: t.colors.good },
+  });

@@ -5,7 +5,9 @@ import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Chips } from "@/components/controls";
-import { colors, useRevealFocused } from "@/components/ui";
+import { useRevealFocused } from "@/components/ui";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 type Unit = "seconds" | "minutes" | "hours" | "days";
 
@@ -50,6 +52,8 @@ export function DurationPicker({
   min: number;
   max: number;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const reveal = useRevealFocused();
   const [unit, setUnit] = useState<Unit>(() => unitFor(seconds));
   // What's in the box while typing. Otherwise the box shows the value.
@@ -104,8 +108,8 @@ export function DurationPicker({
           step={1}
           value={Math.min(Math.max(count, low), high)}
           onValueChange={(value) => setCount(value)}
-          minimumTrackTintColor={colors.primary}
-          thumbTintColor={colors.primary}
+          minimumTrackTintColor={t.colors.primary}
+          thumbTintColor={t.colors.primary}
         />
       )}
       <Chips
@@ -120,19 +124,21 @@ export function DurationPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  block: { gap: 6 },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  box: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    minWidth: 70,
-    color: colors.text,
-  },
-  unit: { fontSize: 16, color: colors.text },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    block: { gap: 6 },
+    label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
+    row: { flexDirection: "row", alignItems: "center", gap: 8 },
+    box: {
+      fontFamily: t.fonts.regular,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 16,
+      minWidth: 70,
+      color: t.colors.text,
+    },
+    unit: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text },
+  });

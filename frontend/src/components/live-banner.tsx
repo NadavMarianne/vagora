@@ -7,9 +7,11 @@ import { Animated, PanResponder, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Tappable } from "@/components/tappable";
-import { colors, LEVEL_COLOR } from "@/components/ui";
+import { levelColors } from "@/components/ui";
 import { type Banner, useLive } from "@/lib/live";
 import { useNotifications } from "@/lib/notifications";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 const SHOW_FOR_MS = 5000;
 // How far a swipe must go, or how fast, to dismiss the banner.
@@ -24,6 +26,8 @@ function open(banner: Banner) {
 }
 
 export function LiveBanner() {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const { banner, dismissBanner } = useLive();
   const { markRead } = useNotifications();
   const insets = useSafeAreaInsets();
@@ -64,7 +68,7 @@ export function LiveBanner() {
       style={[
         styles.banner,
         {
-          backgroundColor: LEVEL_COLOR[banner.level ?? "info"],
+          backgroundColor: levelColors(t, banner.level ?? "info")[0],
           top: insets.top + 8,
           transform: [{ translateX: offset }],
           opacity: offset.interpolate({
@@ -85,27 +89,38 @@ export function LiveBanner() {
         accessibilityLiveRegion="polite"
         accessibilityHint="Opens it. Swipe sideways to dismiss."
       >
-        <Text style={styles.text}>{banner.message}</Text>
-        <Text style={styles.hint}>Tap to open · swipe to dismiss</Text>
+        <Text style={[styles.text, { color: levelColors(t, banner.level ?? "info")[1] }]}>
+          {banner.message}
+        </Text>
+        <Text style={[styles.hint, { color: levelColors(t, banner.level ?? "info")[1] }]}>
+          Tap to open · swipe to dismiss
+        </Text>
       </Tappable>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 14,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  text: { color: colors.background, fontSize: 16, fontWeight: "600" },
-  hint: { color: colors.background, fontSize: 13, opacity: 0.85, marginTop: 2 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    banner: {
+      position: "absolute",
+      left: 12,
+      right: 12,
+      backgroundColor: t.colors.primary,
+      borderRadius: 12,
+      padding: 14,
+      elevation: 6,
+      shadowColor: "#000",
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+    },
+    text: { color: t.colors.background, fontSize: 16, fontFamily: t.fonts.bold },
+    hint: {
+      fontFamily: t.fonts.regular,
+      color: t.colors.background,
+      fontSize: 13,
+      opacity: 0.85,
+      marginTop: 2,
+    },
+  });
