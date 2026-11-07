@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
@@ -76,6 +76,12 @@ export default function MarketScreen() {
     );
   }
 
+  // A new member sets their limits before anything else (decision 0022).
+  const needsLimits = data?.market.my_limits_set === false;
+  useEffect(() => {
+    if (needsLimits) router.replace(`/markets/${id}/limits-setup`);
+  }, [needsLimits, id]);
+
   if (!data) {
     return (
       <Screen>
@@ -133,9 +139,17 @@ export default function MarketScreen() {
 
       <Text style={styles.heading}>Members</Text>
       {members.map((member) => (
-        <Body key={member.username}>
-          {member.display_name} (@{member.username})
-        </Body>
+        <Tappable
+          key={member.username}
+          style={styles.row}
+          accessibilityRole="button"
+          onPress={() => router.push(`/markets/${id}/members/${member.username}`)}
+        >
+          <Text style={styles.note}>
+            {member.display_name} (@{member.username})
+          </Text>
+          <Text style={styles.open}>Limits ›</Text>
+        </Tappable>
       ))}
 
       <Text style={styles.heading}>Invites</Text>
@@ -186,4 +200,5 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: "600", color: "#2E7D32" },
   negative: { color: colors.error },
   cancel: { color: colors.error, fontWeight: "600", padding: 4 },
+  open: { color: colors.primary, fontWeight: "600" },
 });

@@ -29,6 +29,7 @@ export default function MarketSettingsScreen() {
             time_zone: market.time_zone,
             transfers_enabled: market.transfers_enabled,
             contest_window_seconds: market.contest_window_seconds,
+            limits_edit_price: market.limits_edit_price,
             allowances: market.allowances,
           }),
         );

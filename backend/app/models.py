@@ -46,6 +46,8 @@ class Market(Base):
     transfers_enabled: Mapped[bool] = mapped_column(server_default="false")
     # After a buyer cancels a missed order, how long the seller has to contest the refund.
     contest_window_seconds: Mapped[int] = mapped_column(server_default="86400")
+    # What an edit of your limits file costs (decision 0022). The coins vanish.
+    limits_edit_price: Mapped[int] = mapped_column(BigInteger, server_default="0")
     # A time zone name like "Asia/Jerusalem". Schedules use it.
     time_zone: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -105,6 +107,10 @@ class Membership(Base):
     allowance_paid_until: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # When they first set their limits file. Empty until then (a new member's first step).
+    limits_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How many edits of the limits file they made after setting it. The first one is free.
+    limits_edits: Mapped[int] = mapped_column(server_default="0")
 
     market: Mapped[Market] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(foreign_keys=[user_id])
@@ -155,6 +161,7 @@ class EntryKind(StrEnum):
     PURCHASE = "purchase"  # the price leaves the buyer and is held
     SALE = "sale"  # held coins reach the seller
     REFUND = "refund"  # held coins return to the buyer
+    LIMITS_EDIT = "limits_edit"  # paid to edit the limits file; the coins vanish
 
 
 class LedgerEntry(Base):
@@ -439,3 +446,19 @@ class Notification(Base):
     level: Mapped[str] = mapped_column(String(10), server_default="info")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LimitItem(Base):
+    """One line of a member's limits file: something never allowed for them (decision 0022).
+
+    Lines are never changed or deleted. A removed line keeps its removal time, so the file can be
+    seen as it was at any moment.
+    """
+
+    __tablename__ = "limit_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("memberships.id"), index=True)
+    text: Mapped[str] = mapped_column(String(100))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

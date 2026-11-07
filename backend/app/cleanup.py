@@ -15,6 +15,7 @@ from app.models import (
     Allowance,
     Invite,
     LedgerEntry,
+    LimitItem,
     Market,
     Membership,
     Offer,
@@ -42,6 +43,7 @@ def delete_old_empty_markets(db: Session) -> int:
 
     memberships = select(Membership.id).where(Membership.market_id.in_(market_ids))
     db.execute(delete(LedgerEntry).where(LedgerEntry.membership_id.in_(memberships)))
+    db.execute(delete(LimitItem).where(LimitItem.membership_id.in_(memberships)))
     db.execute(delete(Invite).where(Invite.market_id.in_(market_ids)))
     db.execute(delete(Order).where(Order.market_id.in_(market_ids)))
     products = select(Product.id).where(Product.market_id.in_(market_ids))

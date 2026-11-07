@@ -32,6 +32,8 @@ export type MarketSettings = {
   transfers_enabled: boolean;
   /** After a missed deadline, how long a seller has to contest a cancellation. */
   contest_window_seconds: number;
+  /** What an edit of your limits file costs (the coins vanish). */
+  limits_edit_price: number;
   allowances: Allowance[];
 };
 
@@ -40,6 +42,8 @@ export type Market = MarketSettings & {
   name: string;
   currency_name: string;
   my_balance: number;
+  /** Whether you've set your limits file here yet. New members do it first. */
+  my_limits_set: boolean;
 };
 
 export type LedgerEntry = {
@@ -53,6 +57,18 @@ export type Member = {
   username: string;
   display_name: string;
   joined_at: string;
+};
+
+/** A member's page, with their limits file. Mirrors backend/app/limits.py. */
+export type MemberPage = {
+  username: string;
+  display_name: string;
+  joined_at: string;
+  is_me: boolean;
+  limits: string[];
+  /** Only on your own page. */
+  limits_set: boolean | null;
+  next_edit_cost: number | null;
 };
 
 export type TimeZone = {
