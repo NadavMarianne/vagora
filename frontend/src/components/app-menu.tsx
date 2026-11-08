@@ -289,20 +289,18 @@ const makeStyles = (t: Theme) =>
       borderRadius: t.radius.button,
     },
     itemSelected: { backgroundColor: t.colors.surfaceAlt },
-    // The very top of the menu: the home icon, big and centered.
+    // The very top of the menu: home, as a wide bar across the menu, easy to press.
     top: {
-      alignItems: "center",
+      paddingHorizontal: 16,
       paddingTop: 8,
       paddingBottom: 12,
       marginBottom: 8,
       borderBottomWidth: 1,
       borderBottomColor: t.colors.border,
     },
-    // A round, softly tinted button, the usual look of a menu's home icon.
     homeButton: {
-      width: 52,
       height: 52,
-      borderRadius: 26,
+      borderRadius: t.radius.button,
       backgroundColor: t.colors.surfaceAlt,
       borderWidth: t.borderWidth,
       borderColor: t.colors.border,
