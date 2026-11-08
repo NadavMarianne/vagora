@@ -10,4 +10,7 @@
 - The bell is now a line drawing (added `react-native-svg`), in the theme's colors. Home in the menu is bold and centered. Transactions got "Show less".
 - The home page now greets me with the date and a one-line summary, then shows invites, orders I have to deliver across all my markets (a new backend request), my markets with their balances, and my recent activity.
 - Home in the menu became a drawn house icon, pinned at the very top. The Decline button next to a timed Accept now stretches to the same height.
+- Home in the menu is a wide bar with a house icon, pinned at the very top (the menu used to count the status bar twice).
+- Menu buttons are split by thin lines, sections by thicker ones, and the market I'm in is highlighted with a colored bar.
+- Markets can be reordered from the home page ("Reorder", arrows, "Done"); the order is saved on my account and the menu follows it.
 - Next: try it, then the production setup and the APK.

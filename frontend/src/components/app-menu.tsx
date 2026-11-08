@@ -152,9 +152,10 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
         </View>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <Text style={styles.section}>Your markets</Text>
-          {markets.map((m) => (
+          {markets.map((m, index) => (
             <Item
               key={m.id}
+              first={index === 0}
               title={m.name}
               detail={`${m.my_balance.toLocaleString()} ${m.currency_name}`}
               selected={String(m.id) === marketId}
@@ -174,7 +175,7 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
             <>
               <View style={styles.divider} />
               <Text style={styles.section}>{market ? market.name : "This market"}</Text>
-              <Item title="Members" onPress={() => go(`/markets/${marketId}/members`)} />
+              <Item first title="Members" onPress={() => go(`/markets/${marketId}/members`)} />
               <Item title="Invite someone" onPress={() => go(`/markets/${marketId}/invite`)} />
               <Item title="Market settings" onPress={() => go(`/markets/${marketId}/settings`)} />
               <Item title="Leave market" danger onPress={leave} />
@@ -185,7 +186,12 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
 
         {/* Always at the bottom. */}
         <View style={styles.bottom}>
-          <Item title="Settings" selected={path === "/settings"} onPress={() => go("/settings")} />
+          <Item
+            first
+            title="Settings"
+            selected={path === "/settings"}
+            onPress={() => go("/settings")}
+          />
           <Item title="Log out" danger onPress={() => close(() => signOut(auth))} />
         </View>
       </Animated.View>
@@ -223,8 +229,11 @@ function Item({
   detail,
   selected,
   danger,
+  first,
   onPress,
 }: {
+  /** The first in its group: no thin line above it. */
+  first?: boolean;
   title: string;
   detail?: string;
   selected?: boolean;
@@ -235,10 +244,13 @@ function Item({
   return (
     <Tappable
       onPress={onPress}
-      style={[styles.item, selected && styles.itemSelected]}
+      style={[styles.item, !first && styles.itemLine, selected && styles.itemSelected]}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
     >
-      <Text style={[styles.itemText, danger && styles.danger]}>{title}</Text>
+      <Text style={[styles.itemText, danger && styles.danger, selected && styles.selectedText]}>
+        {title}
+      </Text>
       {detail && <Text style={styles.detail}>{detail}</Text>}
     </Tappable>
   );
@@ -268,7 +280,7 @@ const makeStyles = (t: Theme) =>
       borderLeftColor: t.colors.border,
     },
     scroll: { flex: 1 },
-    content: { paddingHorizontal: 16, gap: 4, paddingBottom: 16 },
+    content: { paddingHorizontal: 16, paddingBottom: 16 },
     section: {
       fontSize: 13,
       fontFamily: t.fonts.accent,
@@ -284,18 +296,26 @@ const makeStyles = (t: Theme) =>
       justifyContent: "space-between",
       alignItems: "center",
       gap: 8,
-      paddingVertical: 12,
-      paddingHorizontal: 8,
-      borderRadius: t.radius.button,
+      paddingVertical: 13,
+      paddingHorizontal: 10,
     },
-    itemSelected: { backgroundColor: t.colors.surfaceAlt },
+    // A thin line between buttons; sections get a thicker one (see `divider`).
+    itemLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
+    // Where you are: a colored bar on the left and a tinted background.
+    itemSelected: {
+      backgroundColor: t.colors.surfaceAlt,
+      borderLeftWidth: 4,
+      borderLeftColor: t.colors.primary,
+      paddingLeft: 6,
+    },
+    selectedText: { color: t.colors.primary },
     // The very top of the menu: home, as a wide bar across the menu, easy to press.
     top: {
       paddingHorizontal: 16,
       paddingTop: 8,
       paddingBottom: 12,
       marginBottom: 8,
-      borderBottomWidth: 1,
+      borderBottomWidth: 3,
       borderBottomColor: t.colors.border,
     },
     homeButton: {
@@ -330,12 +350,11 @@ const makeStyles = (t: Theme) =>
     },
     createText: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.primary },
     error: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.error, paddingHorizontal: 8 },
-    divider: { height: 1, backgroundColor: t.colors.border, marginVertical: 10 },
+    divider: { height: 3, backgroundColor: t.colors.border, marginVertical: 12, borderRadius: 2 },
     bottom: {
       paddingHorizontal: 16,
       paddingTop: 8,
-      borderTopWidth: 1,
+      borderTopWidth: 3,
       borderTopColor: t.colors.border,
-      gap: 2,
     },
   });

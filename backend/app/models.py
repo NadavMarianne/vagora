@@ -113,6 +113,9 @@ class Membership(Base):
     limits_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # How many edits of the limits file they made after setting it. The first one is free.
     limits_edits: Mapped[int] = mapped_column(server_default="0")
+    # Where this market shows in this person's list (their own order). Empty: after the others,
+    # in the order they joined.
+    position: Mapped[int | None] = mapped_column()
 
     market: Mapped[Market] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(foreign_keys=[user_id])

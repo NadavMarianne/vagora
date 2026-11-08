@@ -213,12 +213,39 @@ def create_market(new: MarketCreate, user: CurrentUser, db: DbSession) -> Market
 
 @router.get("")
 def list_my_markets(user: CurrentUser, db: DbSession) -> list[MarketView]:
+    """Your markets, in the order you set (new ones after the others, in the order you joined)."""
     memberships = db.scalars(
-        active_memberships().where(Membership.user_id == user.id).order_by(Membership.joined_at)
+        active_memberships()
+        .where(Membership.user_id == user.id)
+        .order_by(Membership.position.asc().nulls_last(), Membership.joined_at)
     ).all()
     for membership in memberships:
         catch_up(db, membership.market)
     return [view(membership) for membership in memberships]
+
+
+class MarketOrder(BaseModel):
+    """Your markets' IDs, in the order you want them."""
+
+    market_ids: list[int]
+
+
+@router.put("/order", status_code=status.HTTP_204_NO_CONTENT)
+def reorder_markets(order: MarketOrder, user: CurrentUser, db: DbSession) -> None:
+    """Sets the order of your markets, for the home screen and the menu."""
+    memberships = {
+        m.market_id: m
+        for m in db.scalars(active_memberships().where(Membership.user_id == user.id))
+    }
+    if set(order.market_ids) != set(memberships) or len(order.market_ids) != len(memberships):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Send each of your markets exactly once."
+        )
+    for position, market_id in enumerate(order.market_ids):
+        memberships[market_id].position = position
+    db.commit()
+    # Your other screens (like the menu) show the new order at once.
+    signals.notify(db, [user.firebase_uid], "markets")
 
 
 @router.get("/left")
