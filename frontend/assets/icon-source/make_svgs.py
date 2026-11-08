@@ -1,0 +1,122 @@
+"""Writes the Vagora icon (design B, "deep night") as the SVG files the app needs.
+
+To change the icon: edit this script, run it (`python make_svgs.py`), then turn each SVG into a
+PNG at the size listed in app.json's images (for example by opening it in a browser and saving a
+screenshot, or with any SVG converter), and copy the PNGs into ../images.
+
+- icon.svg: the full icon (square; the phone rounds it).
+- adaptive-background.svg / adaptive-foreground.svg: Android's two layers. The design sits in
+  the middle two thirds (Android's safe zone), with the sky and water extended around it.
+- monochrome.svg: a one-color version for Android's themed icons.
+- splash.svg: the coin alone, for the splash screen.
+"""
+
+import pathlib
+
+OUT = pathlib.Path(__file__).parent
+
+DEFS = """
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#030619"/><stop offset="0.6" stop-color="#0B1D4A"/><stop offset="1" stop-color="#0E4A55"/>
+  </linearGradient>
+  <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A2E44"/><stop offset="1" stop-color="#01040F"/></linearGradient>
+  <linearGradient id="gold" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+    <stop offset="0" stop-color="#FFF7D1"/><stop offset="0.28" stop-color="#FFD84D"/>
+    <stop offset="0.62" stop-color="#F0AE16"/><stop offset="1" stop-color="#B97A06"/>
+  </linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE07A"/><stop offset="1" stop-color="#9C6200"/></linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C98A0C"/><stop offset="1" stop-color="#7A4A00"/></linearGradient>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#FFE9A0" stop-opacity="0.5"/><stop offset="1" stop-color="#FFE9A0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.6"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+  <mask id="fadeMask" maskUnits="userSpaceOnUse" x="-60" y="108" width="280" height="120"><rect x="-60" y="108" width="280" height="120" fill="url(#fade)"/></mask>
+  <clipPath id="water"><rect x="-60" y="108" width="280" height="120"/></clipPath>
+</defs>
+"""
+
+SPARK = "M0 -9 C1.2 -2 2 -1.2 9 0 C2 1.2 1.2 2 0 9 C-1.2 2 -2 1.2 -9 0 C-2 -1.2 -1.2 -2 0 -9 Z"
+
+
+def spark(x, y, s, fill="#FFFFFF"):
+    return f'<path d="{SPARK}" transform="translate({x} {y}) scale({s})" fill="{fill}"/>'
+
+
+COIN = """
+<circle cx="80" cy="64" r="40" fill="url(#glow)"/>
+<circle cx="80" cy="66" r="36" fill="url(#edge)"/>
+<circle cx="80" cy="62" r="36" fill="url(#rim)"/>
+<circle cx="80" cy="62" r="29" fill="url(#gold)"/>
+<circle cx="80" cy="62" r="29" fill="none" stroke="#FFF2B0" stroke-width="1.5" opacity="0.8"/>
+<path d="M64 48 L80 80 L96 48" fill="none" stroke="#8F5600" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M64 48 L80 80 L96 48" fill="none" stroke="#FFF4C2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7" transform="translate(-1.5 -2.5)"/>
+<path d="M58 44 Q66 34 80 33" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+"""
+
+# The moon sits a little further in than on the mockup, so round launcher masks don't clip it.
+NIGHT = (
+    # A real crescent (a circle with a bite cut out), so it works on a see-through layer too.
+    '<mask id="moonCut" maskUnits="userSpaceOnUse" x="100" y="10" width="40" height="40">'
+    '<rect x="100" y="10" width="40" height="40" fill="#FFFFFF"/>'
+    '<circle cx="118" cy="26" r="11.5" fill="#000000"/></mask>'
+    '<circle cx="124" cy="31" r="13" fill="#F4F0FF" mask="url(#moonCut)"/>'
+    + spark(38, 22, 0.55)
+    + spark(22, 46, 0.4, "#E0F2FE")
+    + spark(106, 16, 0.35)
+    + '<circle cx="140" cy="58" r="1.6" fill="#FFFFFF"/><circle cx="24" cy="84" r="1.4" fill="#FFFFFF"/>'
+)
+
+WATER_EXTRAS = """
+<path d="M20 118 H56 M100 124 H138 M78 136 H122 M24 148 H56" stroke="#FFD84D" stroke-width="1.6" opacity="0.45" stroke-linecap="round"/>
+<g stroke="#6EE7D2" stroke-width="0.8" opacity="0.28">
+  <path d="M-60 114 H220 M-60 128 H220 M-60 144 H220 M-60 162 H220 M-60 184 H220"/>
+  <path d="M80 108 L18 160 M80 108 L58 160 M80 108 L102 160 M80 108 L142 160"/>
+</g>
+"""
+
+REFLECTION = (
+    '<g clip-path="url(#water)" mask="url(#fadeMask)"><g transform="translate(0 216) scale(1 -1)">'
+    + COIN
+    + "</g></g>"
+)
+
+
+def background(x0, y0, w, h):
+    """Sky and water filling the given area."""
+    return (
+        f'<rect x="{x0}" y="{y0}" width="{w}" height="{108 - y0}" fill="url(#sky)"/>'
+        f'<rect x="{x0}" y="108" width="{w}" height="{y0 + h - 108}" fill="url(#sea)"/>'
+    )
+
+
+def svg(view, size, body):
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="{view}">'
+        + DEFS
+        + body
+        + "</svg>"
+    )
+
+
+FOREGROUND = NIGHT + COIN + spark(54, 38, 0.95) + REFLECTION + WATER_EXTRAS
+
+# The full icon: the design fills the square.
+(OUT / "icon.svg").write_text(svg("0 0 160 160", 1024, background(0, 0, 160, 160) + FOREGROUND))
+
+# Android: the design in the middle two thirds of a 240-unit layer (Android's safe zone).
+ADAPTIVE = "-40 -40 240 240"
+(OUT / "adaptive-background.svg").write_text(svg(ADAPTIVE, 1024, background(-40, -40, 240, 240)))
+(OUT / "adaptive-foreground.svg").write_text(svg(ADAPTIVE, 1024, FOREGROUND))
+
+# One color, for Android's themed icons: the coin with its V cut out.
+MONO = """
+<mask id="vCut" maskUnits="userSpaceOnUse" x="-40" y="-40" width="240" height="240">
+  <rect x="-40" y="-40" width="240" height="240" fill="#FFFFFF"/>
+  <path d="M60 46 L80 86 L100 46" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</mask>
+<circle cx="80" cy="66" r="44" fill="#FFFFFF" mask="url(#vCut)"/>
+"""
+(OUT / "monochrome.svg").write_text(svg(ADAPTIVE, 432, MONO))
+
+# The splash screen: just the coin and its sparkle, on the deep night color.
+(OUT / "splash.svg").write_text(svg("36 18 88 88", 512, COIN + spark(54, 38, 0.95)))
+print("ok")
