@@ -6,16 +6,8 @@
 import { usePathname } from "expo-router";
 import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Animated,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView, ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
@@ -109,7 +101,6 @@ function MenuPanel({ markets: known, onClose }: { markets: Market[]; onClose: ()
   }
 
   const go = (href: string) => close(() => openPage(href));
-  const [dragging, setDragging] = useState(false);
   // Which of this market's pages you're on, to highlight it.
   const on = (section: string) => path.startsWith(`/markets/${marketId}/${section}`);
 
@@ -155,87 +146,89 @@ function MenuPanel({ markets: known, onClose }: { markets: Market[]; onClose: ()
       navigationBarTranslucent
       onRequestClose={() => close()}
     >
-      <Pressable style={styles.backdrop} onPress={() => close()} accessibilityLabel="Close menu" />
-      <Animated.View
-        style={[
-          styles.panel,
-          { paddingTop: insets.top, paddingBottom: insets.bottom + 12 },
-          { transform: [{ translateX: slide }] },
-        ]}
-      >
-        {/* Always at the top: home. */}
-        <View style={styles.top}>
-          <HomeIcon onPress={() => close(() => openPage("/"))} />
-        </View>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          scrollEnabled={!dragging}
+      {/* Gestures inside a Modal need their own root on Android. */}
+      <GestureHandlerRootView style={styles.root}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => close()}
+          accessibilityLabel="Close menu"
+        />
+        <Animated.View
+          style={[
+            styles.panel,
+            { paddingTop: insets.top, paddingBottom: insets.bottom + 12 },
+            { transform: [{ translateX: slide }] },
+          ]}
         >
-          <Text style={styles.section}>Your markets</Text>
-          <DraggableMarkets
-            markets={markets}
-            selectedId={marketId}
-            onOpen={(m) => close(() => openPage(`/markets/${m.id}`))}
-            onReorder={saveOrder}
-            onDragging={setDragging}
-          />
-          <View style={styles.halfDivider} />
-          <Tappable
-            onPress={() => go("/markets/new")}
-            style={styles.create}
-            accessibilityRole="button"
-          >
-            <Text style={styles.createText}>Create a market</Text>
-          </Tappable>
+          {/* Always at the top: home. */}
+          <View style={styles.top}>
+            <HomeIcon onPress={() => close(() => openPage("/"))} />
+          </View>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <Text style={styles.section}>Your markets</Text>
+            <DraggableMarkets
+              markets={markets}
+              selectedId={marketId}
+              onOpen={(m) => close(() => openPage(`/markets/${m.id}`))}
+              onReorder={saveOrder}
+            />
+            <View style={styles.halfDivider} />
+            <Tappable
+              onPress={() => go("/markets/new")}
+              style={styles.create}
+              accessibilityRole="button"
+            >
+              <Text style={styles.createText}>Create a market</Text>
+            </Tappable>
 
-          {marketId && (
-            <>
-              <View style={styles.divider} />
-              <Text style={styles.section}>{market ? market.name : "This market"}</Text>
-              <Item
-                first
-                title="Store"
-                selected={on("store") || on("proposals")}
-                onPress={() => go(`/markets/${marketId}/store`)}
-              />
-              <Item
-                title="Orders"
-                selected={on("orders")}
-                onPress={() => go(`/markets/${marketId}/orders`)}
-              />
-              <Item
-                title="Members"
-                selected={on("members")}
-                onPress={() => go(`/markets/${marketId}/members`)}
-              />
-              <Item
-                title="Invite someone"
-                selected={on("invite")}
-                onPress={() => go(`/markets/${marketId}/invite`)}
-              />
-              <Item
-                title="Market settings"
-                selected={on("settings")}
-                onPress={() => go(`/markets/${marketId}/settings`)}
-              />
-              <Item title="Leave market" danger onPress={leave} />
-              {error !== "" && <Text style={styles.error}>{error}</Text>}
-            </>
-          )}
-        </ScrollView>
+            {marketId && (
+              <>
+                <View style={styles.divider} />
+                <Text style={styles.section}>{market ? market.name : "This market"}</Text>
+                <Item
+                  first
+                  title="Store"
+                  selected={on("store") || on("proposals")}
+                  onPress={() => go(`/markets/${marketId}/store`)}
+                />
+                <Item
+                  title="Orders"
+                  selected={on("orders")}
+                  onPress={() => go(`/markets/${marketId}/orders`)}
+                />
+                <Item
+                  title="Members"
+                  selected={on("members")}
+                  onPress={() => go(`/markets/${marketId}/members`)}
+                />
+                <Item
+                  title="Invite someone"
+                  selected={on("invite")}
+                  onPress={() => go(`/markets/${marketId}/invite`)}
+                />
+                <Item
+                  title="Market settings"
+                  selected={on("settings")}
+                  onPress={() => go(`/markets/${marketId}/settings`)}
+                />
+                <Item title="Leave market" danger onPress={leave} />
+                {error !== "" && <Text style={styles.error}>{error}</Text>}
+              </>
+            )}
+          </ScrollView>
 
-        {/* Always at the bottom. */}
-        <View style={styles.bottom}>
-          <Item
-            first
-            title="Settings"
-            selected={path === "/settings"}
-            onPress={() => go("/settings")}
-          />
-          <Item title="Log out" danger onPress={() => close(() => signOut(auth))} />
-        </View>
-      </Animated.View>
+          {/* Always at the bottom. */}
+          <View style={styles.bottom}>
+            <Item
+              first
+              title="Settings"
+              selected={path === "/settings"}
+              onPress={() => go("/settings")}
+            />
+            <Item title="Log out" danger onPress={() => close(() => signOut(auth))} />
+          </View>
+        </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -320,6 +313,7 @@ const makeStyles = (t: Theme) =>
       borderLeftWidth: t.borderWidth,
       borderLeftColor: t.colors.border,
     },
+    root: { flex: 1 },
     scroll: { flex: 1 },
     content: { paddingHorizontal: 16, paddingBottom: 16 },
     section: {

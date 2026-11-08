@@ -2,6 +2,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { MenuButton } from "@/components/app-menu";
 import { LiveBanner } from "@/components/live-banner";
@@ -38,11 +39,12 @@ export default function RootLayout() {
 function Themed() {
   const t = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+    // The gesture root lets drags (like reordering markets) run smoothly on the UI thread.
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: t.colors.background }}>
       <StatusBar style={t.dark ? "light" : "dark"} />
       <Screens />
       <LiveBanner />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

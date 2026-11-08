@@ -1,186 +1,209 @@
-// Your markets in the menu, in your order. Tap one to open it; drag its grip (⋮⋮) up or down to
-// move it. The new order is saved on your account (see the menu).
-import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, StyleSheet, Text, View } from "react-native";
+// Your markets in the menu, in your order. Tap one to open it; drag its grip (six dots) up or down
+// to move it. The drag runs on the phone's UI thread (gesture handler + Reanimated), so it stays
+// smooth, and the rows it passes slide aside. The new order is saved on your account (see the menu).
+import { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
+import Animated, {
+  type SharedValue,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { Tappable } from "@/components/tappable";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { Market } from "@/lib/types";
 
+// Every row is this tall, so a position is simply a row number.
+const ROW = 52;
+
+/** Each market's row number, by its ID. */
+type Positions = Record<number, number>;
+
+const toPositions = (markets: Market[]): Positions =>
+  Object.fromEntries(markets.map((m, index) => [m.id, index]));
+
 export function DraggableMarkets({
   markets,
   selectedId,
   onOpen,
   onReorder,
-  onDragging,
 }: {
   markets: Market[];
   /** The market you're in, highlighted. */
   selectedId: string | null;
   onOpen: (market: Market) => void;
   onReorder: (markets: Market[]) => void;
-  /** Told when a drag starts and ends, so the menu stops scrolling while one is going on. */
-  onDragging: (dragging: boolean) => void;
 }) {
-  const styles = useStyles(makeStyles);
-  const t = useTheme();
-  const [order, setOrder] = useState(markets);
-  const [dragged, setDragged] = useState<number | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
-  const [dragY] = useState(() => new Animated.Value(0));
-  // A row's height, to know how far a drag has moved a market.
-  const [rowHeight, setRowHeight] = useState(52);
-  // The same values for the touch handlers, which run between renders.
-  const live = useRef({
-    order,
-    rowHeight,
-    dragged: null as number | null,
-    hover: null as number | null,
-  });
+  const positions = useSharedValue<Positions>(toPositions(markets));
+
+  // A fresh list from the backend (it may have changed elsewhere).
   useEffect(() => {
-    live.current.order = order;
-    live.current.rowHeight = rowHeight;
-  }, [order, rowHeight]);
+    positions.set(toPositions(markets));
+  }, [markets, positions]);
 
-  // A fresh list from the backend, unless a drag is going on.
-  useEffect(() => {
-    // Take the new list from the backend (it may have changed elsewhere).
-    if (live.current.dragged === null) setOrder(markets);
-  }, [markets]);
-
-  function grip(index: number) {
-    const end = () => {
-      const from = live.current.dragged;
-      const to = live.current.hover;
-      live.current.dragged = live.current.hover = null;
-      setDragged(null);
-      setHover(null);
-      dragY.setValue(0);
-      onDragging(false);
-      if (from === null || to === null || from === to) return;
-      const next = [...live.current.order];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      setOrder(next);
-      onReorder(next);
-    };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        live.current.dragged = live.current.hover = index;
-        setDragged(index);
-        setHover(index);
-        dragY.setValue(0);
-        onDragging(true);
-      },
-      onPanResponderMove: (_, g) => {
-        dragY.setValue(g.dy);
-        const last = live.current.order.length - 1;
-        const step = live.current.rowHeight;
-        const target = Math.max(0, Math.min(last, index + Math.round(g.dy / step)));
-        if (target !== live.current.hover) {
-          live.current.hover = target;
-          setHover(target);
-        }
-      },
-      onPanResponderRelease: end,
-      onPanResponderTerminate: end,
-    });
-  }
-
-  /** How far a row moves aside to make room for the one being dragged. */
-  function shift(index: number): number {
-    if (dragged === null || hover === null || index === dragged) return 0;
-    if (dragged < index && index <= hover) return -rowHeight;
-    if (hover <= index && index < dragged) return rowHeight;
-    return 0;
+  function dropped(final: Positions) {
+    const next = [...markets].sort((a, b) => final[a.id] - final[b.id]);
+    if (next.some((m, index) => m.id !== markets[index].id)) onReorder(next);
   }
 
   return (
-    <View>
-      {/* The grips' touch handlers read the refs only during a drag, never while drawing. */}
-      {/* eslint-disable-next-line react-hooks/refs */}
-      {order.map((market, index) => {
-        const isDragged = index === dragged;
-        const selected = String(market.id) === selectedId;
-        return (
-          <Animated.View
-            key={market.id}
-            onLayout={(e) => {
-              const height = e.nativeEvent.layout.height;
-              if (index === 0 && height !== rowHeight) setRowHeight(height);
-            }}
-            style={[
-              styles.row,
-              index > 0 && styles.line,
-              selected && styles.selected,
-              isDragged && styles.lifted,
-              { transform: [{ translateY: isDragged ? dragY : shift(index) }] },
-            ]}
-          >
-            <Tappable
-              onPress={() => onOpen(market)}
-              style={styles.open}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-            >
-              <Text style={[styles.name, selected && styles.selectedText]}>{market.name}</Text>
-              <Text style={styles.detail}>
-                {market.my_balance.toLocaleString()} {market.currency_name}
-              </Text>
-            </Tappable>
-            {order.length > 1 && (
-              <View
-                {...grip(index).panHandlers}
-                style={styles.grip}
-                accessibilityLabel={`Drag to move ${market.name}`}
-              >
-                <Text style={[styles.gripText, { color: t.colors.muted }]}>⋮⋮</Text>
-              </View>
-            )}
-          </Animated.View>
-        );
-      })}
+    <View style={{ height: markets.length * ROW }}>
+      {markets.map((market) => (
+        <Row
+          key={market.id}
+          market={market}
+          count={markets.length}
+          positions={positions}
+          selected={String(market.id) === selectedId}
+          onOpen={() => onOpen(market)}
+          onDrop={dropped}
+        />
+      ))}
     </View>
+  );
+}
+
+function Row({
+  market,
+  count,
+  positions,
+  selected,
+  onOpen,
+  onDrop,
+}: {
+  market: Market;
+  count: number;
+  positions: SharedValue<Positions>;
+  selected: boolean;
+  onOpen: () => void;
+  onDrop: (final: Positions) => void;
+}) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
+  const id = market.id;
+  const top = useSharedValue((positions.get()[id] ?? 0) * ROW);
+  const start = useSharedValue(0);
+  const dragging = useSharedValue(false);
+
+  // When another row takes this one's place, slide to the new place.
+  useAnimatedReaction(
+    () => positions.get()[id],
+    (now, before) => {
+      if (now !== before && now !== undefined && !dragging.get()) {
+        top.set(withTiming(now * ROW, { duration: 160 }));
+      }
+    },
+  );
+
+  const drag = usePanGesture({
+    minDistance: 0,
+    onBegin: () => {
+      "worklet";
+      dragging.set(true);
+      start.set(top.get());
+    },
+    onUpdate: (event) => {
+      "worklet";
+      const max = (count - 1) * ROW;
+      top.set(Math.min(max, Math.max(0, start.get() + event.translationY)));
+      // The row the finger is over now; the market there swaps into this one's old place.
+      const to = Math.min(count - 1, Math.max(0, Math.round(top.get() / ROW)));
+      const from = positions.get()[id];
+      if (to !== from) {
+        const next: Positions = { ...positions.get() };
+        for (const key of Object.keys(next)) {
+          if (next[Number(key)] === to) next[Number(key)] = from;
+        }
+        next[id] = to;
+        positions.set(next);
+      }
+    },
+    onFinalize: () => {
+      "worklet";
+      if (!dragging.get()) return;
+      dragging.set(false);
+      top.set(withTiming(positions.get()[id] * ROW, { duration: 160 }));
+      scheduleOnRN(onDrop, positions.get());
+    },
+  });
+
+  const placed = useAnimatedStyle(() => ({
+    top: top.get(),
+    zIndex: dragging.get() ? 10 : 0,
+    elevation: dragging.get() ? 8 : 0,
+    transform: [{ scale: withTiming(dragging.get() ? 1.03 : 1, { duration: 120 }) }],
+  }));
+
+  return (
+    <Animated.View style={[styles.row, selected && styles.selected, placed]}>
+      <Tappable
+        onPress={onOpen}
+        style={styles.open}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+      >
+        <Text style={[styles.name, selected && styles.selectedText]} numberOfLines={1}>
+          {market.name}
+        </Text>
+        <Text style={styles.detail}>
+          {market.my_balance.toLocaleString()} {market.currency_name}
+        </Text>
+      </Tappable>
+      {count > 1 && (
+        <GestureDetector gesture={drag}>
+          <View style={styles.grip} accessibilityLabel={`Drag to move ${market.name}`}>
+            {/* Six dots, in two columns of three. */}
+            {[0, 1, 2].map((r) => (
+              <View key={r} style={styles.dots}>
+                <View style={[styles.dot, { backgroundColor: t.colors.muted }]} />
+                <View style={[styles.dot, { backgroundColor: t.colors.muted }]} />
+              </View>
+            ))}
+          </View>
+        </GestureDetector>
+      )}
+    </Animated.View>
   );
 }
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     row: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: ROW,
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: t.colors.background,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.colors.border,
     },
-    line: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
     // Where you are: a colored bar on the left and a tinted background.
     selected: {
       backgroundColor: t.colors.surfaceAlt,
       borderLeftWidth: 4,
       borderLeftColor: t.colors.primary,
     },
-    // The row being dragged floats above the others.
-    lifted: {
-      zIndex: 10,
-      elevation: 8,
-      backgroundColor: t.colors.surface,
-      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.35)",
-    },
     open: {
       flex: 1,
+      height: ROW,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       gap: 8,
-      paddingVertical: 13,
       paddingLeft: 10,
       paddingRight: 4,
     },
     name: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     selectedText: { color: t.colors.primary },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
-    grip: { paddingHorizontal: 10, paddingVertical: 13 },
-    gripText: { fontSize: 16, letterSpacing: -3 },
+    grip: { height: ROW, paddingHorizontal: 14, justifyContent: "center", gap: 3 },
+    dots: { flexDirection: "row", gap: 3 },
+    dot: { width: 4, height: 4, borderRadius: 2 },
   });

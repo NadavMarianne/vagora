@@ -15,4 +15,5 @@
 - Markets can be reordered by dragging their grip in the menu; the order is saved on my account, and the home page follows it.
 - Back now walks outward: pages opened from the menu, a notification, or the home page open along their path (Home, then the market, then its section, then the page), and Home has nothing behind it.
 - The menu has Store and Orders in the market section, and highlights the page I'm on there.
+- Dragging was glitchy: every finger movement went through the app's JavaScript, and the menu's scroll fought it. Rebuilt it with the gesture and animation packages Expo already includes, so it runs on the phone's UI thread and the other rows slide aside smoothly. The grip is six drawn dots.
 - Next: try it, then the production setup and the APK.
