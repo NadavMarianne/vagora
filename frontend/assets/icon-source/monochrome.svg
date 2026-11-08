@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="432" height="432" viewBox="-40 -40 240 240">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#030619"/><stop offset="0.6" stop-color="#0B1D4A"/><stop offset="1" stop-color="#0E4A55"/>
+  </linearGradient>
+  <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A2E44"/><stop offset="1" stop-color="#01040F"/></linearGradient>
+  <linearGradient id="gold" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+    <stop offset="0" stop-color="#FFF7D1"/><stop offset="0.28" stop-color="#FFD84D"/>
+    <stop offset="0.62" stop-color="#F0AE16"/><stop offset="1" stop-color="#B97A06"/>
+  </linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE07A"/><stop offset="1" stop-color="#9C6200"/></linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C98A0C"/><stop offset="1" stop-color="#7A4A00"/></linearGradient>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#FFE9A0" stop-opacity="0.5"/><stop offset="1" stop-color="#FFE9A0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.6"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+  <mask id="fadeMask" maskUnits="userSpaceOnUse" x="-60" y="108" width="280" height="120"><rect x="-60" y="108" width="280" height="120" fill="url(#fade)"/></mask>
+  <clipPath id="water"><rect x="-60" y="108" width="280" height="120"/></clipPath>
+</defs>
+
+<mask id="vCut" maskUnits="userSpaceOnUse" x="-40" y="-40" width="240" height="240">
+  <rect x="-40" y="-40" width="240" height="240" fill="#FFFFFF"/>
+  <path d="M60 46 L80 86 L100 46" fill="none" stroke="#000000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</mask>
+<circle cx="80" cy="66" r="44" fill="#FFFFFF" mask="url(#vCut)"/>
+</svg>
