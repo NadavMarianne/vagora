@@ -103,12 +103,13 @@ function Screens() {
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
         <Stack.Screen name="markets/[id]/members/index" options={{ title: "Members" }} />
         <Stack.Screen name="markets/new" options={{ title: "Create a market" }} />
-        <Stack.Screen name="markets/[id]/index" options={{ title: "Market" }} />
+        {/* These pages show their own name once it loads; until then the title stays empty. */}
+        <Stack.Screen name="markets/[id]/index" options={{ title: "" }} />
         <Stack.Screen name="markets/[id]/settings" options={{ title: "Market settings" }} />
         <Stack.Screen name="markets/[id]/invite" options={{ title: "Invite someone" }} />
         <Stack.Screen name="markets/[id]/store/index" options={{ title: "Store" }} />
         <Stack.Screen name="markets/[id]/store/new" options={{ title: "New product" }} />
-        <Stack.Screen name="markets/[id]/store/[productId]/index" options={{ title: "Product" }} />
+        <Stack.Screen name="markets/[id]/store/[productId]/index" options={{ title: "" }} />
         <Stack.Screen
           name="markets/[id]/store/[productId]/my-offer"
           options={{ title: "My offer" }}
@@ -118,12 +119,12 @@ function Screens() {
           options={{ title: "Asked to sell" }}
         />
         <Stack.Screen name="markets/[id]/orders/index" options={{ title: "Orders" }} />
-        <Stack.Screen name="markets/[id]/members/[username]" options={{ title: "Member" }} />
+        <Stack.Screen name="markets/[id]/members/[username]" options={{ title: "" }} />
         <Stack.Screen
           name="markets/[id]/limits-setup"
           options={{ title: "Your limits", headerBackVisible: false }}
         />
-        <Stack.Screen name="markets/[id]/orders/[orderId]" options={{ title: "Order" }} />
+        <Stack.Screen name="markets/[id]/orders/[orderId]" options={{ title: "" }} />
       </Stack.Protected>
     </Stack>
   );
