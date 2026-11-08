@@ -133,7 +133,7 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
       <Animated.View
         style={[
           styles.panel,
-          { paddingTop: insets.top + 4, paddingBottom: insets.bottom + 12 },
+          { paddingTop: insets.top, paddingBottom: insets.bottom + 12 },
           { transform: [{ translateX: slide }] },
         ]}
       >
@@ -190,7 +190,7 @@ function HomeIcon({ onPress }: { onPress: () => void }) {
   const t = useTheme();
   const line = {
     stroke: t.colors.text,
-    strokeWidth: 2,
+    strokeWidth: 1.6,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
   };
@@ -201,7 +201,7 @@ function HomeIcon({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel="Home"
     >
-      <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+      <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
         <Path d="M3 10.5 12 3l9 7.5" {...line} />
         <Path d="M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9" {...line} />
       </Svg>
@@ -280,15 +280,15 @@ const makeStyles = (t: Theme) =>
       borderRadius: t.radius.button,
     },
     itemSelected: { backgroundColor: t.colors.surfaceAlt },
+    // The very top of the menu: the home icon, big and centered.
     top: {
-      flexDirection: "row",
-      paddingHorizontal: 16,
-      paddingBottom: 8,
+      alignItems: "center",
+      paddingBottom: 6,
       marginBottom: 8,
       borderBottomWidth: 1,
       borderBottomColor: t.colors.border,
     },
-    homeButton: { padding: 8 },
+    homeButton: { paddingVertical: 4, paddingHorizontal: 24 },
     itemText: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     danger: { color: t.colors.bad },
