@@ -16,4 +16,5 @@
 - Back now walks outward: pages opened from the menu, a notification, or the home page open along their path (Home, then the market, then its section, then the page), and Home has nothing behind it.
 - The menu has Store and Orders in the market section, and highlights the page I'm on there.
 - Dragging was glitchy: every finger movement went through the app's JavaScript, and the menu's scroll fought it. Rebuilt it with the gesture and animation packages Expo already includes, so it runs on the phone's UI thread and the other rows slide aside smoothly. The grip is six drawn dots.
+- Opening something for a quick look (from the home page, the notifications list, or a banner) now opens it right on top, so one back returns. The menu still opens pages along their path.
 - Next: try it, then the production setup and the APK.

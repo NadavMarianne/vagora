@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { Tappable } from "@/components/tappable";
 import { Body, Button, Info, levelColors, Screen } from "@/components/ui";
 import { useNotifications } from "@/lib/notifications";
-import { openPage } from "@/lib/open-page";
+import { peekPage } from "@/lib/open-page";
 import type { AppNotification } from "@/lib/types";
 import type { Theme } from "@/lib/themes";
 import { useStyles, useTheme } from "@/lib/theme";
@@ -15,7 +15,7 @@ export default function NotificationsScreen() {
 
   function open(notification: AppNotification) {
     markRead(notification.id);
-    openPage(notification.path || "/");
+    peekPage(notification.path || "/");
   }
 
   function clearAll() {

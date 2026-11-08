@@ -9,7 +9,7 @@ import { Tappable } from "@/components/tappable";
 import { levelColors } from "@/components/ui";
 import { type Banner, useLive } from "@/lib/live";
 import { useNotifications } from "@/lib/notifications";
-import { openPage } from "@/lib/open-page";
+import { peekPage } from "@/lib/open-page";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 
@@ -19,10 +19,10 @@ const SWIPE_DISTANCE = 100;
 const SWIPE_SPEED = 0.5;
 
 function open(banner: Banner) {
-  if (banner.path) return openPage(banner.path);
+  if (banner.path) return peekPage(banner.path);
   // Older notes without a page: the market, or the home screen.
   const market = banner.reason.match(/^market:(\d+)$/);
-  openPage(market ? `/markets/${market[1]}` : "/");
+  peekPage(market ? `/markets/${market[1]}` : "/");
 }
 
 export function LiveBanner() {

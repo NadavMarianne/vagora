@@ -17,7 +17,7 @@ import {
 } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useNotifications } from "@/lib/notifications";
-import { openPage } from "@/lib/open-page";
+import { peekPage } from "@/lib/open-page";
 import { useSession } from "@/lib/session";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
@@ -163,7 +163,7 @@ export default function Home() {
               key={order.id}
               style={[styles.card, styles.deliver]}
               accessibilityRole="button"
-              onPress={() => openPage(`/markets/${order.market_id}/orders/${order.id}`)}
+              onPress={() => peekPage(`/markets/${order.market_id}/orders/${order.id}`)}
             >
               <View style={styles.rowText}>
                 <Text style={styles.cardTitle}>{order.product_name}</Text>
@@ -231,7 +231,7 @@ export default function Home() {
               accessibilityRole="button"
               onPress={() => {
                 markRead(n.id);
-                openPage(n.path || "/notifications");
+                peekPage(n.path || "/notifications");
               }}
             >
               <View style={[styles.dot, { backgroundColor: levelColors(t, n.level)[0] }]} />

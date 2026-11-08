@@ -1,6 +1,8 @@
-// Opens a page along its path, so the back arrow walks outward: an order opened from a
-// notification sits on Orders, which sits on its market, which sits on Home. Home is the bottom,
-// with nothing behind it.
+// Two ways to open a page:
+// - `openPage`, for going somewhere (the menu): the page opens along its path, so back walks
+//   outward. An order sits on Orders, which sits on its market, which sits on Home.
+// - `peekPage`, for a quick look (the home page, notifications, banners): the page opens on top
+//   of where you are, so one back returns there.
 import { type Href, router } from "expo-router";
 
 /** The pages that lead to `path`, outermost first, ending with `path` itself (Home not included,
@@ -27,4 +29,11 @@ export function pagePath(path: string): string[] {
 export function openPage(path: string) {
   if (router.canDismiss()) router.dismissAll();
   for (const page of pagePath(path)) router.push(page as Href);
+}
+
+/** Shows `path` on top of the current page, so one back returns to it. Home itself clears
+ * everything open instead. */
+export function peekPage(path: string) {
+  if (path === "/") return openPage("/");
+  router.push(path as Href);
 }
