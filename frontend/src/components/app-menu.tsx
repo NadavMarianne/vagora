@@ -137,11 +137,13 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
         ]}
       >
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          <Item
-            title="Home"
-            selected={path === "/"}
+          <Tappable
             onPress={() => close(() => router.navigate("/"))}
-          />
+            style={[styles.home, path === "/" && styles.itemSelected]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.homeText}>Home</Text>
+          </Tappable>
           <View style={styles.divider} />
 
           <Text style={styles.section}>Your markets</Text>
@@ -257,6 +259,13 @@ const makeStyles = (t: Theme) =>
       borderRadius: t.radius.button,
     },
     itemSelected: { backgroundColor: t.colors.surfaceAlt },
+    home: { paddingVertical: 14, borderRadius: t.radius.button, alignItems: "center" },
+    homeText: {
+      fontSize: 19,
+      fontFamily: t.fonts.heading,
+      color: t.colors.text,
+      textTransform: t.upperTitles ? "uppercase" : "none",
+    },
     itemText: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     danger: { color: t.colors.bad },

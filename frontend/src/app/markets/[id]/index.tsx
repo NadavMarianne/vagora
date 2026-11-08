@@ -105,12 +105,23 @@ export default function MarketScreen() {
           </Text>
         </View>
       ))}
-      {entries.length > shown && (
-        <Button
-          title={`Show more (${Math.min(10, entries.length - shown)})`}
-          kind="secondary"
-          onPress={() => setShown(shown + 10)}
-        />
+      {(entries.length > shown || shown > 5) && (
+        <View style={styles.buttons}>
+          {shown > 5 && (
+            <View style={styles.half}>
+              <Button title="Show less" kind="secondary" onPress={() => setShown(5)} />
+            </View>
+          )}
+          {entries.length > shown && (
+            <View style={styles.half}>
+              <Button
+                title={`Show more (${Math.min(10, entries.length - shown)})`}
+                kind="secondary"
+                onPress={() => setShown(shown + 10)}
+              />
+            </View>
+          )}
+        </View>
       )}
     </Screen>
   );

@@ -308,3 +308,18 @@ def test_ledger_matches_balances(home, db):
             )
         )
         assert total == membership.balance
+
+
+def test_orders_to_deliver_across_markets(home):
+    dana, noa, market_id = home
+    order = buy(home).json()
+
+    waiting = noa.get("/orders/to-deliver").json()
+
+    assert [(o["id"], o["market_name"], o["role"]) for o in waiting] == [
+        (order["id"], "Home", "seller")
+    ]
+    assert dana.get("/orders/to-deliver").json() == []  # Dana is the buyer
+
+    act(noa, market_id, order["id"], "done")
+    assert noa.get("/orders/to-deliver").json() == []  # now it waits for Dana

@@ -32,6 +32,7 @@ app.include_router(products.router)
 app.include_router(offers.router)
 app.include_router(owners.router)
 app.include_router(orders.router)
+app.include_router(orders.everywhere)
 app.include_router(time_zones.router)
 
 

@@ -7,4 +7,6 @@
 - Added a ☰ menu next to the bell, with the market's members, invites, settings, and leaving, plus my markets, notifications, settings, and log out. The market page now shows just the balance, Store, Orders, and transactions.
 - First UI fixes: the menu no longer changes after opening (it loads my markets ahead of time). New order: Home at the top, then my markets with "Create a market" set apart, then the market's own items; Settings and Log out pinned to the bottom; Notifications left out (the bell is enough).
 - A market's page shows the 5 newest transactions, with "Show more".
-- Next: the bell drawing and what the home page should show.
+- The bell is now a line drawing (added `react-native-svg`), in the theme's colors. Home in the menu is bold and centered. Transactions got "Show less".
+- The home page now greets me with the date and a one-line summary, then shows invites, orders I have to deliver across all my markets (a new backend request), my markets with their balances, and my recent activity.
+- Next: try it, then the production setup and the APK.
