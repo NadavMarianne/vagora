@@ -1,7 +1,6 @@
-// The ☰ menu, next to the bell in the top corner of every screen. It slides in from the side
-// with what's not on the main screens: this market's members, invites, settings, and leaving
-// (when you're in a market), and your markets, notifications, settings, and logging out.
-// Android's back button closes it.
+// The ☰ menu, next to the bell in the top corner of every screen. It slides in from the side:
+// Home at the top, then your markets, then this market's members, invites, settings, and leaving
+// (when you're in a market). Settings and Log out stay at the bottom. Android's back closes it.
 import { type Href, router, usePathname } from "expo-router";
 import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
@@ -20,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tappable } from "@/components/tappable";
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/firebase";
-import { useNotifications } from "@/lib/notifications";
+import { useLive } from "@/lib/live";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { Market } from "@/lib/types";
@@ -32,9 +31,33 @@ function currentMarketId(path: string): string | null {
   return path.match(/^\/markets\/(\d+)/)?.[1] ?? null;
 }
 
+// Your markets, kept between screens so the menu is complete the moment it opens.
+let knownMarkets: Market[] = [];
+
+/** Your markets: what's already known at once, refreshed in the background, and again whenever
+ * something changes for you. */
+function useMyMarkets(): Market[] {
+  const { version } = useLive();
+  const [markets, setMarkets] = useState(knownMarkets);
+  useEffect(() => {
+    let current = true;
+    api<Market[]>("/markets")
+      .then((loaded) => {
+        knownMarkets = loaded;
+        if (current) setMarkets(loaded);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [version]);
+  return markets;
+}
+
 export function MenuButton() {
   const styles = useStyles(makeStyles);
   const t = useTheme();
+  const markets = useMyMarkets();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -50,26 +73,21 @@ export function MenuButton() {
           ))}
         </View>
       </Tappable>
-      {open && <MenuPanel onClose={() => setOpen(false)} />}
+      {open && <MenuPanel markets={markets} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function MenuPanel({ onClose }: { onClose: () => void }) {
+function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => void }) {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const path = usePathname();
   const marketId = currentMarketId(path);
-  const { unread } = useNotifications();
-  const [markets, setMarkets] = useState<Market[]>([]);
   const [error, setError] = useState("");
   const [slide] = useState(() => new Animated.Value(PANEL_WIDTH));
 
   useEffect(() => {
     Animated.timing(slide, { toValue: 0, duration: 180, useNativeDriver: true }).start();
-    api<Market[]>("/markets")
-      .then(setMarkets)
-      .catch(() => {});
   }, [slide]);
 
   const market = markets.find((m) => String(m.id) === marketId);
@@ -114,22 +132,17 @@ function MenuPanel({ onClose }: { onClose: () => void }) {
       <Animated.View
         style={[
           styles.panel,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 12 },
           { transform: [{ translateX: slide }] },
         ]}
       >
-        <ScrollView contentContainerStyle={styles.content}>
-          {marketId && (
-            <>
-              <Text style={styles.section}>{market ? market.name : "This market"}</Text>
-              <Item title="Members" onPress={() => go(`/markets/${marketId}/members`)} />
-              <Item title="Invite someone" onPress={() => go(`/markets/${marketId}/invite`)} />
-              <Item title="Market settings" onPress={() => go(`/markets/${marketId}/settings`)} />
-              <Item title="Leave market" danger onPress={leave} />
-              {error !== "" && <Text style={styles.error}>{error}</Text>}
-              <View style={styles.divider} />
-            </>
-          )}
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          <Item
+            title="Home"
+            selected={path === "/"}
+            onPress={() => close(() => router.navigate("/"))}
+          />
+          <View style={styles.divider} />
 
           <Text style={styles.section}>Your markets</Text>
           {markets.map((m) => (
@@ -141,18 +154,33 @@ function MenuPanel({ onClose }: { onClose: () => void }) {
               onPress={() => close(() => router.navigate(`/markets/${m.id}`))}
             />
           ))}
-          <Item title="+ Create a market" onPress={() => go("/markets/new")} />
-          <Item title="Home" onPress={() => close(() => router.navigate("/"))} />
+          <View style={styles.halfDivider} />
+          <Tappable
+            onPress={() => go("/markets/new")}
+            style={styles.create}
+            accessibilityRole="button"
+          >
+            <Text style={styles.createText}>Create a market</Text>
+          </Tappable>
 
-          <View style={styles.divider} />
-          <Item
-            title="Notifications"
-            detail={unread > 0 ? `${unread} unread` : undefined}
-            onPress={() => go("/notifications")}
-          />
-          <Item title="Settings" onPress={() => go("/settings")} />
-          <Item title="Log out" danger onPress={() => close(() => signOut(auth))} />
+          {marketId && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.section}>{market ? market.name : "This market"}</Text>
+              <Item title="Members" onPress={() => go(`/markets/${marketId}/members`)} />
+              <Item title="Invite someone" onPress={() => go(`/markets/${marketId}/invite`)} />
+              <Item title="Market settings" onPress={() => go(`/markets/${marketId}/settings`)} />
+              <Item title="Leave market" danger onPress={leave} />
+              {error !== "" && <Text style={styles.error}>{error}</Text>}
+            </>
+          )}
         </ScrollView>
+
+        {/* Always at the bottom. */}
+        <View style={styles.bottom}>
+          <Item title="Settings" selected={path === "/settings"} onPress={() => go("/settings")} />
+          <Item title="Log out" danger onPress={() => close(() => signOut(auth))} />
+        </View>
       </Animated.View>
     </Modal>
   );
@@ -207,14 +235,15 @@ const makeStyles = (t: Theme) =>
       borderLeftWidth: t.borderWidth,
       borderLeftColor: t.colors.border,
     },
-    content: { paddingHorizontal: 16, gap: 4 },
+    scroll: { flex: 1 },
+    content: { paddingHorizontal: 16, gap: 4, paddingBottom: 16 },
     section: {
       fontSize: 13,
       fontFamily: t.fonts.accent,
       color: t.colors.muted,
       textTransform: "uppercase",
       letterSpacing: 1,
-      marginTop: 8,
+      marginTop: 4,
       marginBottom: 4,
       paddingHorizontal: 8,
     },
@@ -231,6 +260,32 @@ const makeStyles = (t: Theme) =>
     itemText: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     danger: { color: t.colors.bad },
+    // Create a market: set a little apart, and drawn as a dashed outline rather than a row.
+    halfDivider: {
+      height: 1,
+      backgroundColor: t.colors.border,
+      marginVertical: 6,
+      marginHorizontal: 8,
+      width: "45%",
+    },
+    create: {
+      marginTop: 2,
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: t.radius.button,
+      borderWidth: 1.5,
+      borderStyle: "dashed",
+      borderColor: t.colors.primary,
+      alignItems: "center",
+    },
+    createText: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.primary },
     error: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.error, paddingHorizontal: 8 },
     divider: { height: 1, backgroundColor: t.colors.border, marginVertical: 10 },
+    bottom: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: t.colors.border,
+      gap: 2,
+    },
   });

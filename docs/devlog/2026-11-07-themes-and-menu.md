@@ -5,4 +5,6 @@
 - Looked at a page of seven style mockups and decided to keep all seven as looks each person picks: Night (default), Clean, Warm, Velvet, Neon, Paper and ink, Bold pop (decision 0027).
 - Rebuilt every screen to draw itself from the picked look: colors, fonts, shapes, shadows. Added the fonts.
 - Added a ☰ menu next to the bell, with the market's members, invites, settings, and leaving, plus my markets, notifications, settings, and log out. The market page now shows just the balance, Store, Orders, and transactions.
-- Next: try every look on the phone, then my list of UI fixes.
+- First UI fixes: the menu no longer changes after opening (it loads my markets ahead of time). New order: Home at the top, then my markets with "Create a market" set apart, then the market's own items; Settings and Log out pinned to the bottom; Notifications left out (the bell is enough).
+- A market's page shows the 5 newest transactions, with "Show more".
+- Next: the bell drawing and what the home page should show.

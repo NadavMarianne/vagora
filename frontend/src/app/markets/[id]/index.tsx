@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Body, Button, ErrorText, Heading, Info, Loading, Screen } from "@/components/ui";
@@ -19,12 +19,14 @@ type MarketPage = {
 export default function MarketScreen() {
   const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
+  // How many transactions show: the 5 newest, then 10 more each time.
+  const [shown, setShown] = useState(5);
   const { data, error } = useLoad(
     useCallback(async (): Promise<MarketPage> => {
       // The market first: opening it pays any allowance that came due.
       const market = await api<Market>(`/markets/${id}`);
       const [entries, proposals, orders] = await Promise.all([
-        api<LedgerEntry[]>(`/markets/${id}/ledger`),
+        api<LedgerEntry[]>(`/markets/${id}/ledger?limit=100`),
         api<MyProposal[]>(`/markets/${id}/proposals`),
         api<Order[]>(`/markets/${id}/orders`),
       ]);
@@ -91,7 +93,7 @@ export default function MarketScreen() {
 
       <Heading>Recent transactions</Heading>
       {entries.length === 0 && <Body>Nothing yet.</Body>}
-      {entries.map((entry, index) => (
+      {entries.slice(0, shown).map((entry, index) => (
         <View key={index} style={styles.row}>
           <View style={styles.rowText}>
             <Text style={styles.note}>{entry.note}</Text>
@@ -103,6 +105,13 @@ export default function MarketScreen() {
           </Text>
         </View>
       ))}
+      {entries.length > shown && (
+        <Button
+          title={`Show more (${Math.min(10, entries.length - shown)})`}
+          kind="secondary"
+          onPress={() => setShown(shown + 10)}
+        />
+      )}
     </Screen>
   );
 }
