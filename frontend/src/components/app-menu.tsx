@@ -128,7 +128,16 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
   }
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={() => close()}>
+    // Translucent bars: Android otherwise starts the panel below the status bar, and the
+    // padding for it would count the status bar twice.
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={() => close()}
+    >
       <Pressable style={styles.backdrop} onPress={() => close()} accessibilityLabel="Close menu" />
       <Animated.View
         style={[
@@ -190,7 +199,7 @@ function HomeIcon({ onPress }: { onPress: () => void }) {
   const t = useTheme();
   const line = {
     stroke: t.colors.text,
-    strokeWidth: 1.6,
+    strokeWidth: 2,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
   };
@@ -201,7 +210,7 @@ function HomeIcon({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel="Home"
     >
-      <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
+      <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
         <Path d="M3 10.5 12 3l9 7.5" {...line} />
         <Path d="M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9" {...line} />
       </Svg>
@@ -283,12 +292,23 @@ const makeStyles = (t: Theme) =>
     // The very top of the menu: the home icon, big and centered.
     top: {
       alignItems: "center",
-      paddingBottom: 6,
+      paddingTop: 8,
+      paddingBottom: 12,
       marginBottom: 8,
       borderBottomWidth: 1,
       borderBottomColor: t.colors.border,
     },
-    homeButton: { paddingVertical: 4, paddingHorizontal: 24 },
+    // A round, softly tinted button, the usual look of a menu's home icon.
+    homeButton: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: t.colors.surfaceAlt,
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     itemText: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     danger: { color: t.colors.bad },
