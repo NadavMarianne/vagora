@@ -4,7 +4,9 @@ import { type HostInstance, StyleSheet, Switch, Text, View } from "react-native"
 
 import { Inside, newFoldId, useFoldPlace, useFoldRegistry } from "@/components/folds";
 import { Tappable } from "@/components/tappable";
-import { colors, useRevealView } from "@/components/ui";
+import { useRevealView } from "@/components/ui";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 /** A section that opens and closes when its title is tapped. Opening it scrolls it into view.
  * On Android, the back button closes open sections (deepest first) before leaving the page. */
@@ -17,6 +19,7 @@ export function Foldable({
   children: React.ReactNode;
   startOpen?: boolean;
 }) {
+  const styles = useStyles(makeStyles);
   const [open, setOpen] = useState(startOpen);
   const [id] = useState(newFoldId);
   const place = useFoldPlace();
@@ -74,10 +77,17 @@ export function Toggle({
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   return (
     <View style={styles.toggle}>
       <Text style={styles.label}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: t.colors.primary, false: t.colors.border }}
+        thumbColor={value ? t.colors.onPrimary : t.colors.muted}
+      />
     </View>
   );
 }
@@ -96,11 +106,10 @@ export function Chips<T extends string | number>({
   onChange: (selected: T[]) => void;
   multiple?: boolean;
 }) {
+  const styles = useStyles(makeStyles);
   function press(value: T) {
     if (!multiple) return onChange([value]);
-    onChange(
-      selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value],
-    );
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   }
 
   return (
@@ -126,24 +135,38 @@ export function Chips<T extends string | number>({
   );
 }
 
-const styles = StyleSheet.create({
-  foldable: { borderWidth: 1, borderColor: colors.border, borderRadius: 8 },
-  foldableHeader: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
-  foldableArrow: { fontSize: 16, color: colors.primary, width: 16 },
-  foldableTitle: { fontSize: 16, fontWeight: "600", color: colors.text },
-  foldableBody: { paddingHorizontal: 12, paddingBottom: 12, gap: 14 },
-  toggle: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
-  chipsBlock: { gap: 6 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text },
-  chipTextOn: { color: colors.background, fontWeight: "600" },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    foldable: {
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      borderRadius: t.radius.card,
+      backgroundColor: t.colors.surface,
+      boxShadow: t.shadow.card || undefined,
+    },
+    foldableHeader: { flexDirection: "row", alignItems: "center", gap: 8, padding: 14 },
+    foldableArrow: { fontSize: 16, color: t.colors.primary, width: 16 },
+    foldableTitle: {
+      fontSize: 16,
+      fontFamily: t.fonts.bold,
+      color: t.colors.text,
+      flexShrink: 1,
+      textTransform: t.upperTitles ? "uppercase" : "none",
+    },
+    foldableBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 14 },
+    toggle: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
+    chipsBlock: { gap: 6 },
+    chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    chip: {
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      borderRadius: t.radius.chip === 0 ? 0 : 16,
+      backgroundColor: t.colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    chipOn: { backgroundColor: t.colors.primary, borderColor: t.colors.primary },
+    chipText: { color: t.colors.text, fontFamily: t.fonts.regular },
+    chipTextOn: { color: t.colors.onPrimary, fontFamily: t.fonts.bold },
+  });

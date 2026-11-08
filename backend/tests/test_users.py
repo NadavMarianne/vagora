@@ -27,7 +27,7 @@ def test_profile_setup_then_me(login_as):
 
     assert created.status_code == 201
     assert me.status_code == 200
-    assert me.json() == {"username": "dana_k", "display_name": "Dana 💛"}
+    assert me.json() == {"username": "dana_k", "display_name": "Dana 💛", "theme": "night"}
 
 
 def test_profile_can_only_be_set_up_once(login_as):
@@ -80,3 +80,21 @@ def test_display_names_do_not_have_to_be_unique(login_as):
     response = set_up(login_as(uid="uid-noa"), username="noa_r", display_name="Sam")
 
     assert response.status_code == 201
+
+
+def test_theme_starts_as_night_and_can_change(login_as):
+    client = login_as("uid-theme")
+    created = client.post("/me", json={"username": "theme_t", "display_name": "T"}).json()
+    assert created["theme"] == "night"
+
+    changed = client.patch("/me", json={"theme": "velvet", "display_name": "Tee"}).json()
+
+    assert changed == {"username": "theme_t", "display_name": "Tee", "theme": "velvet"}
+    assert client.get("/me").json()["theme"] == "velvet"
+
+
+def test_unknown_theme_is_refused(login_as):
+    client = login_as("uid-theme2")
+    client.post("/me", json={"username": "theme_u", "display_name": "U"})
+
+    assert client.patch("/me", json={"theme": "sparkly"}).status_code == 422

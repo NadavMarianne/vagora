@@ -1,0 +1,20 @@
+# 2026-11-07: Themes and the menu
+
+- Merged PR #37 (limits files).
+- Decided the first release comes before the court, as a birthday gift in a month. Development stays in Expo Go; the release is an Android APK (no store yet), and production gets its own setup that only updates when I release.
+- Looked at a page of seven style mockups and decided to keep all seven as looks each person picks: Night (default), Clean, Warm, Velvet, Neon, Paper and ink, Bold pop (decision 0027).
+- Rebuilt every screen to draw itself from the picked look: colors, fonts, shapes, shadows. Added the fonts.
+- Added a ☰ menu next to the bell, with the market's members, invites, settings, and leaving, plus my markets, notifications, settings, and log out. The market page now shows just the balance, Store, Orders, and transactions.
+- First UI fixes: the menu no longer changes after opening (it loads my markets ahead of time). New order: Home at the top, then my markets with "Create a market" set apart, then the market's own items; Settings and Log out pinned to the bottom; Notifications left out (the bell is enough).
+- A market's page shows the 5 newest transactions, with "Show more".
+- The bell is now a line drawing (added `react-native-svg`), in the theme's colors. Home in the menu is bold and centered. Transactions got "Show less".
+- The home page now greets me with the date and a one-line summary, then shows invites, orders I have to deliver across all my markets (a new backend request), my markets with their balances, and my recent activity.
+- Home in the menu became a drawn house icon, pinned at the very top. The Decline button next to a timed Accept now stretches to the same height.
+- Home in the menu is a wide bar with a house icon, pinned at the very top (the menu used to count the status bar twice).
+- Menu buttons are split by thin lines, sections by thicker ones, and the market I'm in is highlighted with a colored bar.
+- Markets can be reordered by dragging their grip in the menu; the order is saved on my account, and the home page follows it.
+- Back now walks outward: pages opened from the menu, a notification, or the home page open along their path (Home, then the market, then its section, then the page), and Home has nothing behind it.
+- The menu has Store and Orders in the market section, and highlights the page I'm on there.
+- Dragging was glitchy: every finger movement went through the app's JavaScript, and the menu's scroll fought it. Rebuilt it with the gesture and animation packages Expo already includes, so it runs on the phone's UI thread and the other rows slide aside smoothly. The grip is six drawn dots.
+- Opening something for a quick look (from the home page, the notifications list, or a banner) now opens it right on top, so one back returns. The menu still opens pages along their path.
+- Next: try it, then the production setup and the APK.

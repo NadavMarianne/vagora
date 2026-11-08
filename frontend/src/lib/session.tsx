@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 
-export type Profile = { username: string; display_name: string };
+export type Profile = { username: string; display_name: string; theme: string };
 
 export type Session =
   | { state: "loading" }
@@ -43,10 +43,7 @@ async function lookUp(user: User | null): Promise<Session> {
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session>({ state: "loading" });
 
-  useEffect(
-    () => onAuthStateChanged(auth, async (user) => setSession(await lookUp(user))),
-    [],
-  );
+  useEffect(() => onAuthStateChanged(auth, async (user) => setSession(await lookUp(user))), []);
 
   const refresh = useCallback(async () => {
     const user = auth.currentUser;

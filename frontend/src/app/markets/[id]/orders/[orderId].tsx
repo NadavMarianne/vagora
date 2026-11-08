@@ -8,7 +8,6 @@ import { orderState, timers } from "@/components/order-row";
 import {
   Body,
   Button,
-  colors,
   ErrorText,
   Info,
   Loading,
@@ -19,6 +18,8 @@ import {
 import { api, ApiError } from "@/lib/api";
 import type { Market, Order } from "@/lib/types";
 import { useLoad, useReloadAt } from "@/lib/use-load";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 type OrderPage = { market: Market; order: Order };
 
@@ -274,6 +275,7 @@ function NewDeadlineForm({ onSend }: { onSend: (deadline: number, answerTime: nu
 }
 
 export default function OrderScreen() {
+  const styles = useStyles(makeStyles);
   const { id, orderId } = useLocalSearchParams<{ id: string; orderId: string }>();
   const path = `/markets/${id}/orders/${orderId}`;
   const [error, setError] = useState("");
@@ -388,6 +390,7 @@ export default function OrderScreen() {
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.fact}>
       <Text style={styles.label}>{label}</Text>
@@ -396,11 +399,18 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  facts: { gap: 8 },
-  fact: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  label: { fontSize: 15, color: colors.muted },
-  value: { fontSize: 15, color: colors.text, fontWeight: "600", flexShrink: 1, textAlign: "right" },
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
-  history: { fontSize: 14, color: colors.text, lineHeight: 20 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    facts: { gap: 8 },
+    fact: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+    label: { fontFamily: t.fonts.regular, fontSize: 15, color: t.colors.muted },
+    value: {
+      fontSize: 15,
+      color: t.colors.text,
+      fontFamily: t.fonts.bold,
+      flexShrink: 1,
+      textAlign: "right",
+    },
+    heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+    history: { fontFamily: t.fonts.regular, fontSize: 14, color: t.colors.text, lineHeight: 20 },
+  });

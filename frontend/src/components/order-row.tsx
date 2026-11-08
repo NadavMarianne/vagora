@@ -3,8 +3,9 @@ import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
-import { colors } from "@/components/ui";
 import type { Order } from "@/lib/types";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 /** The moments this order changes by itself: its deadline, the 3 days after "I did it", the
  * contest window, and the time to answer a new deadline. */
@@ -60,6 +61,7 @@ export function OrderRow({
   marketId: string;
   currency: string;
 }) {
+  const styles = useStyles(makeStyles);
   const late = ["disputed", "missed", "new_deadline_asked", "cancel_pending"].includes(
     order.status,
   );
@@ -83,19 +85,20 @@ export function OrderRow({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  text: { flexShrink: 1, gap: 2 },
-  name: { fontSize: 16, fontWeight: "600", color: colors.text },
-  small: { fontSize: 13, color: colors.muted },
-  warning: { color: colors.error, fontWeight: "600" },
-  price: { fontSize: 16, fontWeight: "600", color: colors.text },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
+    },
+    text: { flexShrink: 1, gap: 2 },
+    name: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+    small: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    warning: { color: t.colors.error, fontFamily: t.fonts.bold },
+    price: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+  });

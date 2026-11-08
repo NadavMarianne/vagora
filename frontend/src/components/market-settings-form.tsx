@@ -7,8 +7,10 @@ import { Chips, Foldable, Toggle } from "@/components/controls";
 import { DurationPicker } from "@/components/duration-picker";
 import { Tappable } from "@/components/tappable";
 import { TimeZonePicker } from "@/components/time-zone-picker";
-import { Body, Button, colors, Field, useRevealFocused } from "@/components/ui";
+import { Body, Button, Field, useRevealFocused } from "@/components/ui";
 import type { Allowance, AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 export function phoneTimeZone(): string {
   return getCalendars()[0]?.timeZone ?? "UTC";
@@ -91,6 +93,8 @@ function TimesEditor({
   times: string[];
   onChange: (times: string[]) => void;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const reveal = useRevealFocused();
   return (
     <View style={styles.times}>
@@ -102,7 +106,7 @@ function TimesEditor({
             value={time}
             onChangeText={(text) => onChange(times.map((t, i) => (i === index ? text : t)))}
             placeholder="09:00"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={t.colors.muted}
             keyboardType="numbers-and-punctuation"
             maxLength={5}
             onFocus={reveal}
@@ -158,7 +162,11 @@ function AllowanceEditor({
         placeholder="e.g. Pocket money"
       />
       <Toggle label="On" value={value.enabled} onChange={(enabled) => set({ enabled })} />
-      <CoinsField label="Amount each time" value={value.amount} onChange={(amount) => set({ amount })} />
+      <CoinsField
+        label="Amount each time"
+        value={value.amount}
+        onChange={(amount) => set({ amount })}
+      />
       <Chips
         label="How often"
         options={[
@@ -239,9 +247,7 @@ export function MarketSettingsForm({
             onChange={(changed) =>
               setAllowances(value.allowances.map((a) => (a.key === allowance.key ? changed : a)))
             }
-            onRemove={() =>
-              setAllowances(value.allowances.filter((a) => a.key !== allowance.key))
-            }
+            onRemove={() => setAllowances(value.allowances.filter((a) => a.key !== allowance.key))}
           />
         ))}
         <Button title="+ Add an allowance" kind="secondary" onPress={addAllowance} />
@@ -277,20 +283,22 @@ export function MarketSettingsForm({
   );
 }
 
-const styles = StyleSheet.create({
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
-  times: { gap: 8 },
-  timeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  timeInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
-    width: 90,
-    color: colors.text,
-  },
-  remove: { color: colors.error },
-  add: { color: colors.primary, fontWeight: "600" },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
+    times: { gap: 8 },
+    timeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    timeInput: {
+      fontFamily: t.fonts.regular,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 16,
+      width: 90,
+      color: t.colors.text,
+    },
+    remove: { color: t.colors.error },
+    add: { color: t.colors.primary, fontFamily: t.fonts.bold },
+  });

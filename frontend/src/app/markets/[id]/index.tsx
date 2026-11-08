@@ -1,80 +1,38 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { Tappable } from "@/components/tappable";
-import { Body, Button, colors, ErrorText, Loading, Screen } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
-import type {
-  LedgerEntry,
-  Market,
-  Member,
-  MyProposal,
-  Order,
-  PendingInvite,
-} from "@/lib/types";
+import { Body, Button, ErrorText, Heading, Info, Loading, Screen } from "@/components/ui";
+import { api } from "@/lib/api";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
+import type { LedgerEntry, Market, MyProposal, Order } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
 
 type MarketPage = {
   market: Market;
   entries: LedgerEntry[];
-  members: Member[];
-  invites: PendingInvite[];
   proposals: MyProposal[];
   orders: Order[];
 };
 
 export default function MarketScreen() {
+  const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [actionError, setActionError] = useState("");
-  const [leaveError, setLeaveError] = useState("");
-  const { data, error, reload } = useLoad(
+  // How many transactions show: the 5 newest, then 10 more each time.
+  const [shown, setShown] = useState(5);
+  const { data, error } = useLoad(
     useCallback(async (): Promise<MarketPage> => {
       // The market first: opening it pays any allowance that came due.
       const market = await api<Market>(`/markets/${id}`);
-      const [entries, members, invites, proposals, orders] = await Promise.all([
-        api<LedgerEntry[]>(`/markets/${id}/ledger`),
-        api<Member[]>(`/markets/${id}/members`),
-        api<PendingInvite[]>(`/markets/${id}/invites`),
+      const [entries, proposals, orders] = await Promise.all([
+        api<LedgerEntry[]>(`/markets/${id}/ledger?limit=100`),
         api<MyProposal[]>(`/markets/${id}/proposals`),
         api<Order[]>(`/markets/${id}/orders`),
       ]);
-      return { market, entries, members, invites, proposals, orders };
+      return { market, entries, proposals, orders };
     }, [id]),
   );
-
-  async function cancelInvite(inviteId: number) {
-    setActionError("");
-    try {
-      await api(`/markets/${id}/invites/${inviteId}`, { method: "DELETE" });
-      await reload();
-    } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
-    }
-  }
-
-  function leave() {
-    Alert.alert(
-      "Leave this market?",
-      "Your coins stay frozen here. You can rejoin yourself within 30 days and get them back. Your offers without a commitment are removed, and invites you sent are cancelled.",
-      [
-        { text: "Stay", style: "cancel" },
-        {
-          text: "Leave",
-          style: "destructive",
-          onPress: async () => {
-            setLeaveError("");
-            try {
-              await api(`/markets/${id}/leave`, { method: "POST" });
-              router.replace("/");
-            } catch (e) {
-              setLeaveError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
-            }
-          },
-        },
-      ],
-    );
-  }
 
   // A new member sets their limits before anything else (decision 0022).
   const needsLimits = data?.market.my_limits_set === false;
@@ -90,11 +48,12 @@ export default function MarketScreen() {
       </Screen>
     );
   }
-  const { market, entries, members, invites, proposals, orders } = data;
+  const { market, entries, proposals, orders } = data;
   // Orders waiting for you: to deliver as a seller, or to confirm as a buyer.
   const waiting = orders.filter(
     (o) =>
-      (o.role === "seller" && ["open", "new_deadline_asked", "cancel_pending"].includes(o.status)) ||
+      (o.role === "seller" &&
+        ["open", "new_deadline_asked", "cancel_pending"].includes(o.status)) ||
       (o.role === "buyer" && ["done_claimed", "missed"].includes(o.status)),
   ).length;
 
@@ -104,27 +63,37 @@ export default function MarketScreen() {
       <View style={styles.balanceBox}>
         <Text style={styles.balanceLabel}>Your balance</Text>
         <Text style={styles.balance}>
-          {market.my_balance.toLocaleString()} {market.currency_name}
+          {market.my_balance.toLocaleString()}{" "}
+          <Text style={styles.currency}>{market.currency_name}</Text>
         </Text>
       </View>
 
-      <Button title="Store" onPress={() => router.push(`/markets/${id}/store`)} />
-      <Button
-        title={waiting > 0 ? `Orders (${waiting} waiting for you)` : "Orders"}
-        kind="secondary"
-        onPress={() => router.push(`/markets/${id}/orders`)}
-      />
+      <View style={styles.buttons}>
+        <View style={styles.half}>
+          <Button title="Store" onPress={() => router.push(`/markets/${id}/store`)} />
+        </View>
+        <View style={styles.half}>
+          <Button
+            title={waiting > 0 ? `Orders · ${waiting}` : "Orders"}
+            kind="secondary"
+            onPress={() => router.push(`/markets/${id}/orders`)}
+          />
+        </View>
+      </View>
       {proposals.length > 0 && (
-        <Body>
+        <Info>
           {proposals.length === 1
             ? "Someone asked you to sell a product. Open the store to answer."
             : `You were asked to sell ${proposals.length} products. Open the store to answer.`}
-        </Body>
+        </Info>
+      )}
+      {waiting > 0 && (
+        <Body>{waiting === 1 ? "1 order is" : `${waiting} orders are`} waiting for you.</Body>
       )}
 
-      <Text style={styles.heading}>Recent transactions</Text>
+      <Heading>Recent transactions</Heading>
       {entries.length === 0 && <Body>Nothing yet.</Body>}
-      {entries.map((entry, index) => (
+      {entries.slice(0, shown).map((entry, index) => (
         <View key={index} style={styles.row}>
           <View style={styles.rowText}>
             <Text style={styles.note}>{entry.note}</Text>
@@ -136,69 +105,61 @@ export default function MarketScreen() {
           </Text>
         </View>
       ))}
-
-      <Text style={styles.heading}>Members</Text>
-      {members.map((member) => (
-        <Tappable
-          key={member.username}
-          style={styles.row}
-          accessibilityRole="button"
-          onPress={() => router.push(`/markets/${id}/members/${member.username}`)}
-        >
-          <Text style={styles.note}>
-            {member.display_name} (@{member.username})
-          </Text>
-          <Text style={styles.open}>Limits ›</Text>
-        </Tappable>
-      ))}
-
-      <Text style={styles.heading}>Invites</Text>
-      {invites.length === 0 && <Body>No open invites.</Body>}
-      {invites.map((invite) => (
-        <View key={invite.id} style={styles.row}>
-          <View style={styles.rowText}>
-            <Text style={styles.note}>
-              {invite.invited_display_name} (@{invite.invited_username})
-            </Text>
-            <Text style={styles.date}>Expires {new Date(invite.expires_at).toLocaleString()}</Text>
-          </View>
-          <Tappable onPress={() => cancelInvite(invite.id)} accessibilityRole="button">
-            <Text style={styles.cancel}>Cancel</Text>
-          </Tappable>
+      {(entries.length > shown || shown > 5) && (
+        <View style={styles.buttons}>
+          {shown > 5 && (
+            <View style={styles.half}>
+              <Button title="Show less" kind="secondary" onPress={() => setShown(5)} />
+            </View>
+          )}
+          {entries.length > shown && (
+            <View style={styles.half}>
+              <Button
+                title={`Show more (${Math.min(10, entries.length - shown)})`}
+                kind="secondary"
+                onPress={() => setShown(shown + 10)}
+              />
+            </View>
+          )}
         </View>
-      ))}
-      <ErrorText>{actionError}</ErrorText>
-      <Button title="Invite someone" onPress={() => router.push(`/markets/${id}/invite`)} />
-
-      <Button
-        title="Settings"
-        kind="secondary"
-        onPress={() => router.push(`/markets/${id}/settings`)}
-      />
-      <Button title="Leave market" kind="secondary" onPress={leave} />
-      <ErrorText>{leaveError}</ErrorText>
+      )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  balanceBox: { backgroundColor: "#E6F4FE", borderRadius: 12, padding: 20, gap: 4 },
-  balanceLabel: { fontSize: 14, color: colors.muted },
-  balance: { fontSize: 30, fontWeight: "700", color: colors.text },
-  heading: { fontSize: 18, fontWeight: "700", color: colors.text, marginTop: 8 },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  rowText: { flexShrink: 1, gap: 2 },
-  note: { fontSize: 16, color: colors.text },
-  date: { fontSize: 13, color: colors.muted },
-  amount: { fontSize: 16, fontWeight: "600", color: "#2E7D32" },
-  negative: { color: colors.error },
-  cancel: { color: colors.error, fontWeight: "600", padding: 4 },
-  open: { color: colors.primary, fontWeight: "600" },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    balanceBox: {
+      backgroundColor: t.colors.balance,
+      borderRadius: t.radius.card,
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      padding: 20,
+      gap: 4,
+      boxShadow: t.shadow.card || undefined,
+    },
+    balanceLabel: {
+      fontFamily: t.fonts.accent,
+      fontSize: 14,
+      color: t.colors.balanceLabel,
+      textTransform: t.upperTitles ? "uppercase" : "none",
+    },
+    balance: { fontSize: 36, fontFamily: t.fonts.heading, color: t.colors.balanceText },
+    currency: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.balanceLabel },
+    buttons: { flexDirection: "row", gap: 12 },
+    half: { flex: 1 },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
+    },
+    rowText: { flexShrink: 1, gap: 2 },
+    note: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text },
+    date: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    amount: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.good },
+    negative: { color: t.colors.bad },
+  });

@@ -2,8 +2,10 @@
 // it waits for, and Cancel for whoever asked.
 import { StyleSheet, Text, View } from "react-native";
 
-import { Body, Button, colors, TimedButton } from "@/components/ui";
+import { Body, Button, TimedButton } from "@/components/ui";
 import type { ProductRequest } from "@/lib/types";
+import { useStyles } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 const names = (people: { display_name: string }[]) => people.map((p) => p.display_name).join(", ");
 
@@ -39,6 +41,7 @@ export function RequestCard({
   onAnswer: (approve: boolean) => void;
   onCancel: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{describeRequest(request, forMe)}</Text>
@@ -61,7 +64,7 @@ export function RequestCard({
             />
           </View>
           <View style={styles.answer}>
-            <Button title="Decline" kind="bad" onPress={() => onAnswer(false)} />
+            <Button title="Decline" kind="bad" fill onPress={() => onAnswer(false)} />
           </View>
         </View>
       )}
@@ -70,10 +73,11 @@ export function RequestCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: colors.primary, borderRadius: 8, padding: 12, gap: 6 },
-  title: { fontSize: 16, fontWeight: "600", color: colors.text },
-  small: { fontSize: 13, color: colors.muted },
-  answers: { flexDirection: "row", gap: 12 },
-  answer: { flex: 1 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    card: { borderWidth: 1, borderColor: t.colors.primary, borderRadius: 8, padding: 12, gap: 6 },
+    title: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
+    small: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    answers: { flexDirection: "row", gap: 12 },
+    answer: { flex: 1 },
+  });

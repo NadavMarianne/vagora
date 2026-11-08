@@ -120,3 +120,28 @@ def test_bad_setting_change_is_refused(member):
     response = client.patch(f"/markets/{market_id}", json={"time_zone": "Nowhere"})
 
     assert response.status_code == 422
+
+
+def test_reorder_markets(member):
+    dana = member("dana_k")
+    ids = [
+        dana.post("/markets", json={**NEW_MARKET, "name": name}).json()["id"]
+        for name in ("A", "B", "C")
+    ]
+
+    assert dana.put("/markets/order", json={"market_ids": ids[::-1]}).status_code == 204
+    assert [m["name"] for m in dana.get("/markets").json()] == ["C", "B", "A"]
+
+    # A new market goes after the ones in your order.
+    dana.post("/markets", json={**NEW_MARKET, "name": "D"})
+    assert [m["name"] for m in dana.get("/markets").json()] == ["C", "B", "A", "D"]
+
+
+def test_reorder_needs_every_market_once(member):
+    dana = member("dana_k")
+    a = dana.post("/markets", json=NEW_MARKET).json()["id"]
+    b = dana.post("/markets", json=NEW_MARKET).json()["id"]
+
+    assert dana.put("/markets/order", json={"market_ids": [a]}).status_code == 422
+    assert dana.put("/markets/order", json={"market_ids": [a, a, b]}).status_code == 422
+    assert dana.put("/markets/order", json={"market_ids": [a, b, 999]}).status_code == 422

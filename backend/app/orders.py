@@ -19,10 +19,12 @@ from sqlalchemy.orm import Session
 
 from app import ledger, order_flow, signals, store
 from app.markets import get_membership
-from app.models import EntryKind, Market, Offer, Order, OrderStatus, Product, User
+from app.models import EntryKind, Market, Membership, Offer, Order, OrderStatus, Product, User
 from app.users import CurrentUser, DbSession
 
 router = APIRouter(prefix="/markets/{market_id}", tags=["store"])
+# Orders across all your markets, for the home screen.
+everywhere = APIRouter(tags=["store"])
 
 # Ten seconds to 30 days, like every other time people pick.
 Seconds = Annotated[int, Field(ge=10, le=30 * 24 * 3600)]
@@ -162,6 +164,54 @@ def buy(market_id: int, offer_id: int, user: CurrentUser, db: DbSession) -> Orde
     signals.notify_market(db, market_id)
     tell(db, order, offer.seller, f"{user.display_name} bought {product.name}")
     return order_view(order, user)
+
+
+class ToDeliverView(OrderView):
+    """An order you sell that waits for you, with the market it's in."""
+
+    market_id: int
+    market_name: str
+    currency_name: str
+
+
+# Orders that wait for the seller: to do, to answer a new deadline, or to admit or contest.
+WAITING_FOR_SELLER = (
+    OrderStatus.OPEN,
+    OrderStatus.MISSED,
+    OrderStatus.NEW_DEADLINE_ASKED,
+    OrderStatus.CANCEL_PENDING,
+)
+
+
+@everywhere.get("/orders/to-deliver")
+def orders_to_deliver(user: CurrentUser, db: DbSession) -> list[ToDeliverView]:
+    """Orders you sell that wait for you, in every market you're in, soonest deadline first.
+
+    Load `/markets` first: that catches every market up, so missed deadlines show here.
+    """
+    rows = db.execute(
+        select(Order, Market)
+        .join(Market, Market.id == Order.market_id)
+        .join(
+            Membership,
+            (Membership.market_id == Order.market_id) & (Membership.user_id == user.id),
+        )
+        .where(
+            Order.seller_id == user.id,
+            Order.status.in_(WAITING_FOR_SELLER),
+            Membership.left_at.is_(None),
+        )
+        .order_by(Order.due_at)
+    ).all()
+    return [
+        ToDeliverView(
+            **order_view(order, user).model_dump(),
+            market_id=market.id,
+            market_name=market.name,
+            currency_name=market.currency_name,
+        )
+        for order, market in rows
+    ]
 
 
 @router.get("/orders")

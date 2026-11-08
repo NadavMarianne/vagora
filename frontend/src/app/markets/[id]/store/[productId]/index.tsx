@@ -8,12 +8,14 @@ import { OfferCard, STATUS_LABELS } from "@/components/offer-card";
 import { OrderRow } from "@/components/order-row";
 import { OwnerTools } from "@/components/owner-tools";
 import { RequestCard } from "@/components/request-card";
-import { Body, Button, colors, ErrorText, Info, Loading, Screen } from "@/components/ui";
+import { Body, Button, ErrorText, Info, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import type { Market, Member, Offer, Order, Product } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
 import { useLoad } from "@/lib/use-load";
+import type { Theme } from "@/lib/themes";
+import { useStyles } from "@/lib/theme";
 
 type ProductPage = { market: Market; product: Product; members: Member[]; orders: Order[] };
 
@@ -27,6 +29,7 @@ const ACTIVE: Order["status"][] = [
 ];
 
 export default function ProductScreen() {
+  const styles = useStyles(makeStyles);
   const { id, productId } = useLocalSearchParams<{
     id: string;
     productId: string;
@@ -235,7 +238,8 @@ export default function ProductScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  small: { fontSize: 13, color: colors.muted },
-  buttons: { gap: 8 },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    small: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    buttons: { gap: 8 },
+  });

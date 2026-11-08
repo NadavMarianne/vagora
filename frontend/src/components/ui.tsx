@@ -1,4 +1,5 @@
-// Plain building blocks shared by the screens. Styling comes later.
+// Plain building blocks shared by the screens, drawn in the theme the person picked
+// (src/lib/themes.ts).
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,30 +21,21 @@ import {
 
 import { FoldRegistry } from "@/components/folds";
 import { Tappable } from "@/components/tappable";
-
-export const colors = {
-  primary: "#208AEF",
-  text: "#111111",
-  muted: "#666666",
-  border: "#CCCCCC",
-  error: "#C62828",
-  background: "#FFFFFF",
-  // Buttons that agree or admit, and buttons that contest or dispute.
-  good: "#2E7D32",
-  bad: "#C62828",
-  warning: "#EF6C00",
-};
+import { useStyles, useTheme } from "@/lib/theme";
+import type { Theme } from "@/lib/themes";
 
 /** How important a notification is (backend/app/signals.py). */
 export type Level = "info" | "good" | "warning" | "critical";
 
-/** The color pattern for notifications: red critical, orange warning, green good, blue info. */
-export const LEVEL_COLOR: Record<Level, string> = {
-  info: colors.primary,
-  good: colors.good,
-  warning: colors.warning,
-  critical: colors.bad,
-};
+/** The color pattern for notifications: red critical, orange warning, green good, and the
+ * theme's own color for the rest. Returns the color and the text color on top of it. */
+export function levelColors(t: Theme, level: Level): [string, string] {
+  const c = t.colors;
+  if (level === "critical") return [c.bad, c.onBad];
+  if (level === "warning") return [c.warning, c.onWarning];
+  if (level === "good") return [c.good, c.onGood];
+  return [c.info, c.onInfo];
+}
 
 /** Puts levels in order, so the most important of several can be picked. */
 export const LEVEL_RANK: Record<Level, number> = { info: 0, good: 1, warning: 2, critical: 3 };
@@ -75,6 +67,7 @@ const TOP_MARGIN = 80;
 /** A scrollable page. Keeps the field being typed in visible above the keyboard, scrolls
  * opened sections into view, and closes the keyboard when the page is scrolled. */
 export function Screen({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   const scroll = useRef<ScrollViewInstance>(null);
   const content = useRef<HostInstance>(null);
   const [keyboardRoom, setKeyboardRoom] = useState(0);
@@ -138,21 +131,43 @@ export function Screen({ children }: { children: React.ReactNode }) {
 }
 
 export function Title({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   return <Text style={styles.title}>{children}</Text>;
 }
 
+/** A section's heading inside a page, like "Recent transactions". */
+export function Heading({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
+  return <Text style={styles.heading}>{children}</Text>;
+}
+
 export function Body({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   return <Text style={styles.body}>{children}</Text>;
 }
 
+/** Quieter small text, like dates. */
+export function Small({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
+  return <Text style={styles.small}>{children}</Text>;
+}
+
+/** A card: a raised box on the page, in the theme's shape. */
+export function Card({ children, style }: { children: React.ReactNode; style?: object }) {
+  const styles = useStyles(makeStyles);
+  return <View style={[styles.card, style]}>{children}</View>;
+}
+
 export function Field({ label, onFocus, ...input }: { label: string } & TextInputProps) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const reveal = useRevealFocused();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={styles.input}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={t.colors.muted}
         onFocus={(event) => {
           onFocus?.(event);
           reveal();
@@ -171,6 +186,7 @@ export function TimeLeft({ until, style }: { until: string; style?: StyleProp<Te
 
 /** A highlighted explanation: what a page is for, or what happens next. */
 export function Info({ title, children }: { title?: string; children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.info}>
       {title && <Text style={styles.infoTitle}>{title}</Text>}
@@ -180,18 +196,21 @@ export function Info({ title, children }: { title?: string; children: React.Reac
 }
 
 export function ErrorText({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   if (!children) return null;
   return <Text style={styles.error}>{children}</Text>;
 }
 
 type ButtonKind = "primary" | "secondary" | "good" | "bad";
 
-const BUTTON_COLOR: Record<ButtonKind, string> = {
-  primary: colors.primary,
-  secondary: colors.primary,
-  good: colors.good,
-  bad: colors.bad,
-};
+/** A button's color, and the color of text on top of it. */
+function buttonColors(t: Theme, kind: ButtonKind): [string, string] {
+  const c = t.colors;
+  if (kind === "good") return [c.good, c.onGood];
+  if (kind === "bad") return [c.bad, c.onBad];
+  if (kind === "secondary") return [c.outline, c.outlineText];
+  return [c.primary, c.onPrimary];
+}
 
 type ButtonProps = {
   title: string;
@@ -223,17 +242,20 @@ function timeLeft(ms: number): string {
 }
 
 /** A button with a deadline. Its color fills it like a progress bar and drains smoothly as the
- * time between `from` and `until` runs out. Where it's filled, the title shows in white. */
+ * time between `from` and `until` runs out. Where it's filled, the title takes the color that
+ * reads on it. */
 export function TimedButton({
   from,
   until,
   kind = "primary",
   ...button
 }: ButtonProps & { from: string; until: string }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const now = useNow();
   const start = Date.parse(from);
   const end = Date.parse(until);
-  const color = BUTTON_COLOR[kind];
+  const [color, onColor] = buttonColors(t, kind === "secondary" ? "primary" : kind);
   const [width, setWidth] = useState(0);
   // 1 when the time starts, 0 when it's up.
   const [progress] = useState(() => new Animated.Value(1));
@@ -261,10 +283,11 @@ export function TimedButton({
     return () => step?.stop();
   }, [progress, start, end]);
 
-  // The colored layer slides left as time runs out; its white title slides back so it stays put.
+  // The colored layer slides left as time runs out; its title slides back so it stays put.
   const fillShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-width, 0] });
   const titleShift = progress.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
   const left = timeLeft(end - now);
+  const title = t.upperButtons ? button.title.toUpperCase() : button.title;
 
   return (
     <View
@@ -281,8 +304,8 @@ export function TimedButton({
         ]}
       >
         <Animated.View style={[styles.button, { transform: [{ translateX: titleShift }] }]}>
-          <Text style={[styles.buttonText, { color: colors.background }]}>{button.title}</Text>
-          <Text style={[styles.timeLeft, { color: colors.background }]}>{left}</Text>
+          <Text style={[styles.buttonText, { color: onColor }]}>{title}</Text>
+          <Text style={[styles.timeLeft, { color: onColor }]}>{left}</Text>
         </Animated.View>
       </Animated.View>
     </View>
@@ -294,10 +317,15 @@ export function Button({
   onPress,
   kind = "primary",
   timed,
+  fill = false,
 }: ButtonProps & {
   /** Set by TimedButton: the time left, shown under the title over its time bar. */
   timed?: string;
+  /** Grow to the height of the space it's in, like the timed button next to it. */
+  fill?: boolean;
 }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   const [busy, setBusy] = useState(false);
 
   async function press() {
@@ -310,19 +338,21 @@ export function Button({
     }
   }
 
-  const filled = kind !== "secondary";
-  const color = BUTTON_COLOR[kind];
+  const outlined = kind === "secondary";
+  const [color, onColor] = buttonColors(t, kind);
   // A timed button's color is drawn behind it as a time bar, so the button itself is clear.
-  const background = timed !== undefined ? "transparent" : filled ? color : colors.background;
-  const textColor = timed !== undefined ? colors.text : filled ? colors.background : color;
+  const background = timed !== undefined ? "transparent" : outlined ? t.colors.surface : color;
+  const textColor = timed !== undefined ? t.colors.text : onColor;
   return (
     <Tappable
       onPress={press}
       disabled={busy}
       style={({ pressed }) => [
         styles.button,
+        fill && styles.buttonFill,
+        timed === undefined && styles.buttonShadow,
         { backgroundColor: background },
-        !filled && timed === undefined && { borderWidth: 1, borderColor: color },
+        outlined && timed === undefined && { borderWidth: t.borderWidth, borderColor: color },
         (pressed || busy) && styles.buttonPressed,
       ]}
     >
@@ -330,7 +360,9 @@ export function Button({
         <ActivityIndicator color={textColor} />
       ) : (
         <>
-          <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+          <Text style={[styles.buttonText, { color: textColor }]}>
+            {t.upperButtons ? title.toUpperCase() : title}
+          </Text>
           {timed !== undefined && <Text style={styles.timeLeft}>{timed}</Text>}
         </>
       )}
@@ -339,51 +371,90 @@ export function Button({
 }
 
 export function Loading() {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
   return (
     <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={t.colors.primary} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
-  screenContent: { padding: 24, gap: 16 },
-  title: { fontSize: 26, fontWeight: "700", color: colors.text },
-  body: { fontSize: 16, color: colors.text, lineHeight: 22 },
-  field: { gap: 6 },
-  label: { fontSize: 14, fontWeight: "600", color: colors.text },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
-  error: { color: colors.error, fontSize: 15 },
-  button: { borderRadius: 8, paddingVertical: 14, alignItems: "center" },
-  buttonPressed: { opacity: 0.7 },
-  buttonText: { fontSize: 16, fontWeight: "700" },
-  timed: { borderWidth: 2, borderRadius: 8, overflow: "hidden" },
-  // Clips the white title to the colored part, so the rest of the title stays dark.
-  timedFill: { overflow: "hidden" },
-  timeLeft: { fontSize: 12, color: colors.text, marginTop: 2 },
-  info: {
-    backgroundColor: "#E6F4FE",
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-    borderRadius: 8,
-    padding: 12,
-    gap: 4,
-  },
-  infoTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
-  infoText: { fontSize: 15, color: colors.text, lineHeight: 21 },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.background,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.colors.background },
+    screenContent: { padding: 20, gap: 16 },
+    title: {
+      fontSize: 28,
+      fontFamily: t.fonts.heading,
+      color: t.colors.text,
+      textTransform: t.upperTitles ? "uppercase" : "none",
+    },
+    heading: {
+      fontSize: 19,
+      fontFamily: t.fonts.heading,
+      color: t.colors.text,
+      marginTop: 8,
+      textTransform: t.upperTitles ? "uppercase" : "none",
+    },
+    body: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text, lineHeight: 22 },
+    small: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
+    card: {
+      backgroundColor: t.colors.surface,
+      borderColor: t.colors.border,
+      borderWidth: t.borderWidth,
+      borderRadius: t.radius.card,
+      padding: 16,
+      gap: 10,
+      boxShadow: t.shadow.card || undefined,
+    },
+    field: { gap: 6 },
+    label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
+    input: {
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      borderRadius: t.radius.button,
+      backgroundColor: t.colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      fontFamily: t.fonts.regular,
+      color: t.colors.text,
+    },
+    error: { color: t.colors.error, fontSize: 15, fontFamily: t.fonts.bold },
+    button: { borderRadius: t.radius.button, paddingVertical: 14, alignItems: "center" },
+    buttonShadow: { boxShadow: t.shadow.button || undefined },
+    buttonFill: { flex: 1, justifyContent: "center" },
+    buttonPressed: { opacity: 0.7 },
+    buttonText: { fontSize: 16, fontFamily: t.fonts.bold, letterSpacing: t.upperButtons ? 1 : 0 },
+    timed: {
+      borderWidth: Math.max(2, t.borderWidth),
+      borderRadius: t.radius.button,
+      overflow: "hidden",
+      backgroundColor: t.colors.surface,
+    },
+    // Clips the light title to the colored part, so the rest of the title stays dark.
+    timedFill: { overflow: "hidden" },
+    timeLeft: { fontSize: 12, fontFamily: t.fonts.regular, color: t.colors.text, marginTop: 2 },
+    info: {
+      backgroundColor: t.colors.note,
+      borderLeftWidth: 4,
+      borderLeftColor: t.colors.primary,
+      borderRadius: Math.min(t.radius.card, 10),
+      padding: 12,
+      gap: 4,
+    },
+    infoTitle: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.noteText },
+    infoText: {
+      fontSize: 15,
+      fontFamily: t.fonts.regular,
+      color: t.colors.noteText,
+      lineHeight: 21,
+    },
+    loading: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.background,
+    },
+  });
