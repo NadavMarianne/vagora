@@ -12,5 +12,7 @@
 - Home in the menu became a drawn house icon, pinned at the very top. The Decline button next to a timed Accept now stretches to the same height.
 - Home in the menu is a wide bar with a house icon, pinned at the very top (the menu used to count the status bar twice).
 - Menu buttons are split by thin lines, sections by thicker ones, and the market I'm in is highlighted with a colored bar.
-- Markets can be reordered from the home page ("Reorder", arrows, "Done"); the order is saved on my account and the menu follows it.
+- Markets can be reordered by dragging their grip in the menu; the order is saved on my account, and the home page follows it.
+- Back now walks outward: pages opened from the menu, a notification, or the home page open along their path (Home, then the market, then its section, then the page), and Home has nothing behind it.
+- The menu has Store and Orders in the market section, and highlights the page I'm on there.
 - Next: try it, then the production setup and the APK.

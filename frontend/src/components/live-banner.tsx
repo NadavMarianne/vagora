@@ -1,7 +1,6 @@
 // The pop-up at the top of the screen for live news, like "Dana invited you to Home".
 // Tapping it opens the page the news is about. Swiping it sideways dismisses it, and it also
 // goes away by itself after a few seconds.
-import { type Href, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Animated, PanResponder, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,6 +9,7 @@ import { Tappable } from "@/components/tappable";
 import { levelColors } from "@/components/ui";
 import { type Banner, useLive } from "@/lib/live";
 import { useNotifications } from "@/lib/notifications";
+import { openPage } from "@/lib/open-page";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 
@@ -19,10 +19,10 @@ const SWIPE_DISTANCE = 100;
 const SWIPE_SPEED = 0.5;
 
 function open(banner: Banner) {
-  if (banner.path) return router.navigate(banner.path as Href);
+  if (banner.path) return openPage(banner.path);
   // Older notes without a page: the market, or the home screen.
   const market = banner.reason.match(/^market:(\d+)$/);
-  router.navigate(market ? `/markets/${market[1]}` : "/");
+  openPage(market ? `/markets/${market[1]}` : "/");
 }
 
 export function LiveBanner() {

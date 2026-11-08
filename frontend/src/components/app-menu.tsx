@@ -1,7 +1,9 @@
 // The ☰ menu, next to the bell in the top corner of every screen. It slides in from the side:
-// Home at the top, then your markets, then this market's members, invites, settings, and leaving
-// (when you're in a market). Settings and Log out stay at the bottom. Android's back closes it.
-import { type Href, router, usePathname } from "expo-router";
+// Home at the top, then your markets (drag to reorder), then this market's pages (when you're in
+// a market), with the page you're on highlighted. Settings and Log out stay at the bottom.
+// Everything opens along its path (see open-page.ts), so back walks outward. Android's back
+// closes the menu.
+import { usePathname } from "expo-router";
 import { signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
@@ -17,10 +19,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
+import { DraggableMarkets } from "@/components/draggable-markets";
 import { Tappable } from "@/components/tappable";
 import { api, ApiError } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import { useLive } from "@/lib/live";
+import { openPage } from "@/lib/open-page";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { Market } from "@/lib/types";
@@ -79,8 +83,10 @@ export function MenuButton() {
   );
 }
 
-function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => void }) {
+function MenuPanel({ markets: known, onClose }: { markets: Market[]; onClose: () => void }) {
   const styles = useStyles(makeStyles);
+  // Your markets, in your order. A drag changes the order here at once, before it's saved.
+  const [markets, setMarkets] = useState(known);
   const insets = useSafeAreaInsets();
   const path = usePathname();
   const marketId = currentMarketId(path);
@@ -102,7 +108,18 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
     );
   }
 
-  const go = (href: string) => close(() => router.push(href as Href));
+  const go = (href: string) => close(() => openPage(href));
+  const [dragging, setDragging] = useState(false);
+  // Which of this market's pages you're on, to highlight it.
+  const on = (section: string) => path.startsWith(`/markets/${marketId}/${section}`);
+
+  function saveOrder(next: Market[]) {
+    setMarkets(next);
+    knownMarkets = next;
+    api("/markets/order", { method: "PUT", body: { market_ids: next.map((m) => m.id) } }).catch(
+      () => setError("Couldn’t save the new order. Try again."),
+    );
+  }
 
   function leave() {
     Alert.alert(
@@ -117,7 +134,7 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
             setError("");
             try {
               await api(`/markets/${marketId}/leave`, { method: "POST" });
-              close(() => router.replace("/"));
+              close(() => openPage("/"));
             } catch (e) {
               setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
             }
@@ -148,20 +165,21 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
       >
         {/* Always at the top: home. */}
         <View style={styles.top}>
-          <HomeIcon onPress={() => close(() => router.navigate("/"))} />
+          <HomeIcon onPress={() => close(() => openPage("/"))} />
         </View>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          scrollEnabled={!dragging}
+        >
           <Text style={styles.section}>Your markets</Text>
-          {markets.map((m, index) => (
-            <Item
-              key={m.id}
-              first={index === 0}
-              title={m.name}
-              detail={`${m.my_balance.toLocaleString()} ${m.currency_name}`}
-              selected={String(m.id) === marketId}
-              onPress={() => close(() => router.navigate(`/markets/${m.id}`))}
-            />
-          ))}
+          <DraggableMarkets
+            markets={markets}
+            selectedId={marketId}
+            onOpen={(m) => close(() => openPage(`/markets/${m.id}`))}
+            onReorder={saveOrder}
+            onDragging={setDragging}
+          />
           <View style={styles.halfDivider} />
           <Tappable
             onPress={() => go("/markets/new")}
@@ -175,9 +193,32 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
             <>
               <View style={styles.divider} />
               <Text style={styles.section}>{market ? market.name : "This market"}</Text>
-              <Item first title="Members" onPress={() => go(`/markets/${marketId}/members`)} />
-              <Item title="Invite someone" onPress={() => go(`/markets/${marketId}/invite`)} />
-              <Item title="Market settings" onPress={() => go(`/markets/${marketId}/settings`)} />
+              <Item
+                first
+                title="Store"
+                selected={on("store") || on("proposals")}
+                onPress={() => go(`/markets/${marketId}/store`)}
+              />
+              <Item
+                title="Orders"
+                selected={on("orders")}
+                onPress={() => go(`/markets/${marketId}/orders`)}
+              />
+              <Item
+                title="Members"
+                selected={on("members")}
+                onPress={() => go(`/markets/${marketId}/members`)}
+              />
+              <Item
+                title="Invite someone"
+                selected={on("invite")}
+                onPress={() => go(`/markets/${marketId}/invite`)}
+              />
+              <Item
+                title="Market settings"
+                selected={on("settings")}
+                onPress={() => go(`/markets/${marketId}/settings`)}
+              />
               <Item title="Leave market" danger onPress={leave} />
               {error !== "" && <Text style={styles.error}>{error}</Text>}
             </>

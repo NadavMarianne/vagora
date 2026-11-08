@@ -1,4 +1,4 @@
-import { type Href, router } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -12,17 +12,16 @@ import {
   levelColors,
   Loading,
   Screen,
-  Small,
   TimedButton,
   TimeLeft,
 } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useNotifications } from "@/lib/notifications";
+import { openPage } from "@/lib/open-page";
 import { useSession } from "@/lib/session";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { LeftMarket, Market, Order, ReceivedInvite } from "@/lib/types";
-import { useAction } from "@/lib/use-action";
 import { useLoad, useReloadAt } from "@/lib/use-load";
 
 /** An order you sell that waits for you, with its market (backend/app/orders.py). */
@@ -64,10 +63,6 @@ export default function Home() {
   );
   const [inviteError, setInviteError] = useState("");
   const [rejoinError, setRejoinError] = useState("");
-  // Reordering your markets: the order being arranged, saved when you tap Done.
-  const [reordering, setReordering] = useState(false);
-  const [order, setOrder] = useState<Market[]>([]);
-  const ordering = useAction(reloadHome);
   const [now] = useState(() => new Date());
   // When a deadline of something you deliver runs out, show it at once.
   useReloadAt(
@@ -87,24 +82,6 @@ export default function Home() {
       setInviteError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
       await reloadInvites();
     }
-  }
-
-  function startReorder() {
-    setOrder(data?.markets ?? []);
-    setReordering(true);
-  }
-
-  function move(index: number, by: number) {
-    const next = [...order];
-    [next[index], next[index + by]] = [next[index + by], next[index]];
-    setOrder(next);
-  }
-
-  function saveOrder() {
-    return ordering.run(async () => {
-      await api("/markets/order", { method: "PUT", body: { market_ids: order.map((m) => m.id) } });
-      setReordering(false);
-    });
   }
 
   async function rejoin(market: LeftMarket) {
@@ -186,7 +163,7 @@ export default function Home() {
               key={order.id}
               style={[styles.card, styles.deliver]}
               accessibilityRole="button"
-              onPress={() => router.push(`/markets/${order.market_id}/orders/${order.id}`)}
+              onPress={() => openPage(`/markets/${order.market_id}/orders/${order.id}`)}
             >
               <View style={styles.rowText}>
                 <Text style={styles.cardTitle}>{order.product_name}</Text>
@@ -210,29 +187,19 @@ export default function Home() {
         </>
       )}
 
-      <View style={styles.headingRow}>
-        <Heading>Your markets</Heading>
-        {(data?.markets.length ?? 0) > 1 && (
-          <Tappable
-            onPress={reordering ? saveOrder : startReorder}
-            accessibilityRole="button"
-            style={styles.reorder}
-          >
-            <Text style={styles.reorderText}>{reordering ? "Done" : "Reorder"}</Text>
-          </Tappable>
-        )}
-      </View>
+      <Heading>Your markets</Heading>
       <ErrorText>{error}</ErrorText>
-      <ErrorText>{ordering.error}</ErrorText>
       {!data && !error && <Loading />}
       {data?.markets.length === 0 && <Body>You’re not in any market yet. Create one!</Body>}
-      {reordering && (
-        <Small>Move markets up or down, then tap Done. The menu follows this order.</Small>
-      )}
-      {(reordering ? order : (data?.markets ?? [])).map((market, index, list) => {
+      {data?.markets.map((market) => {
         const count = toDeliver.filter((o) => o.market_id === market.id).length;
-        const content = (
-          <>
+        return (
+          <Tappable
+            key={market.id}
+            style={[styles.card, styles.market]}
+            onPress={() => router.push(`/markets/${market.id}`)}
+            accessibilityRole="button"
+          >
             <View style={styles.rowText}>
               <Text style={styles.cardTitle}>{market.name}</Text>
               {count > 0 && (
@@ -241,47 +208,10 @@ export default function Home() {
                 </Text>
               )}
             </View>
-            {reordering ? (
-              <View style={styles.arrows}>
-                <Tappable
-                  onPress={() => move(index, -1)}
-                  disabled={index === 0}
-                  style={[styles.arrow, index === 0 && styles.arrowOff]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move ${market.name} up`}
-                >
-                  <Text style={styles.arrowText}>▲</Text>
-                </Tappable>
-                <Tappable
-                  onPress={() => move(index, 1)}
-                  disabled={index === list.length - 1}
-                  style={[styles.arrow, index === list.length - 1 && styles.arrowOff]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move ${market.name} down`}
-                >
-                  <Text style={styles.arrowText}>▼</Text>
-                </Tappable>
-              </View>
-            ) : (
-              <Text style={styles.balance}>
-                {market.my_balance.toLocaleString()}{" "}
-                <Text style={styles.currency}>{market.currency_name}</Text>
-              </Text>
-            )}
-          </>
-        );
-        return reordering ? (
-          <View key={market.id} style={[styles.card, styles.market]}>
-            {content}
-          </View>
-        ) : (
-          <Tappable
-            key={market.id}
-            style={[styles.card, styles.market]}
-            onPress={() => router.push(`/markets/${market.id}`)}
-            accessibilityRole="button"
-          >
-            {content}
+            <Text style={styles.balance}>
+              {market.my_balance.toLocaleString()}{" "}
+              <Text style={styles.currency}>{market.currency_name}</Text>
+            </Text>
           </Tappable>
         );
       })}
@@ -301,7 +231,7 @@ export default function Home() {
               accessibilityRole="button"
               onPress={() => {
                 markRead(n.id);
-                router.push((n.path || "/notifications") as Href);
+                openPage(n.path || "/notifications");
               }}
             >
               <View style={[styles.dot, { backgroundColor: levelColors(t, n.level)[0] }]} />
@@ -363,22 +293,6 @@ const makeStyles = (t: Theme) =>
     },
     deliver: { flexDirection: "row", alignItems: "center", gap: 12 },
     market: { flexDirection: "row", alignItems: "center", gap: 12 },
-    headingRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-    reorder: { paddingVertical: 4, paddingHorizontal: 8 },
-    reorderText: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.primary },
-    arrows: { flexDirection: "row", gap: 8 },
-    arrow: {
-      width: 44,
-      height: 44,
-      borderRadius: t.radius.button,
-      borderWidth: t.borderWidth,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.surfaceAlt,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    arrowOff: { opacity: 0.35 },
-    arrowText: { fontSize: 16, color: t.colors.text },
     rowText: { flex: 1, gap: 2 },
     cardTitle: { fontSize: 17, fontFamily: t.fonts.bold, color: t.colors.text },
     state: { fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.primary },
