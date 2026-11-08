@@ -145,7 +145,7 @@ export default function Home() {
                   />
                 </View>
                 <View style={styles.answer}>
-                  <Button title="Decline" kind="bad" onPress={() => answer(invite, false)} />
+                  <Button title="Decline" kind="bad" fill onPress={() => answer(invite, false)} />
                 </View>
               </View>
             </View>

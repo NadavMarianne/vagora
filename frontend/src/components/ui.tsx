@@ -317,9 +317,12 @@ export function Button({
   onPress,
   kind = "primary",
   timed,
+  fill = false,
 }: ButtonProps & {
   /** Set by TimedButton: the time left, shown under the title over its time bar. */
   timed?: string;
+  /** Grow to the height of the space it's in, like the timed button next to it. */
+  fill?: boolean;
 }) {
   const styles = useStyles(makeStyles);
   const t = useTheme();
@@ -346,6 +349,7 @@ export function Button({
       disabled={busy}
       style={({ pressed }) => [
         styles.button,
+        fill && styles.buttonFill,
         timed === undefined && styles.buttonShadow,
         { backgroundColor: background },
         outlined && timed === undefined && { borderWidth: t.borderWidth, borderColor: color },
@@ -420,6 +424,7 @@ const makeStyles = (t: Theme) =>
     error: { color: t.colors.error, fontSize: 15, fontFamily: t.fonts.bold },
     button: { borderRadius: t.radius.button, paddingVertical: 14, alignItems: "center" },
     buttonShadow: { boxShadow: t.shadow.button || undefined },
+    buttonFill: { flex: 1, justifyContent: "center" },
     buttonPressed: { opacity: 0.7 },
     buttonText: { fontSize: 16, fontFamily: t.fonts.bold, letterSpacing: t.upperButtons ? 1 : 0 },
     timed: {

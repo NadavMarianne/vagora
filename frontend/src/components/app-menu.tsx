@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
 import { Tappable } from "@/components/tappable";
 import { api, ApiError } from "@/lib/api";
@@ -132,20 +133,15 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
       <Animated.View
         style={[
           styles.panel,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 12 },
+          { paddingTop: insets.top + 4, paddingBottom: insets.bottom + 12 },
           { transform: [{ translateX: slide }] },
         ]}
       >
+        {/* Always at the top: home. */}
+        <View style={styles.top}>
+          <HomeIcon onPress={() => close(() => router.navigate("/"))} />
+        </View>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          <Tappable
-            onPress={() => close(() => router.navigate("/"))}
-            style={[styles.home, path === "/" && styles.itemSelected]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.homeText}>Home</Text>
-          </Tappable>
-          <View style={styles.divider} />
-
           <Text style={styles.section}>Your markets</Text>
           {markets.map((m) => (
             <Item
@@ -185,6 +181,31 @@ function MenuPanel({ markets, onClose }: { markets: Market[]; onClose: () => voi
         </View>
       </Animated.View>
     </Modal>
+  );
+}
+
+/** A line drawing of a house, in the theme's colors. */
+function HomeIcon({ onPress }: { onPress: () => void }) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
+  const line = {
+    stroke: t.colors.text,
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  return (
+    <Tappable
+      onPress={onPress}
+      style={styles.homeButton}
+      accessibilityRole="button"
+      accessibilityLabel="Home"
+    >
+      <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+        <Path d="M3 10.5 12 3l9 7.5" {...line} />
+        <Path d="M5 9v11a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9" {...line} />
+      </Svg>
+    </Tappable>
   );
 }
 
@@ -259,13 +280,15 @@ const makeStyles = (t: Theme) =>
       borderRadius: t.radius.button,
     },
     itemSelected: { backgroundColor: t.colors.surfaceAlt },
-    home: { paddingVertical: 14, borderRadius: t.radius.button, alignItems: "center" },
-    homeText: {
-      fontSize: 19,
-      fontFamily: t.fonts.heading,
-      color: t.colors.text,
-      textTransform: t.upperTitles ? "uppercase" : "none",
+    top: {
+      flexDirection: "row",
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+      marginBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
     },
+    homeButton: { padding: 8 },
     itemText: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, flexShrink: 1 },
     detail: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     danger: { color: t.colors.bad },

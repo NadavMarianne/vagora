@@ -9,4 +9,5 @@
 - A market's page shows the 5 newest transactions, with "Show more".
 - The bell is now a line drawing (added `react-native-svg`), in the theme's colors. Home in the menu is bold and centered. Transactions got "Show less".
 - The home page now greets me with the date and a one-line summary, then shows invites, orders I have to deliver across all my markets (a new backend request), my markets with their balances, and my recent activity.
+- Home in the menu became a drawn house icon, pinned at the very top. The Decline button next to a timed Accept now stretches to the same height.
 - Next: try it, then the production setup and the APK.

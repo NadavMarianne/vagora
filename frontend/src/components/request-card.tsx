@@ -64,7 +64,7 @@ export function RequestCard({
             />
           </View>
           <View style={styles.answer}>
-            <Button title="Decline" kind="bad" onPress={() => onAnswer(false)} />
+            <Button title="Decline" kind="bad" fill onPress={() => onAnswer(false)} />
           </View>
         </View>
       )}
