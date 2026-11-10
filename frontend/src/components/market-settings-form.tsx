@@ -231,11 +231,8 @@ export function MarketSettingsForm({
           onChange={(starting_amount) => set({ starting_amount })}
         />
         <TimeZonePicker value={value.time_zone} onChange={(time_zone) => set({ time_zone })} />
-        <Toggle
-          label="Members can send coins to each other"
-          value={value.transfers_enabled}
-          onChange={(transfers_enabled) => set({ transfers_enabled })}
-        />
+        {/* The "members can send coins to each other" switch (transfers_enabled) comes back
+            when sending coins is built (issue #46). */}
       </Foldable>
 
       <Foldable title={`Allowances (${value.allowances.length})`}>
