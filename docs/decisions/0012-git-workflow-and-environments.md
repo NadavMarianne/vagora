@@ -6,7 +6,7 @@
 - One repository. `main` is the official version and must always work.
 - Every change goes through a branch and a pull request, then "Squash and merge" into `main` (GitHub Flow).
 - `main` is protected on GitHub: it cannot be deleted or force-pushed, changes need a pull request, and the CI check (`backend`) must pass before merging.
-- Production is a place the app runs, not a separate repo. Releases go out through a `release` branch: a pull request merges `main` into it (updated 2026-11-10, decision 0028).
+- Production is a place the app runs, not a separate repo. Releases go out through a `release` branch: a pull request merges `main` into it with a merge commit (updated 2026-11-10, decision 0028).
 - Each environment gets its own services and data: `vagora-dev` and `vagora-prod` in Firebase and in Neon, and a separate Vercel project for production (decision 0028).
 
 ## Why

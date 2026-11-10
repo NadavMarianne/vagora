@@ -6,3 +6,4 @@
 - Created the Vercel project `vagora-api-prod`, which builds only from `release`. The key and the database address live only there. The first deploy created all the tables, and `/health` answers "ok".
 - The app now picks its setup from its update channel: the production APK talks to production, Expo Go to development. Added `expo-updates` so small fixes reach the installed app without a new install, and linked the app to the Expo organization `vagora-team`.
 - Next: build the first APK and install it on both phones.
+- Protected the `release` branch like `main`. Release pull requests use "Create a merge commit" and everything else "Squash and merge", so `release` keeps the same commits as `main` and doesn't drift apart.
