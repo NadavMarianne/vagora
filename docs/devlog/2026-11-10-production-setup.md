@@ -7,3 +7,4 @@
 - The app now picks its setup from its update channel: the production APK talks to production, Expo Go to development. Added `expo-updates` so small fixes reach the installed app without a new install, and linked the app to the Expo organization `vagora-team`.
 - Next: build the first APK and install it on both phones.
 - Protected the `release` branch like `main`. Release pull requests use "Create a merge commit" and everything else "Squash and merge", so `release` keeps the same commits as `main` and doesn't drift apart.
+- Released 1.0.0: merged `main` into `release` (PR #41) and tagged it `v1.0.0` with a GitHub Release. From now on every release gets a tag, so each version's exact code stays easy to find.
