@@ -14,6 +14,7 @@ import { NotificationsProvider } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { FONTS } from "@/lib/themes";
+import { useCheckingForUpdate } from "@/lib/updates";
 
 // Wake the backend and database right away, while Firebase checks who is logged in.
 warmUp();
@@ -21,7 +22,9 @@ warmUp();
 export default function RootLayout() {
   // Every theme's fonts, loaded once. Until then, nothing is drawn (it takes a moment).
   const [fontsLoaded] = useFonts(FONTS);
-  if (!fontsLoaded) return null;
+  // Meanwhile, a waiting update loads right away (a few seconds at most).
+  const checkingForUpdate = useCheckingForUpdate();
+  if (!fontsLoaded || checkingForUpdate) return null;
   return (
     <SessionProvider>
       <ThemeProvider>
