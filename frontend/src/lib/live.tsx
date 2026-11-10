@@ -14,6 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import type { Level } from "@/components/ui";
 import { app } from "@/lib/firebase";
 import { useSession } from "@/lib/session";
+import { newVersionAnnounced } from "@/lib/updates";
 
 function setUpFirestore(): Firestore {
   try {
@@ -87,12 +88,29 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
     );
   }, [uid]);
 
+  // "A new app version is out": one note shared by everyone, rewritten by each release
+  // (decision 0029). When it changes, the app updates right away.
+  useEffect(() => {
+    if (!uid) return;
+    let first = true;
+    return onSnapshot(
+      doc(db, "app", "version"),
+      () => {
+        // The first reading is the note as it already was, not a new release.
+        if (first) {
+          first = false;
+          return;
+        }
+        newVersionAnnounced();
+      },
+      (error) => console.warn("New version announcements stopped:", error.message),
+    );
+  }, [uid]);
+
   const dismissBanner = useCallback(() => setBanner(null), []);
   const showBanner = useCallback((shown: Banner) => setBanner(shown), []);
 
-  return (
-    <Context value={{ version, banner, dismissBanner, showBanner }}>{children}</Context>
-  );
+  return <Context value={{ version, banner, dismissBanner, showBanner }}>{children}</Context>;
 }
 
 export function useLive(): Live {
