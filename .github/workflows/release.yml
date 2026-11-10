@@ -1,0 +1,71 @@
+name: Release
+
+# Runs when a release pull request is merged into `release` (decisions 0028 and 0029).
+# If the app changed, it publishes the over-the-air update, then tells the backend, which tells
+# every open app to update right away. The backend deploys by itself on Vercel.
+on:
+  push:
+    branches: [release]
+
+# One release at a time, in order.
+concurrency: release
+
+jobs:
+  app-update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Did the app change?
+        id: changes
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git cat-file -e "$BEFORE^{commit}" 2>/dev/null && git diff --quiet "$BEFORE" HEAD -- .; then
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "Backend only: no app update."
+          else
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.app == 'true'
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        if: steps.changes.outputs.app == 'true'
+        run: npm ci
+
+      - name: Publish the over-the-air update
+        if: steps.changes.outputs.app == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          npx eas-cli update --channel production --environment production \
+            --message "$(echo "$MESSAGE" | head -n 1)" --non-interactive
+
+      # The backend may still be deploying this same release, so try for a few minutes.
+      - name: Tell every open app to update
+        if: steps.changes.outputs.app == 'true'
+        env:
+          RELEASE_SECRET: ${{ secrets.RELEASE_SECRET }}
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS -X POST https://vagora-api-prod.vercel.app/internal/app-updated \
+                -H "X-Release-Secret: $RELEASE_SECRET"; then
+              echo "Announced."
+              exit 0
+            fi
+            echo "Not yet (attempt $attempt), trying again in 30 seconds."
+            sleep 30
+          done
+          exit 1
