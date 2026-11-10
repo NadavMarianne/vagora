@@ -9,6 +9,12 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+    // "A new app version is out" (decision 0029): every logged-in app may read it, so it can
+    // update right away. Only the backend writes.
+    match /app/version {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;

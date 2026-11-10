@@ -1,7 +1,7 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { MenuButton } from "@/components/app-menu";
@@ -14,6 +14,7 @@ import { NotificationsProvider } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { FONTS } from "@/lib/themes";
+import { useUpdate } from "@/lib/updates";
 
 // Wake the backend and database right away, while Firebase checks who is logged in.
 warmUp();
@@ -21,7 +22,10 @@ warmUp();
 export default function RootLayout() {
   // Every theme's fonts, loaded once. Until then, nothing is drawn (it takes a moment).
   const [fontsLoaded] = useFonts(FONTS);
-  if (!fontsLoaded) return null;
+  // Meanwhile, and whenever the app comes back to the screen, a new version installs right away.
+  const update = useUpdate();
+  if (update === "updating") return <Updating />;
+  if (!fontsLoaded || update === "checking") return null;
   return (
     <SessionProvider>
       <ThemeProvider>
@@ -34,6 +38,28 @@ export default function RootLayout() {
     </SessionProvider>
   );
 }
+
+/** Shown while a new version installs. Plain, in the icon's colors: themes and fonts may not be
+ * loaded yet. */
+function Updating() {
+  return (
+    <View style={updatingStyles.screen}>
+      <ActivityIndicator color="#FFD84D" size="large" />
+      <Text style={updatingStyles.text}>Updating Vagora…</Text>
+    </View>
+  );
+}
+
+const updatingStyles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    backgroundColor: "#030619",
+  },
+  text: { color: "#FFFFFF", fontSize: 16 },
+});
 
 /** The whole app in the person's theme: the page, the header, and the phone's status bar. */
 function Themed() {

@@ -112,15 +112,18 @@ function TimesEditor({
             onFocus={reveal}
           />
           {times.length > 1 && (
-            <Tappable onPress={() => onChange(times.filter((_, i) => i !== index))}>
-              <Text style={styles.remove}>Remove</Text>
+            <Tappable
+              onPress={() => onChange(times.filter((_, i) => i !== index))}
+              style={styles.remove}
+              accessibilityRole="button"
+              accessibilityLabel="Remove this time"
+            >
+              <Text style={styles.removeText}>✕</Text>
             </Tappable>
           )}
         </View>
       ))}
-      <Tappable onPress={() => onChange([...times, "21:00"])}>
-        <Text style={styles.add}>+ Add a time</Text>
-      </Tappable>
+      <Button title="+ Add a time" kind="secondary" onPress={() => onChange([...times, "21:00"])} />
     </View>
   );
 }
@@ -231,11 +234,8 @@ export function MarketSettingsForm({
           onChange={(starting_amount) => set({ starting_amount })}
         />
         <TimeZonePicker value={value.time_zone} onChange={(time_zone) => set({ time_zone })} />
-        <Toggle
-          label="Members can send coins to each other"
-          value={value.transfers_enabled}
-          onChange={(transfers_enabled) => set({ transfers_enabled })}
-        />
+        {/* The "members can send coins to each other" switch (transfers_enabled) comes back
+            when sending coins is built (issue #46). */}
       </Foldable>
 
       <Foldable title={`Allowances (${value.allowances.length})`}>
@@ -287,7 +287,7 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
     times: { gap: 8 },
-    timeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    timeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     timeInput: {
       fontFamily: t.fonts.regular,
       borderWidth: 1,
@@ -299,6 +299,6 @@ const makeStyles = (t: Theme) =>
       width: 90,
       color: t.colors.text,
     },
-    remove: { color: t.colors.error },
-    add: { color: t.colors.primary, fontFamily: t.fonts.bold },
+    remove: { padding: 8 },
+    removeText: { fontFamily: t.fonts.regular, fontSize: 18, color: t.colors.muted },
   });
