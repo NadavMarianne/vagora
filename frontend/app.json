@@ -2,11 +2,15 @@
   "expo": {
     "name": "Vagora",
     "slug": "vagora",
+    "owner": "vagora-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vagora",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "bundleIdentifier": "com.vagora.app"
     },
@@ -40,6 +44,14 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cd485907-9390-4b32-a093-b94359606202"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cd485907-9390-4b32-a093-b94359606202"
     }
   }
 }
