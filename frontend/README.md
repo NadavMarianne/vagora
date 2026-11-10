@@ -11,6 +11,15 @@ Code changes appear on the phone within seconds.
 
 By default the app uses the online backend (https://vagora-three.vercel.app). To use a backend running on your computer instead, start Expo with `EXPO_PUBLIC_API_URL` set to its address.
 
+Expo Go always uses development (`vagora-dev`). Only the production APK uses the real setup (decision 0028).
+
+## Releasing (the production APK)
+The Expo project is `@vagora-team/vagora`. Log in once with `npx.cmd eas-cli login`.
+- **A new APK** (first install, or after native changes like a new native package or the icon): `npx.cmd eas-cli build --platform android --profile production`. It builds in Expo's cloud and gives a download link.
+- **An update to installed APKs** (JavaScript and screen changes only): `npx.cmd eas-cli update --channel production --message "what changed"`. Phones get it the next time the app opens and restarts.
+
+Release the backend first (merge `main` into `release`), then the app.
+
 ## Checks
 - `npx expo lint`: code style
 - `npx tsc --noEmit`: types
