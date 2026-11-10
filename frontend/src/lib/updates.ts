@@ -1,48 +1,64 @@
-// Over-the-air updates, loaded as soon as the app opens (decision 0029).
-// By default a new update downloads on one open and is used on the next. Here the app checks
-// while it starts, and if an update arrives in time it reloads into it, so one open is enough.
+// Over-the-air updates, forced as soon as they exist (decision 0029).
+// By default a new update downloads on one open and is used on the next, and an app left in the
+// background can stay old for days. Here the app checks when it opens and whenever it comes back
+// to the screen, and if there is an update it shows "Updating" and reloads into it.
 import * as Updates from "expo-updates";
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 
-// How long opening may wait for an update. After that the app opens as it is, and a downloaded
-// update is used on the next open (never a reload in the middle of using the app).
-const WAIT_MS = 5000;
+// How long to wait for the update server to answer, and for a download. If either takes longer
+// (a bad connection), the app carries on as it is and tries again next time it comes back.
+const CHECK_MS = 5000;
+const DOWNLOAD_MS = 30000;
 
 // Expo Go and the dev server have no over-the-air updates.
 const enabled = Updates.isEnabled && !__DEV__;
 
-/** True while the app is still checking for an update on opening. */
-export function useCheckingForUpdate(): boolean {
-  const [checking, setChecking] = useState(enabled);
+export type UpdateState = "checking" | "updating" | "ready";
+
+/** Rejects if the promise takes longer than `ms`. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timed out")), ms)),
+  ]);
+}
+
+/** Checks for an update, and if there is one, downloads it and reloads the app into it. */
+async function updateIfAvailable(onUpdating: () => void): Promise<void> {
+  const { isAvailable } = await within(Updates.checkForUpdateAsync(), CHECK_MS);
+  if (!isAvailable) return;
+  onUpdating();
+  const { isNew } = await within(Updates.fetchUpdateAsync(), DOWNLOAD_MS);
+  if (isNew) await Updates.reloadAsync();
+}
+
+/** Whether the app is checking for an update, installing one, or ready to use. */
+export function useUpdate(): UpdateState {
+  const [state, setState] = useState<UpdateState>(enabled ? "checking" : "ready");
 
   useEffect(() => {
     if (!enabled) return;
-    let waited = false;
-    const stopWaiting = () => {
-      waited = true;
-      setChecking(false);
-    };
-    const timer = setTimeout(stopWaiting, WAIT_MS);
+    let busy = false;
 
-    (async () => {
+    async function run() {
+      if (busy) return;
+      busy = true;
       try {
-        const { isAvailable } = await Updates.checkForUpdateAsync();
-        if (isAvailable) {
-          const { isNew } = await Updates.fetchUpdateAsync();
-          if (isNew && !waited) {
-            await Updates.reloadAsync();
-            return;
-          }
-        }
+        await updateIfAvailable(() => setState("updating"));
       } catch {
-        // No internet or the update server is down: open the version we have.
+        // No internet, or too slow: use the version we have and try again next time.
       }
-      clearTimeout(timer);
-      stopWaiting();
-    })();
+      busy = false;
+      setState("ready");
+    }
 
-    return () => clearTimeout(timer);
+    run();
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") run();
+    });
+    return () => subscription.remove();
   }, []);
 
-  return checking;
+  return state;
 }
