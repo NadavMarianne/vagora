@@ -1,3 +1,5 @@
+<!-- Merging: "Squash and merge" into main. A release (main into release) uses "Create a merge commit". -->
+
 ## What changed
 <!-- A few plain sentences. -->
 

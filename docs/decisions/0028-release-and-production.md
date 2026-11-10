@@ -10,6 +10,7 @@
   - Neon project `vagora-prod`: Postgres 18, Frankfurt, database `vagora`. The development project is renamed `vagora-dev`.
   - Vercel project `vagora-api-prod`, at `https://vagora-api-prod.vercel.app`: root `backend`, region `fra1`, and the three settings (`DATABASE_URL`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT`) set for Production only. It builds only production deployments.
 - **Releasing:** production follows a `release` branch. A release is a pull request that merges `main` into `release`. Merging to `main` changes development only.
+- **Merging:** pull requests into `main` use "Squash and merge" (the only option there). Release pull requests use "Create a merge commit" (the only option on `release`), so `release` holds the exact commits of `main` and each release shows only what's new. `release` is protected like `main`: no deleting, no force pushes, changes through a pull request with the CI check passing.
 - **App updates over the air** (`expo-updates`): JavaScript changes reach the installed APK without a new install. Native changes (new native packages, icon, app ID) need a new APK. The runtime version follows the app version, so an update only goes to APKs it fits.
 - **The app picks its setup from its update channel.** The production APK is built on the `production` channel (`eas.json`), so it talks to the production backend and Firebase, including after every update. Expo Go has no channel, so it uses development.
 
