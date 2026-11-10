@@ -16,9 +16,9 @@ Expo Go always uses development (`vagora-dev`). Only the production APK uses the
 ## Releasing (the production APK)
 The Expo project is `@vagora-team/vagora`. Log in once with `npx.cmd eas-cli login`.
 - **A new APK** (first install, or after native changes like a new native package or the icon): `npx.cmd eas-cli build --platform android --profile production`. It builds in Expo's cloud and gives a download link.
-- **An update to installed APKs** (JavaScript and screen changes only): `npx.cmd eas-cli update --channel production --message "what changed"`. Phones get it the next time the app opens and restarts.
+- **An update to installed APKs** (JavaScript and screen changes only): automatic. Merging a release pull request into `release` publishes it, and every open app updates within seconds (decision 0029). By hand, if ever needed: `npx.cmd eas-cli update --channel production --message "what changed"`.
 
-Release the backend first (merge `main` into `release`), then the app. Then mark the version: a GitHub Release with a tag like `v1.0.1` on the release commit. Raise `version` in `app.json` only together with a new APK: updates only reach APKs with the same version.
+Release the backend first (merge `main` into `release`), then the app. Then mark the version: a GitHub Release with a tag on the release commit, `v1.1.0` for a new APK (the same number as `version` in `app.json`) or `v1.0.1` for an over-the-air or backend-only release. The notes start with the kind of update (decision 0029).
 
 ## Checks
 - `npx expo lint`: code style
