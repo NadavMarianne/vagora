@@ -124,3 +124,16 @@ def notify_market(
     if but is not None:
         members = [uid for uid in members if uid != but.firebase_uid]
     notify(db, members, f"market:{market_id}", message, path or f"/markets/{market_id}")
+
+
+def announce_new_version() -> bool:
+    """Tells every open app that a new version is out, so it updates right away (decision 0029).
+
+    One shared note, `app/version`, that every logged-in app listens to. Returns False when live
+    updates are off. Unlike other notes, a failure here is raised, so the release can retry.
+    """
+    client = _client()
+    if client is None:
+        return False
+    client.collection("app").document("version").set({"at": firestore.SERVER_TIMESTAMP}, timeout=5)
+    return True

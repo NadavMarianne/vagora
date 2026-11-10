@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # The Firestore-only key for live updates, as JSON. Secret: set only in Vercel, never in Git.
     # Empty means live updates are off (tests and local development).
     firebase_service_account: str = ""
+    # The password GitHub uses to announce a new app version (decision 0029). Secret: set only in
+    # Vercel and in GitHub, never in Git. Empty means announcing is off.
+    release_secret: str = ""
 
     @field_validator("database_url")
     @classmethod
