@@ -17,6 +17,7 @@ from app import (
     owners,
     products,
     releases,
+    tables,
     time_zones,
     users,
 )
@@ -36,6 +37,7 @@ app.include_router(orders.router)
 app.include_router(orders.everywhere)
 app.include_router(time_zones.router)
 app.include_router(releases.router)
+app.include_router(tables.router)
 
 
 @app.middleware("http")

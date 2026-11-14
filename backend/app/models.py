@@ -167,6 +167,8 @@ class EntryKind(StrEnum):
     SALE = "sale"  # held coins reach the seller
     REFUND = "refund"  # held coins return to the buyer
     LIMITS_EDIT = "limits_edit"  # paid to edit the limits file; the coins vanish
+    TABLE_BUY_IN = "table_buy_in"  # coins taken to a game table (sitting down or topping up)
+    TABLE_CASH_OUT = "table_cash_out"  # a stack brought back from a game table
 
 
 class LedgerEntry(Base):
@@ -467,3 +469,80 @@ class LimitItem(Base):
     text: Mapped[str] = mapped_column(String(100))
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PokerTable(Base):
+    """A poker table in a market's Games section (decision 0030).
+
+    The cards are real; the table holds the chips. Its settings are fixed while a hand is played.
+    """
+
+    __tablename__ = "poker_tables"
+    __table_args__ = (
+        CheckConstraint("max_players BETWEEN 2 AND 9", name="table_players_2_to_9"),
+        CheckConstraint("small_blind > 0", name="table_small_blind_positive"),
+        CheckConstraint(
+            "min_buy_in >= 2 * small_blind AND max_buy_in >= min_buy_in",
+            name="table_buy_ins_in_order",
+        ),
+        CheckConstraint("turn_seconds IS NULL OR turn_seconds > 0", name="table_turn_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"), index=True)
+    creator_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String(40))
+    max_players: Mapped[int] = mapped_column()
+    # The big blind is always twice this, and the smallest bet is one big blind.
+    small_blind: Mapped[int] = mapped_column(BigInteger)
+    min_buy_in: Mapped[int] = mapped_column(BigInteger)
+    max_buy_in: Mapped[int] = mapped_column(BigInteger)
+    # How long each turn may take. Empty: no timer.
+    turn_seconds: Mapped[int | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Set when the table is closed. Only an empty table can be closed.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    creator: Mapped[User] = relationship()
+    seats: Mapped[list["PokerSeat"]] = relationship(
+        back_populates="table", order_by="PokerSeat.number"
+    )
+
+
+class PokerSeat(Base):
+    """A player sitting at a poker table, with their stack (the chips in front of them)."""
+
+    __tablename__ = "poker_seats"
+    __table_args__ = (
+        CheckConstraint("number BETWEEN 0 AND 8", name="seat_number_0_to_8"),
+        CheckConstraint("stack >= 0", name="seat_stack_not_negative"),
+        # One seat per person at a table, and one person per seat, while they're sitting.
+        Index(
+            "one_seat_per_player",
+            "table_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("left_at IS NULL"),
+        ),
+        Index(
+            "one_player_per_seat",
+            "table_id",
+            "number",
+            unique=True,
+            postgresql_where=text("left_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    table_id: Mapped[int] = mapped_column(ForeignKey("poker_tables.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    membership_id: Mapped[int] = mapped_column(ForeignKey("memberships.id"))
+    # Where they sit, 0 to 8 clockwise. Turns and the dealer button go around in this order.
+    number: Mapped[int] = mapped_column()
+    stack: Mapped[int] = mapped_column(BigInteger)
+    sat_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    table: Mapped[PokerTable] = relationship(back_populates="seats")
+    user: Mapped[User] = relationship()
+    membership: Mapped[Membership] = relationship()
