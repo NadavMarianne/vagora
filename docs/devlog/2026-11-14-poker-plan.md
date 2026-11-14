@@ -6,3 +6,4 @@
 - Next: tables and seats (buy-in, top-up, leaving), then the hand engine with thorough tests, then the app screens.
 - Built poker tables and seats: opening a table with its settings, sitting down with a buy-in, topping up to the maximum, leaving with the whole stack, closing an empty table. Leaving a market gets you up from its tables. The tests check after each step that every coin is accounted for.
 - Built the hand engine: the poker rules on their own (blinds, turns, minimum raises, short all-ins, side pots, splits), and saving hands with the turn timer and the showdown agreement. A test plays thousands of random hands and checks no chip is ever lost or made.
+- Built the poker screens: Games in the menu and on the market page, opening a table, and the table itself (seats and stacks, dealer prompts, your turn with a two-tap fold and raise shortcuts, the showdown agreement, sitting down, topping up and getting up).
