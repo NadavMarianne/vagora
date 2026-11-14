@@ -13,3 +13,4 @@
 - With a timer, each round now waits until the dealer taps "Cards are out". The table is drawn round, with a seat for each possible player, a big timer ring in the middle, and you pick your seat by tapping it.
 - Third round of polish: a colored label above each player with their last action (check, call, bet or raise, fold, all-in, and what they won), and folded players fade. Card outlines with a question mark show where the real cards are: the board in the middle and two by each player still in. The raise pop-up remembers the amount for that turn. Every poker slider has − and + buttons, which repeat when held.
 - Added to the ideas notes: virtual cards as a table mode (real or virtual), and table skins.
+- Slider fix: holding − or + repeated the step, which made a normal press jump too far. Now a tap is one step and holding does nothing extra (the slider is for big moves). Tapping a slider's amount lets you type one.

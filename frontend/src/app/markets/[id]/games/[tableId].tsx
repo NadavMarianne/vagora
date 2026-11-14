@@ -2,7 +2,7 @@
 // The cards are real; this screen tells the dealer what to deal and keeps the chips.
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountSlider, POKER } from "@/components/amount-slider";
 import { PokerTableView } from "@/components/poker-table";
@@ -335,6 +335,8 @@ function RaiseSheet({
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+      {/* Typing an amount: the sheet moves up above the keyboard. */}
+      <KeyboardAvoidingView style={styles.sheetArea} behavior="padding">
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <View style={styles.sheet}>
         <Text style={styles.street}>{word === "Bet" ? "Bet" : "Raise to"}</Text>
@@ -359,6 +361,7 @@ function RaiseSheet({
         />
         <Button title="Cancel" kind="secondary" onPress={onClose} />
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -692,6 +695,7 @@ const makeStyles = (t: Theme) =>
     yourTurn: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.primary },
     buttons: { flexDirection: "row", gap: 10 },
     half: { flex: 1 },
+    sheetArea: { flex: 1 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
     sheet: {
       gap: 12,

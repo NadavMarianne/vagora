@@ -1,12 +1,13 @@
 // Picks an amount of chips with a slider: shortcut buttons above it (like half the pot), and a
 // button at its end for the most (like all-in). Sliding all the way, or pressing that button,
 // moves the slider to the end and makes the button shine. − and + at the slider's ends move it one
-// step; holding them keeps going.
+// step, and tapping the amount lets you type one.
 import Slider from "@react-native-community/slider";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Animated, Easing, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
+import { useRevealFocused } from "@/components/ui";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 
@@ -54,7 +55,7 @@ export function AmountSlider({
   return (
     <View style={styles.block}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <Text style={styles.amount}>{value.toLocaleString()}</Text>
+      <AmountBox value={value} min={min} max={max} onChange={onChange} />
       {shortcuts.length > 0 && (
         <View style={styles.shortcuts}>
           {shortcuts.map((s) => {
@@ -75,13 +76,7 @@ export function AmountSlider({
         </View>
       )}
       <View style={styles.row}>
-        <StepButton
-          sign="−"
-          disabled={value <= min}
-          value={value}
-          onStep={(v) => clamp(v - step)}
-          onChange={onChange}
-        />
+        <StepButton sign="−" disabled={value <= min} onPress={() => onChange(clamp(value - step))} />
         <View style={styles.slider}>
           {max > min && (
             <Slider
@@ -95,73 +90,88 @@ export function AmountSlider({
             />
           )}
         </View>
-        <StepButton
-          sign="+"
-          disabled={value >= max}
-          value={value}
-          onStep={(v) => clamp(v + step)}
-          onChange={onChange}
-        />
+        <StepButton sign="+" disabled={value >= max} onPress={() => onChange(clamp(value + step))} />
         <MaxButton label={maxLabel} on={atMax} onPress={() => onChange(max)} />
       </View>
     </View>
   );
 }
 
-/** − or +: one step per tap. Held down, it repeats faster and faster until let go. */
+/** − or +: one step per tap. */
 function StepButton({
   sign,
   disabled,
-  value,
-  onStep,
-  onChange,
+  onPress,
 }: {
   sign: string;
   disabled: boolean;
-  value: number;
-  /** The value one step on from the one given. */
-  onStep: (value: number) => number;
-  onChange: (value: number) => void;
+  onPress: () => void;
 }) {
   const styles = useStyles(makeStyles);
-  // The latest value, for the repeats while held (the timer outlives each draw).
-  const latest = useRef(value);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    latest.current = value;
-  }, [value]);
-  useEffect(() => stop, []);
-
-  function stop() {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  }
-  function step() {
-    const next = onStep(latest.current);
-    latest.current = next;
-    onChange(next);
-  }
-  function hold(wait: number) {
-    timer.current = setTimeout(() => {
-      step();
-      hold(Math.max(40, wait * 0.8));
-    }, wait);
-  }
-
   return (
-    <Pressable
+    <Tappable
       disabled={disabled}
-      onPressIn={() => {
-        step();
-        hold(400);
-      }}
-      onPressOut={stop}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={sign === "+" ? "More" : "Less"}
       style={({ pressed }) => [styles.step, pressed && styles.stepPressed, disabled && styles.dim]}
     >
       <Text style={styles.stepText}>{sign}</Text>
-    </Pressable>
+    </Tappable>
+  );
+}
+
+/** The amount in big numbers. Tapping it opens the keyboard to type one; it's kept between the
+ * smallest and the most once typing ends. */
+function AmountBox({
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  const styles = useStyles(makeStyles);
+  const t = useTheme();
+  const reveal = useRevealFocused();
+  // What's typed, while typing. Otherwise the box shows the value.
+  const [typing, setTyping] = useState<string | null>(null);
+
+  function type(text: string) {
+    const digits = text.replace(/\D/g, "").slice(0, 12);
+    setTyping(digits);
+    // In range: the slider and buttons follow at once.
+    const n = Number(digits);
+    if (digits && n >= min && n <= max) onChange(n);
+  }
+  function done() {
+    if (typing !== null && typing !== "") {
+      onChange(Math.max(min, Math.min(max, Number(typing))));
+    }
+    setTyping(null);
+  }
+
+  return (
+    <TextInput
+      style={[styles.amount, typing !== null && styles.amountTyping]}
+      value={typing ?? value.toLocaleString()}
+      onChangeText={type}
+      onFocus={() => {
+        setTyping(String(value));
+        reveal();
+      }}
+      onBlur={done}
+      onSubmitEditing={done}
+      keyboardType="number-pad"
+      returnKeyType="done"
+      selectTextOnFocus
+      selectionColor={POKER.gold[0]}
+      placeholderTextColor={t.colors.muted}
+      accessibilityLabel="Amount"
+    />
   );
 }
 
@@ -233,7 +243,14 @@ const makeStyles = (t: Theme) =>
       fontFamily: t.fonts.bold,
       color: t.colors.text,
       textAlign: "center",
+      alignSelf: "center",
+      minWidth: 140,
+      paddingVertical: 2,
+      paddingHorizontal: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: "transparent",
     },
+    amountTyping: { borderBottomColor: POKER.gold[0] },
     shortcuts: { flexDirection: "row", gap: 6 },
     shortcut: {
       flex: 1,
