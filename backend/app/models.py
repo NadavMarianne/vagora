@@ -502,6 +502,8 @@ class PokerTable(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Set when the table is closed. Only an empty table can be closed.
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Where the dealer button was in the last hand. The next hand moves it on.
+    button_seat: Mapped[int | None] = mapped_column()
 
     creator: Mapped[User] = relationship()
     seats: Mapped[list["PokerSeat"]] = relationship(
@@ -546,3 +548,36 @@ class PokerSeat(Base):
     table: Mapped[PokerTable] = relationship(back_populates="seats")
     user: Mapped[User] = relationship()
     membership: Mapped[Membership] = relationship()
+
+
+class PokerHand(Base):
+    """One hand at a poker table. Its state is the plain data of app/poker.py (decision 0030)."""
+
+    __tablename__ = "poker_hands"
+    __table_args__ = (
+        # One hand at a time per table.
+        Index(
+            "one_hand_at_a_time",
+            "table_id",
+            unique=True,
+            postgresql_where=text("finished_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    table_id: Mapped[int] = mapped_column(ForeignKey("poker_tables.id"), index=True)
+    # 1 for a table's first hand, then 2, 3, ...
+    number: Mapped[int] = mapped_column()
+    state: Mapped[dict] = mapped_column(JSONB)
+    # Which seat row each seat number in the hand belongs to, so a player who leaves and
+    # someone new in the same seat never get mixed up.
+    seat_ids: Mapped[dict] = mapped_column(JSONB)
+    # At the showdown: who someone said won each pot, and who agreed so far.
+    # {"by": seat, "winners": [[seats], ...], "confirmed": [seats]}
+    claim: Mapped[dict | None] = mapped_column(JSONB)
+    # When the current turn began, for the table's turn timer.
+    turn_started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

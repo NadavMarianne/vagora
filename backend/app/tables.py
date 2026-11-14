@@ -2,8 +2,9 @@
 
 The cards are real; the table holds the chips. Sitting down moves your buy-in from your balance
 onto the table, topping up adds more (only up to the maximum buy-in), and leaving brings your
-whole stack back. Winnings aren't capped, so a stack can grow past the maximum. Hands come in
-app/poker.py.
+whole stack back. Winnings aren't capped, so a stack can grow past the maximum. Topping up and
+getting up happen between hands (a player who folded may get up during the hand). Hands are
+played in app/hands.py.
 """
 
 from datetime import UTC, datetime
@@ -14,7 +15,8 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import ledger, signals
+from app import hand_state, ledger, poker, signals
+from app.hand_state import HandView
 from app.markets import get_membership
 from app.models import EntryKind, Membership, PokerSeat, PokerTable, User
 from app.store import Price
@@ -90,6 +92,8 @@ class TableView(BaseModel):
     seats: list[SeatView]
     # Your seat number, if you're sitting here.
     my_seat: int | None
+    # The hand being played, or else the last one (to show how it ended).
+    hand: HandView | None
 
 
 def seated(table: PokerTable) -> list[PokerSeat]:
@@ -97,8 +101,9 @@ def seated(table: PokerTable) -> list[PokerSeat]:
     return [seat for seat in table.seats if seat.left_at is None]
 
 
-def view(table: PokerTable, user: User) -> TableView:
+def view(table: PokerTable, user: User, db: Session) -> TableView:
     seats = seated(table)
+    hand = hand_state.latest(db, table)
     return TableView(
         id=table.id,
         name=table.name,
@@ -119,6 +124,7 @@ def view(table: PokerTable, user: User) -> TableView:
             for s in seats
         ],
         my_seat=next((s.number for s in seats if s.user_id == user.id), None),
+        hand=hand_state.view(hand, table, user) if hand is not None else None,
     )
 
 
@@ -176,7 +182,10 @@ def leave_all(db: Session, market_id: int, user_id: int) -> None:
         )
         .with_for_update(of=PokerSeat)
     )
+    from app import hands  # here, because hands uses this module
+
     for seat in seats:
+        hands.fold_out(db, seat.table, seat.user)
         cash_out(db, seat)
 
 
@@ -195,7 +204,7 @@ def list_tables(market_id: int, user: CurrentUser, db: DbSession) -> list[TableV
         .where(PokerTable.market_id == market_id, PokerTable.closed_at.is_(None))
         .order_by(PokerTable.created_at.desc(), PokerTable.id.desc())
     )
-    return [view(table, user) for table in tables]
+    return [view(table, user, db) for table in tables]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -207,13 +216,16 @@ def create_table(
     table = PokerTable(market_id=market_id, creator=user, **settings.model_dump())
     db.add(table)
     changed(db, market_id, user)
-    return view(table, user)
+    return view(table, user, db)
 
 
 @router.get("/{table_id}")
 def get_table_view(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> TableView:
     get_membership(db, user, market_id)
-    return view(get_table(db, market_id, table_id), user)
+    table = get_table(db, market_id, table_id, lock=True)
+    hand_state.catch_up(db, table)
+    db.commit()
+    return view(table, user, db)
 
 
 @router.put("/{table_id}")
@@ -226,6 +238,8 @@ def change_settings(
     table = get_table(db, market_id, table_id, lock=True)
     if table.creator_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only whoever opened the table can.")
+    if hand_state.current(db, table) is not None:
+        raise conflict("Settings can change between hands.")
     if settings.max_players < len(seated(table)):
         raise conflict("More players are sitting here than that.")
     if any(s.number >= settings.max_players for s in seated(table)):
@@ -233,7 +247,7 @@ def change_settings(
     for key, value in settings.model_dump().items():
         setattr(table, key, value)
     changed(db, market_id, user)
-    return view(table, user)
+    return view(table, user, db)
 
 
 @router.post("/{table_id}/sit")
@@ -261,7 +275,7 @@ def sit_down(
     )
     changed(db, market_id, user)
     db.refresh(table, ["seats"])
-    return view(table, user)
+    return view(table, user, db)
 
 
 @router.post("/{table_id}/top-up")
@@ -272,6 +286,9 @@ def top_up(
     membership = get_membership(db, user, market_id)
     table = get_table(db, market_id, table_id, lock=True)
     seat = my_seat(table, user)
+    hand_state.catch_up(db, table)
+    if hand_state.in_current_hand(db, table, seat):
+        raise conflict("You can top up between hands.")
     room = table.max_buy_in - seat.stack
     if room <= 0:
         raise conflict("Your stack is already at the maximum buy-in or above.")
@@ -281,7 +298,7 @@ def top_up(
     take_coins(db, membership, body.amount, table)
     seat.stack += body.amount
     changed(db, market_id, user)
-    return view(table, user)
+    return view(table, user, db)
 
 
 @router.post("/{table_id}/leave")
@@ -289,10 +306,16 @@ def leave_table(market_id: int, table_id: int, user: CurrentUser, db: DbSession)
     """Gets up. Your whole stack goes back to your balance."""
     get_membership(db, user, market_id)
     table = get_table(db, market_id, table_id, lock=True)
-    cash_out(db, my_seat(table, user))
+    hand_state.catch_up(db, table)
+    seat = my_seat(table, user)
+    row = hand_state.current(db, table)
+    if row is not None and hand_state.in_current_hand(db, table, seat):
+        if not poker.Hand.from_data(row.state).player(seat.number).folded:
+            raise conflict("Finish this hand first, or fold.")
+    cash_out(db, seat)
     changed(db, market_id, user)
     db.refresh(table, ["seats"])
-    return view(table, user)
+    return view(table, user, db)
 
 
 @router.post("/{table_id}/close", status_code=status.HTTP_204_NO_CONTENT)

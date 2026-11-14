@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from app import (
     cleanup,
     db,
+    hands,
     invites,
     limits,
     markets,
@@ -38,6 +39,7 @@ app.include_router(orders.everywhere)
 app.include_router(time_zones.router)
 app.include_router(releases.router)
 app.include_router(tables.router)
+app.include_router(hands.router)
 
 
 @app.middleware("http")
