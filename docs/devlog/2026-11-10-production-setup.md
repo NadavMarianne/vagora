@@ -5,8 +5,9 @@
 - Created the Neon project `vagora-prod` (Postgres 18, Frankfurt, database `vagora`) and renamed the old one to `vagora-dev`. Kept them separate so passwords and free limits aren't shared with testing.
 - Created the Vercel project `vagora-api-prod`, which builds only from `release`. The key and the database address live only there. The first deploy created all the tables, and `/health` answers "ok".
 - The app now picks its setup from its update channel: the production APK talks to production, Expo Go to development. Added `expo-updates` so small fixes reach the installed app without a new install, and linked the app to the Expo organization `vagora-team`.
-- Next: build the first APK and install it on both phones.
+- Built the first APK in Expo's cloud and installed it on both phones.
 - Protected the `release` branch like `main`. Release pull requests use "Create a merge commit" and everything else "Squash and merge", so `release` keeps the same commits as `main` and doesn't drift apart.
 - Released 1.0.0: merged `main` into `release` (PR #41) and tagged it `v1.0.0` with a GitHub Release. From now on every release gets a tag, so each version's exact code stays easy to find.
 - Found two annoyances on the phones and logged them as issues. Fixed the allowance time buttons (#47) and hid the coins switch until sending coins exists (#46, for after the birthday).
 - Decided how to tell release kinds apart (over the air, new APK, backend only) in tags, release notes and pull requests, and how to keep older apps working: forced updates on opening, on coming back, and the moment a release announces one (releases now publish the update by themselves), plus a minimum app version that asks old apps to update (decision 0029).
+- Tested the whole release chain: re-running the release workflow made an open app show "Updating Vagora…" and reload within seconds.
