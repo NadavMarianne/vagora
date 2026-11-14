@@ -320,12 +320,16 @@ def leave_market(market_id: int, user: CurrentUser, db: DbSession) -> None:
     """Leaves the market. Your coins are frozen, and invites you sent are cancelled.
 
     Not possible while you have committed offers or orders to deliver. Your other offers are
-    removed, proposals waiting for you are declined, and you stop owning products. You can
+    removed, proposals waiting for you are declined, you stop owning products, and you get up
+    from every game table with your stack. You can
     rejoin yourself within 30 days. If you were the last member, the market is archived.
     """
     membership = get_membership(db, user, market_id)
     store.leave_store(db, market_id, user.id)
     ownership.leave(db, market_id, user.id)
+    from app import tables  # here, because tables uses this module
+
+    tables.leave_all(db, market_id, user.id)
     # Lock the market so two last members leaving at once can't both miss archiving it.
     market = db.get(Market, market_id, with_for_update=True, populate_existing=True)
     membership.left_at = now()

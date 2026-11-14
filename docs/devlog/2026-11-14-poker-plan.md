@@ -4,3 +4,4 @@
 - Planned the first game: a poker table for real cards, where the app is the chips and does the bookkeeping. No-Limit Texas Hold'em, 2 to 9 players, blinds and buy-ins per table, an optional turn timer, side pots, and a showdown everyone in the hand agrees on (decision 0030).
 - Only the market's currency is played for. Betting store items might come later.
 - Next: tables and seats (buy-in, top-up, leaving), then the hand engine with thorough tests, then the app screens.
+- Built poker tables and seats: opening a table with its settings, sitting down with a buy-in, topping up to the maximum, leaving with the whole stack, closing an empty table. Leaving a market gets you up from its tables. The tests check after each step that every coin is accounted for.
