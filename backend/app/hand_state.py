@@ -66,17 +66,21 @@ def save(db: Session, row: PokerHand, hand: poker.Hand, at: datetime | None = No
     db.flush()
 
 
-def catch_up(db: Session, table: PokerTable) -> None:
-    """Applies the turn timer: every turn that ran out checks if it can, or folds."""
+def catch_up(db: Session, table: PokerTable) -> bool:
+    """Applies the turn timer: every turn that ran out checks if it can, or folds.
+    Returns whether any did, so the other players can be told."""
     row = current(db, table)
     if row is None or table.turn_seconds is None:
-        return
+        return False
     limit = timedelta(seconds=table.turn_seconds)
     hand = poker.Hand.from_data(row.state)
+    ran = False
     while hand.to_act is not None and row.turn_started_at + limit <= now():
         ran_out = row.turn_started_at + limit
         poker.time_out(hand)
         save(db, row, hand, at=ran_out)
+        ran = True
+    return ran
 
 
 class PotView(BaseModel):

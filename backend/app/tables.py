@@ -72,6 +72,10 @@ class TopUp(BaseModel):
     amount: Price
 
 
+class CashOut(BaseModel):
+    amount: Price
+
+
 class SeatView(BaseModel):
     number: int
     username: str
@@ -223,8 +227,11 @@ def create_table(
 def get_table_view(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> TableView:
     get_membership(db, user, market_id)
     table = get_table(db, market_id, table_id, lock=True)
-    hand_state.catch_up(db, table)
-    db.commit()
+    if hand_state.catch_up(db, table):
+        # A turn ran out: everyone else's screen moves on too, not only this one.
+        changed(db, market_id, user)
+    else:
+        db.commit()
     return view(table, user, db)
 
 
@@ -297,6 +304,27 @@ def top_up(
 
     take_coins(db, membership, body.amount, table)
     seat.stack += body.amount
+    changed(db, market_id, user)
+    return view(table, user, db)
+
+
+@router.post("/{table_id}/cash-out")
+def cash_out_some(
+    market_id: int, table_id: int, body: CashOut, user: CurrentUser, db: DbSession
+) -> TableView:
+    """Takes some of your stack back to your balance, between your hands, and stays seated.
+    With nothing left you sit out until you top up."""
+    get_membership(db, user, market_id)
+    table = get_table(db, market_id, table_id, lock=True)
+    seat = my_seat(table, user)
+    hand_state.catch_up(db, table)
+    if hand_state.in_current_hand(db, table, seat):
+        raise conflict("You can cash out between hands.")
+    if body.amount > seat.stack:
+        raise conflict(f"You have {seat.stack} on the table.")
+    note = f"Cashed out at {table.name}"
+    ledger.record(db, seat.membership, body.amount, EntryKind.TABLE_CASH_OUT, note)
+    seat.stack -= body.amount
     changed(db, market_id, user)
     return view(table, user, db)
 

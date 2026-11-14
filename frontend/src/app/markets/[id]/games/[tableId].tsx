@@ -2,15 +2,15 @@
 // The cards are real; this screen tells the dealer what to deal and keeps the chips.
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AmountSlider, POKER } from "@/components/amount-slider";
 import { Chips } from "@/components/controls";
 import {
   Body,
   Button,
   Card,
   ErrorText,
-  Field,
   Info,
   Loading,
   Screen,
@@ -22,8 +22,6 @@ import type { Theme } from "@/lib/themes";
 import type { Market, PokerHand, PokerTable } from "@/lib/types";
 import { Mistake, useAction } from "@/lib/use-action";
 import { useLoad, useReloadAt } from "@/lib/use-load";
-
-const digits = (text: string) => text.replace(/\D/g, "");
 
 /** What the dealer deals at the start of each betting round. */
 const DEAL: Record<string, string> = {
@@ -94,7 +92,7 @@ export default function TableScreen() {
       {table.my_seat === null ? (
         <SitDown table={table} url={url} balance={market.my_balance} reload={reload} />
       ) : (
-        <MySeat table={table} url={url} reload={reload} />
+        <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
       )}
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
@@ -216,7 +214,7 @@ function HandPanel({
         </Text>
       )}
       {/* A fresh one each turn, so an old raise amount doesn't stay. */}
-      {hand.my_turn && <MyTurn key={hand.log.length} hand={hand} url={url} reload={reload} />}
+      {hand.my_turn && <MyTurn key={hand.log.length} table={table} hand={hand} url={url} reload={reload} />}
       {hand.street === "showdown" && (
         <Showdown key={hand.number} table={table} hand={hand} url={url} reload={reload} />
       )}
@@ -235,25 +233,28 @@ function HandPanel({
   );
 }
 
-function MyTurn({ hand, url, reload }: { hand: PokerHand; url: string; reload: () => void }) {
+function MyTurn({
+  table,
+  hand,
+  url,
+  reload,
+}: {
+  table: PokerTable;
+  hand: PokerHand;
+  url: string;
+  reload: () => void;
+}) {
   const styles = useStyles(makeStyles);
   const turn = hand.my_turn!;
   const { run, error } = useAction(reload);
-  const [raiseTo, setRaiseTo] = useState(turn.raise_min ? String(turn.raise_min) : "");
   // Folding takes two taps, so it never happens by accident.
   const [foldArmed, setFoldArmed] = useState(false);
+  const [raising, setRaising] = useState(false);
 
-  const act = (action: string, amount?: number) =>
-    run(() =>
-      api(`${url}/hands/current/act`, {
-        method: "POST",
-        body: amount === undefined ? { action } : { action, amount },
-      }),
-    );
-
-  const pot = hand.pots.reduce((sum, p) => sum + p.amount, 0);
-  const clamp = (n: number) => Math.max(turn.raise_min!, Math.min(turn.raise_max!, n));
-  const word = hand.current_bet === 0 ? "Bet" : "Raise to";
+  const act = (body: { action: string; amount?: number }) =>
+    run(() => api(`${url}/hands/current/act`, { method: "POST", body }));
+  const canRaise = turn.raise_min !== null && turn.raise_max !== null;
+  const word = hand.current_bet === 0 ? "Bet" : "Raise";
 
   return (
     <View style={styles.turn}>
@@ -266,73 +267,113 @@ function MyTurn({ hand, url, reload }: { hand: PokerHand; url: string; reload: (
           </Text>
         )}
       </Text>
-      <View style={styles.buttons}>
-        <View style={styles.half}>
-          {foldArmed ? (
-            <Button title="Tap again to fold" kind="bad" onPress={() => act("fold")} />
-          ) : (
-            <Button title="Fold" kind="secondary" onPress={() => setFoldArmed(true)} />
+      {foldArmed ? (
+        <View style={styles.buttons}>
+          <View style={styles.half}>
+            <Button
+              title="Tap again to fold"
+              colors={POKER.fold}
+              onPress={() => act({ action: "fold" })}
+            />
+          </View>
+          <View style={styles.half}>
+            <Button title="Don’t fold" kind="secondary" onPress={() => setFoldArmed(false)} />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.buttons}>
+          <View style={styles.half}>
+            <Button title="Fold" colors={POKER.fold} onPress={() => setFoldArmed(true)} />
+          </View>
+          <View style={styles.half}>
+            {turn.can_check ? (
+              <Button title="Check" colors={POKER.check} onPress={() => act({ action: "check" })} />
+            ) : (
+              <Button
+                title={`Call ${turn.to_call.toLocaleString()}`}
+                colors={POKER.call}
+                onPress={() => act({ action: "call" })}
+              />
+            )}
+          </View>
+          {canRaise && (
+            <View style={styles.half}>
+              <Button title={word} colors={POKER.gold} onPress={() => setRaising(true)} />
+            </View>
           )}
         </View>
-        <View style={styles.half}>
-          {turn.can_check ? (
-            <Button title="Check" onPress={() => act("check")} />
-          ) : (
-            <Button title={`Call ${turn.to_call.toLocaleString()}`} onPress={() => act("call")} />
-          )}
-        </View>
-      </View>
-      {foldArmed && (
-        <Button title="Don't fold" kind="secondary" onPress={() => setFoldArmed(false)} />
       )}
-
-      {turn.raise_min !== null && turn.raise_max !== null && (
-        <View style={styles.raise}>
-          <Field
-            label={`${word} (${turn.raise_min.toLocaleString()} to ${turn.raise_max.toLocaleString()})`}
-            value={raiseTo}
-            onChangeText={(text) => setRaiseTo(digits(text))}
-            keyboardType="number-pad"
-          />
-          <Chips
-            options={[
-              { value: "min", label: "Min" },
-              { value: "pot", label: "Pot" },
-              { value: "max", label: "All-in" },
-            ]}
-            selected={[]}
-            onChange={([pick]) =>
-              setRaiseTo(
-                String(
-                  pick === "min"
-                    ? turn.raise_min
-                    : pick === "max"
-                      ? turn.raise_max
-                      : clamp(hand.current_bet + pot + turn.to_call),
-                ),
-              )
-            }
-          />
-          <Button
-            title={`${word} ${Number(raiseTo || 0).toLocaleString()}`}
-            kind="good"
-            onPress={() =>
-              run(async () => {
-                const amount = Number(raiseTo);
-                if (!amount) throw new Mistake("Choose how much.");
-                if (amount === turn.raise_max) return act("all_in");
-                await api(`${url}/hands/current/act`, {
-                  method: "POST",
-                  body: { action: "raise", amount },
-                });
-              })
-            }
-          />
-        </View>
-      )}
-      {turn.raise_min === null && turn.to_call > 0 && <Body>You can only call or fold now.</Body>}
+      {!canRaise && turn.to_call > 0 && <Body>You can only call or fold now.</Body>}
       <ErrorText>{error}</ErrorText>
+      {raising && (
+        <RaiseSheet
+          table={table}
+          hand={hand}
+          word={word}
+          onClose={() => setRaising(false)}
+          onRaise={(amount) => {
+            setRaising(false);
+            return act(
+              amount >= turn.raise_max! ? { action: "all_in" } : { action: "raise", amount },
+            );
+          }}
+        />
+      )}
     </View>
+  );
+}
+
+/** The raise pop-up: a slider from the smallest raise to all-in, with shortcuts for part of the
+ * pot. */
+function RaiseSheet({
+  table,
+  hand,
+  word,
+  onClose,
+  onRaise,
+}: {
+  table: PokerTable;
+  hand: PokerHand;
+  word: string;
+  onClose: () => void;
+  onRaise: (amount: number) => void;
+}) {
+  const styles = useStyles(makeStyles);
+  const turn = hand.my_turn!;
+  const max = turn.raise_max!;
+  const [amount, setAmount] = useState(turn.raise_min!);
+  const pot = hand.pots.reduce((sum, p) => sum + p.amount, 0);
+  // Part of the pot: call first, then raise by that part of the pot as it is after the call.
+  const part = (share: number) => hand.current_bet + Math.round(share * (pot + turn.to_call));
+  const allIn = amount >= max;
+
+  return (
+    <Modal transparent visible animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+      <View style={styles.sheet}>
+        <Text style={styles.street}>{word === "Bet" ? "Bet" : "Raise to"}</Text>
+        <AmountSlider
+          min={turn.raise_min!}
+          max={max}
+          value={amount}
+          onChange={setAmount}
+          step={table.small_blind}
+          shortcuts={[
+            { label: "¼ pot", value: part(1 / 4) },
+            { label: "⅓ pot", value: part(1 / 3) },
+            { label: "½ pot", value: part(1 / 2) },
+            { label: "Pot", value: part(1) },
+          ]}
+          maxLabel="All-in"
+        />
+        <Button
+          title={allIn ? `All-in ${max.toLocaleString()}` : `${word} ${amount.toLocaleString()}`}
+          colors={POKER.gold}
+          onPress={() => onRaise(amount)}
+        />
+        <Button title="Cancel" kind="secondary" onPress={onClose} />
+      </View>
+    </Modal>
   );
 }
 
@@ -477,83 +518,147 @@ function SitDown({
   balance: number;
   reload: () => void;
 }) {
-  const [buyIn, setBuyIn] = useState(String(Math.min(table.max_buy_in, Math.max(balance, 0))));
+  const most = Math.min(table.max_buy_in, balance);
+  const [buyIn, setBuyIn] = useState(most);
   const { run, error } = useAction(reload);
   if (table.seats.length >= table.max_players) return <Body>The table is full.</Body>;
+  if (most < table.min_buy_in) {
+    return (
+      <Body>
+        Sitting down takes at least {table.min_buy_in.toLocaleString()}, and you have{" "}
+        {balance.toLocaleString()}.
+      </Body>
+    );
+  }
   return (
     <Card>
-      <Field
-        label={`Buy-in (${table.min_buy_in.toLocaleString()} to ${table.max_buy_in.toLocaleString()}, you have ${balance.toLocaleString()})`}
+      <AmountSlider
+        label={`Buy-in (you have ${balance.toLocaleString()})`}
+        min={table.min_buy_in}
+        max={most}
         value={buyIn}
-        onChangeText={(text) => setBuyIn(digits(text))}
-        keyboardType="number-pad"
+        onChange={setBuyIn}
+        step={table.big_blind}
+        maxLabel="Max"
       />
       <Button
-        title="Sit down"
-        onPress={() =>
-          run(() => api(`${url}/sit`, { method: "POST", body: { buy_in: Number(buyIn) } }))
-        }
+        title={`Sit down with ${buyIn.toLocaleString()}`}
+        onPress={() => run(() => api(`${url}/sit`, { method: "POST", body: { buy_in: buyIn } }))}
       />
       <ErrorText>{error}</ErrorText>
     </Card>
   );
 }
 
-function MySeat({ table, url, reload }: { table: PokerTable; url: string; reload: () => void }) {
+/** Between your hands: add chips, take some back, or get up. */
+function MySeat({
+  table,
+  url,
+  balance,
+  reload,
+}: {
+  table: PokerTable;
+  url: string;
+  balance: number;
+  reload: () => void;
+}) {
   const styles = useStyles(makeStyles);
   const me = table.seats.find((s) => s.number === table.my_seat)!;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
   const inHand = playing ? hand.players.find((p) => p.seat === me.number) : undefined;
-  const room = table.max_buy_in - me.stack;
-  const [amount, setAmount] = useState("");
-  const [leaving, setLeaving] = useState(false);
-  const topUp = useAction(reload);
-  const leave = useAction(reload);
+  const room = Math.min(table.max_buy_in - me.stack, balance);
+  const [doing, setDoing] = useState<"top-up" | "cash-out" | "leave" | null>(null);
+  const [amount, setAmount] = useState(0);
+  const { run, error } = useAction(reload);
 
   const canTopUp = !inHand && room > 0;
+  const canCashOut = !inHand && me.stack > 0;
   const canLeave = !inHand || inHand.folded;
-  if (!canTopUp && !canLeave) return null;
+  if (!canTopUp && !canCashOut && !canLeave) return null;
 
+  function start(what: "top-up" | "cash-out" | "leave") {
+    setDoing(what);
+    setAmount(what === "top-up" ? room : Math.ceil(me.stack / 2));
+  }
+  const finish = (path: string, body?: object) =>
+    run(async () => {
+      await api(`${url}/${path}`, { method: "POST", body });
+      setDoing(null);
+    });
+
+  if (doing === "top-up" && canTopUp) {
+    return (
+      <Card style={styles.mySeat}>
+        <AmountSlider
+          label={`Add chips (up to ${room.toLocaleString()})`}
+          min={1}
+          max={room}
+          value={amount}
+          onChange={setAmount}
+          step={table.small_blind}
+          maxLabel="Max"
+        />
+        <Button
+          title={`Add ${amount.toLocaleString()}`}
+          onPress={() => finish("top-up", { amount })}
+        />
+        <Button title="Never mind" kind="secondary" onPress={() => setDoing(null)} />
+        <ErrorText>{error}</ErrorText>
+      </Card>
+    );
+  }
+  if (doing === "cash-out" && canCashOut) {
+    return (
+      <Card style={styles.mySeat}>
+        <AmountSlider
+          label="Take chips back to your balance"
+          min={1}
+          max={me.stack}
+          value={amount}
+          onChange={setAmount}
+          step={table.small_blind}
+          maxLabel="All"
+        />
+        <Body>You stay at the table with the rest. With nothing left, you sit out the hands.</Body>
+        <Button
+          title={`Cash out ${amount.toLocaleString()}`}
+          onPress={() => finish("cash-out", { amount })}
+        />
+        <Button title="Never mind" kind="secondary" onPress={() => setDoing(null)} />
+        <ErrorText>{error}</ErrorText>
+      </Card>
+    );
+  }
+  if (doing === "leave" && canLeave) {
+    return (
+      <Card style={styles.mySeat}>
+        <Body>Your {me.stack.toLocaleString()} chips go back to your balance.</Body>
+        <Button title="Get up" kind="bad" onPress={() => finish("leave")} />
+        <Button title="Stay" kind="secondary" onPress={() => setDoing(null)} />
+        <ErrorText>{error}</ErrorText>
+      </Card>
+    );
+  }
   return (
     <Card style={styles.mySeat}>
-      {canTopUp && (
-        <>
-          <Field
-            label={`Top up (up to ${room.toLocaleString()})`}
-            value={amount}
-            onChangeText={(text) => setAmount(digits(text))}
-            keyboardType="number-pad"
-          />
-          <Button
-            title="Add chips"
-            kind="secondary"
-            onPress={() =>
-              topUp.run(async () => {
-                if (!Number(amount)) throw new Mistake("Choose how much.");
-                await api(`${url}/top-up`, { method: "POST", body: { amount: Number(amount) } });
-                setAmount("");
-              })
-            }
-          />
-          <ErrorText>{topUp.error}</ErrorText>
-        </>
+      {(canTopUp || canCashOut) && (
+        <View style={styles.buttons}>
+          {canTopUp && (
+            <View style={styles.half}>
+              <Button title="Add chips" kind="secondary" onPress={() => start("top-up")} />
+            </View>
+          )}
+          {canCashOut && (
+            <View style={styles.half}>
+              <Button title="Cash out" kind="secondary" onPress={() => start("cash-out")} />
+            </View>
+          )}
+        </View>
       )}
-      {canLeave &&
-        (leaving ? (
-          <>
-            <Body>Your {me.stack.toLocaleString()} chips go back to your balance.</Body>
-            <Button
-              title="Get up"
-              kind="bad"
-              onPress={() => leave.run(() => api(`${url}/leave`, { method: "POST" }))}
-            />
-            <Button title="Stay" kind="secondary" onPress={() => setLeaving(false)} />
-          </>
-        ) : (
-          <Button title="Get up from the table" kind="secondary" onPress={() => setLeaving(true)} />
-        ))}
-      <ErrorText>{leave.error}</ErrorText>
+      {canLeave && (
+        <Button title="Get up from the table" kind="secondary" onPress={() => start("leave")} />
+      )}
     </Card>
   );
 }
@@ -615,7 +720,15 @@ const makeStyles = (t: Theme) =>
     yourTurn: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.primary },
     buttons: { flexDirection: "row", gap: 10 },
     half: { flex: 1 },
-    raise: { gap: 8 },
+    backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
+    sheet: {
+      gap: 12,
+      padding: 20,
+      paddingBottom: 32,
+      borderTopLeftRadius: t.radius.card,
+      borderTopRightRadius: t.radius.card,
+      backgroundColor: t.colors.background,
+    },
     claimLine: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
     log: { gap: 2, borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
     mySeat: { gap: 10 },

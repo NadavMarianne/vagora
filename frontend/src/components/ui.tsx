@@ -318,11 +318,14 @@ export function Button({
   kind = "primary",
   timed,
   fill = false,
+  colors,
 }: ButtonProps & {
   /** Set by TimedButton: the time left, shown under the title over its time bar. */
   timed?: string;
   /** Grow to the height of the space it's in, like the timed button next to it. */
   fill?: boolean;
+  /** Its own colors, the button's and its text's, instead of the theme's for its kind. */
+  colors?: [string, string];
 }) {
   const styles = useStyles(makeStyles);
   const t = useTheme();
@@ -339,7 +342,7 @@ export function Button({
   }
 
   const outlined = kind === "secondary";
-  const [color, onColor] = buttonColors(t, kind);
+  const [color, onColor] = colors ?? buttonColors(t, kind);
   // A timed button's color is drawn behind it as a time bar, so the button itself is clear.
   const background = timed !== undefined ? "transparent" : outlined ? t.colors.surface : color;
   const textColor = timed !== undefined ? t.colors.text : onColor;

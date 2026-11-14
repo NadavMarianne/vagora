@@ -5,6 +5,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import func, select, update
 
+from app import signals
 from app.models import LedgerEntry, Membership, PokerHand, PokerSeat
 
 NEW_MARKET = {
@@ -247,6 +248,25 @@ def test_a_turn_that_runs_out_checks_or_folds(game, db):
     coins_add_up(db)
 
 
+def test_a_turn_that_runs_out_tells_everyone(game, db, monkeypatch):
+    dana, noa, url, _ = game
+    dana.put(url, json={"name": "Hotel", "small_blind": 5, "min_buy_in": 100, "turn_seconds": 30})
+    dana.post(f"{url}/hands")
+    told = []
+    monkeypatch.setattr(signals, "notify_market", lambda *args, **kwargs: told.append(args))
+
+    noa.get(url)  # nothing ran out yet: nobody needs telling
+    assert told == []
+
+    db.execute(
+        update(PokerHand).values(turn_started_at=PokerHand.turn_started_at - timedelta(minutes=1))
+    )
+    db.flush()
+    noa.get(url)
+
+    assert len(told) == 1
+
+
 def test_without_a_timer_turns_wait(game, db):
     dana, noa, url, _ = game
     dana.post(f"{url}/hands")
@@ -256,3 +276,29 @@ def test_without_a_timer_turns_wait(game, db):
     db.flush()
 
     assert noa.get(url).json()["hand"]["to_act"] == 0
+
+
+def test_cashing_out_some_chips_between_hands(game, db):
+    dana, noa, url, market_id = game
+
+    table = dana.post(f"{url}/cash-out", json={"amount": 200}).json()
+
+    assert stacks(table) == {0: 300, 1: 500}
+    assert dana.get(f"/markets/{market_id}").json()["my_balance"] == 700
+    coins_add_up(db)
+
+    # All of it: still seated, sitting out until a top-up.
+    table = dana.post(f"{url}/cash-out", json={"amount": 300}).json()
+    assert stacks(table) == {0: 0, 1: 500}
+    assert table["my_seat"] == 0
+    assert dana.post(f"{url}/hands").status_code == 409
+    coins_add_up(db)
+
+
+def test_no_cashing_out_more_than_the_stack_or_during_your_hand(game):
+    dana, noa, url, _ = game
+    assert dana.post(f"{url}/cash-out", json={"amount": 501}).status_code == 409
+
+    dana.post(f"{url}/hands")
+
+    assert dana.post(f"{url}/cash-out", json={"amount": 5}).status_code == 409

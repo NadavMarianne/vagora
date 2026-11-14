@@ -14,6 +14,7 @@ A market gets a **Games** section. The first game is a **poker table**: the card
 - **Sitting down:** a player chooses a buy-in between the minimum and maximum, and those coins move from their balance onto the table (a ledger entry). Coins on a table can't be spent in the store.
 - **Topping up** between hands: allowed while the stack is below the maximum buy-in, and only up to it. **Winnings are not capped:** a stack can grow past the maximum, as in a real game.
 - **Leaving** between hands: the whole stack goes back to the balance (a ledger entry). A player with no chips left sits out until they top up or leave.
+- **Cashing out part** of a stack, between your hands: that much goes back to the balance and you stay seated (added after the first test game).
 - A hand needs at least two players with chips.
 
 ### A hand
@@ -27,10 +28,10 @@ A market gets a **Games** section. The first game is a **poker table**: the card
 6. Then the next hand can start.
 
 ### Bookkeeping
-- Stacks live on the table. The ledger records only sitting down, topping up and leaving, so balances stay exact and every movement is in each person's history.
+- Stacks live on the table. The ledger records only sitting down, topping up, cashing out and leaving, so balances stay exact and every movement is in each person's history.
 - The total of all stacks and pots on a table always equals what was bought in minus what was taken out. The tests check this after every action.
 - Actions are checked on the backend (whose turn, the allowed amounts), and two taps at the same moment can't both count.
-- The turn timer is applied when anyone next loads or acts at the table, the same way deadlines are caught up elsewhere (no scheduler).
+- The turn timer is applied when anyone next loads or acts at the table, the same way deadlines are caught up elsewhere (no scheduler). When it applies a run-out turn, everyone at the table is told, so every screen moves on.
 
 ## Why
 Playing a card game for the market's currency should feel like a real table: the cards in hand, and the chips handled for you. Making the app the chips (not the cards) keeps the fun of real cards and needs no hidden information on the phones. Up to 9 players covers a full table, so the same feature works for two people or a group. The showdown needs everyone in the hand to agree because the app can't see the cards.
