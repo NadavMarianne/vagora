@@ -1,13 +1,17 @@
-// Casino chips, seen from the side and stacked. More chips the more there is: about one more each
-// time the amount doubles. Their colors come from real chip values (white, red, green, black,
-// purple, gold), counted in small blinds.
+// Casino chips, seen from the side and stacked in one pile. More chips the more there is: one more
+// each time the amount doubles (a little slower in a small pile), up to the most a pile holds.
+// Their colors come from real chip values (white, red, green, black, purple, gold), counted in
+// small blinds.
 import { StyleSheet, View } from "react-native";
 
-const CHIP_W = 24;
+const CHIP_W = 20;
 const CHIP_H = 7;
-// How much of each chip shows above the one under it.
-const LAYER = 4;
-const PER_COLUMN = 6;
+/** A small pile fits in a bet's pill; a big one is the pot. `layer` is how much of each chip
+ * shows above the one under it, `doublings` how many times the amount doubles per extra chip. */
+const PILES = {
+  small: { most: 5, layer: 2.5, doublings: 1.5 },
+  big: { most: 10, layer: 3, doublings: 1 },
+};
 
 /** Chip values in small blinds, biggest first, with each one's color and edge. */
 const KINDS = [
@@ -20,10 +24,10 @@ const KINDS = [
 ];
 
 /** The chips for an amount: how many grows with the amount, colors from the biggest values in it. */
-function chipsFor(amount: number, smallBlind: number) {
+function chipsFor(amount: number, smallBlind: number, most: number, doublings: number) {
   const blinds = Math.max(1, amount / Math.max(1, smallBlind));
-  const count = Math.min(PER_COLUMN * 3, 1 + Math.floor(Math.log2(blinds) * 1.3));
-  // Pay the amount out in real chip values, biggest first.
+  const count = Math.min(most, 1 + Math.floor(Math.log2(blinds) / doublings));
+  // Pay the amount out in real chip values, biggest first (at the bottom of the pile).
   const kinds: (typeof KINDS)[number][] = [];
   let left = blinds;
   for (const kind of KINDS) {
@@ -33,39 +37,41 @@ function chipsFor(amount: number, smallBlind: number) {
     }
   }
   // Fewer real chips than the count: fill up with the smallest one used.
-  while (kinds.length < count) kinds.push(kinds.at(-1) ?? KINDS.at(-1)!);
+  while (kinds.length < count) kinds.push(kinds[kinds.length - 1] ?? KINDS[KINDS.length - 1]);
   return kinds;
 }
 
-/** A pile of chips for an amount: up to three stacks side by side. */
-export function ChipStack({ amount, smallBlind }: { amount: number; smallBlind: number }) {
-  const chips = chipsFor(amount, smallBlind);
-  const columns: (typeof chips)[] = [];
-  chips.forEach((chip, i) => {
-    const column = Math.floor(i / PER_COLUMN);
-    (columns[column] ??= []).push(chip);
-  });
+/** The tallest a pile gets. */
+export function pileHeight(size: keyof typeof PILES) {
+  return CHIP_H + PILES[size].layer * (PILES[size].most - 1);
+}
+
+/** A pile of chips for an amount. */
+export function ChipStack({
+  amount,
+  smallBlind,
+  size = "small",
+}: {
+  amount: number;
+  smallBlind: number;
+  size?: keyof typeof PILES;
+}) {
+  const { most, layer, doublings } = PILES[size];
+  const chips = chipsFor(amount, smallBlind, most, doublings);
   return (
-    <View style={styles.pile}>
-      {columns.map((column, c) => (
+    <View style={[styles.pile, { height: CHIP_H + layer * (chips.length - 1) }]}>
+      {chips.map((chip, i) => (
         <View
-          key={c}
-          style={[styles.column, { height: CHIP_H + LAYER * (PER_COLUMN - 1), marginTop: c * 3 }]}
+          key={i}
+          style={[
+            styles.chip,
+            { bottom: i * layer, backgroundColor: chip.color, borderColor: chip.edge },
+          ]}
         >
-          {column.map((chip, i) => (
-            <View
-              key={i}
-              style={[
-                styles.chip,
-                { bottom: i * LAYER, backgroundColor: chip.color, borderColor: chip.edge },
-              ]}
-            >
-              {/* The white stripes around a chip's edge. */}
-              <View style={[styles.stripe, { left: 3 }]} />
-              <View style={[styles.stripe, { left: CHIP_W / 2 - 2.5 }]} />
-              <View style={[styles.stripe, { right: 3 }]} />
-            </View>
-          ))}
+          {/* The white stripes around a chip's edge. */}
+          <View style={[styles.stripe, { left: 2 }]} />
+          <View style={[styles.stripe, { left: CHIP_W / 2 - 2.5 }]} />
+          <View style={[styles.stripe, { right: 2 }]} />
         </View>
       ))}
     </View>
@@ -73,8 +79,7 @@ export function ChipStack({ amount, smallBlind }: { amount: number; smallBlind: 
 }
 
 const styles = StyleSheet.create({
-  pile: { flexDirection: "row", alignItems: "flex-end", gap: 1 },
-  column: { width: CHIP_W, justifyContent: "flex-end" },
+  pile: { width: CHIP_W },
   chip: {
     position: "absolute",
     left: 0,
@@ -82,14 +87,13 @@ const styles = StyleSheet.create({
     height: CHIP_H,
     borderRadius: CHIP_H / 2,
     borderWidth: 1,
-    boxShadow: "0 1px 1px rgba(0,0,0,0.4)",
+    overflow: "hidden",
   },
   stripe: {
     position: "absolute",
-    top: 0.5,
+    top: 0,
+    bottom: 0,
     width: 3,
-    height: CHIP_H - 3,
-    borderRadius: 1,
-    backgroundColor: "rgba(255,255,255,0.85)",
+    backgroundColor: "rgba(255,255,255,0.8)",
   },
 });

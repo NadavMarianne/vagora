@@ -86,7 +86,7 @@ export default function TableScreen() {
       <Body>
         Blinds {table.small_blind}/{table.big_blind} · buy-in {table.min_buy_in.toLocaleString()} to{" "}
         {table.max_buy_in.toLocaleString()} {market.currency_name}
-        {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
+        {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
       )}
 
@@ -186,6 +186,12 @@ function HandPanel({
 }) {
   const styles = useStyles(makeStyles);
   const betting = hand.street !== "showdown" && hand.street !== "done";
+  // Whether anything shows above the last actions, so a line can go between them.
+  const somethingAbove =
+    (betting && (hand.waiting_for_cards || !table.turn_seconds)) ||
+    hand.street === "showdown" ||
+    (hand.street !== "done" && hand.pots.length > 1) ||
+    hand.my_turn !== null;
   return (
     <Card style={styles.panel}>
       {/* During the hand the table shows the round. */}
@@ -206,8 +212,8 @@ function HandPanel({
       {hand.street !== "done" && hand.pots.length > 1 && (
         <Text style={styles.small}>
           {hand.pots
-            .map((p, i) => `${i === 0 ? "Main pot" : `side pot ${i}`} ${p.amount.toLocaleString()}`)
-            .join(", ")}
+            .map((p, i) => `${i === 0 ? "Main pot" : `Side pot ${i}`}: ${p.amount.toLocaleString()}`)
+            .join(" · ")}
         </Text>
       )}
       {/* A fresh one each turn, so an old raise amount doesn't stay. */}
@@ -232,9 +238,10 @@ function HandPanel({
       )}
 
       {hand.street !== "done" && hand.log.length > 0 && (
-        <View style={styles.log}>
-          {hand.log.slice(-2).map((entry, i) => (
-            <Text key={i} style={styles.small}>
+        // A line between it and anything above it.
+        <View style={[styles.log, hand.log.length > 0 && somethingAbove && styles.logLine]}>
+          {hand.log.slice(-4).map((entry, i) => (
+            <Text key={i} style={styles.small} numberOfLines={1}>
               {describe(table, entry)}
             </Text>
           ))}
@@ -256,6 +263,7 @@ function CardsOut({
   url: string;
   reload: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   const { run, error } = useAction(reload);
   if (!hand.i_say_cards_out) {
     const dealer = hand.dealer_seat !== null ? seatName(table, hand.dealer_seat) : "The dealer";
@@ -268,7 +276,7 @@ function CardsOut({
         colors={POKER.gold}
         onPress={() => run(() => api(`${url}/hands/current/cards-out`, { method: "POST" }))}
       />
-      <Body>You dealt this hand. Tap once the cards are on the table, and the timer starts.</Body>
+      <Text style={styles.small}>You dealt. Tap once they’re on the table; then the timer starts.</Text>
       <ErrorText>{error}</ErrorText>
     </>
   );
@@ -760,12 +768,13 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.colors.background,
     },
     claimLine: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
-    log: { gap: 2, borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
+    log: { gap: 2 },
+    logLine: { borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
     mySeat: { gap: 10 },
     balances: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
     balance: {
       flex: 1,
-      paddingVertical: 8,
+      paddingVertical: 5,
       paddingHorizontal: 10,
       borderRadius: t.radius.card,
       borderWidth: t.borderWidth,
@@ -774,5 +783,5 @@ const makeStyles = (t: Theme) =>
     },
     balanceTotal: { borderColor: POKER.gold[0] },
     balanceLabel: { fontSize: 11, fontFamily: t.fonts.regular, color: t.colors.muted },
-    balanceValue: { fontSize: 17, fontFamily: t.fonts.bold, color: t.colors.text },
+    balanceValue: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
   });
