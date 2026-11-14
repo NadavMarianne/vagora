@@ -1,15 +1,16 @@
 // A poker table drawn from above: a felt oval with a place for every seat (as many as the table's
 // most players), your seat at the bottom, and in the middle the pot and a big turn timer.
-// Before you sit down, tapping an empty seat picks it.
+// Before you sit down, tapping an empty seat picks it. Above each player: their last action.
+// The cards are real, so the table only shows where they are: outlines with a question mark.
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
 import { POKER } from "@/components/amount-slider";
 import { Tappable } from "@/components/tappable";
 import { useStyles } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
-import type { PokerTable } from "@/lib/types";
+import type { PokerHand, PokerTable } from "@/lib/types";
 
 const FELT = "#0E6B3C";
 const RIM = "#5A3A1F";
@@ -17,6 +18,10 @@ const ON_FELT = "#FFFFFF";
 const SEAT_W = 80;
 const SEAT_H = 60;
 const RING = 92;
+// Room above the top seat for its action label.
+const LABEL_ROOM = 14;
+// How many cards are face up in the middle after each betting round.
+const BOARD: Record<string, number> = { preflop: 0, flop: 3, turn: 4, river: 5, showdown: 5 };
 
 const STREETS: Record<string, string> = {
   preflop: "Before the flop",
@@ -53,7 +58,7 @@ export function PokerTableView({
     const ry = (height - SEAT_H) / 2;
     return {
       x: width / 2 + rx * toward * Math.cos(angle),
-      y: height / 2 + ry * toward * Math.sin(angle),
+      y: LABEL_ROOM + height / 2 + ry * toward * Math.sin(angle),
     };
   }
 
@@ -67,7 +72,7 @@ export function PokerTableView({
 
   return (
     <View
-      style={[styles.area, { height: height || 1 }]}
+      style={[styles.area, { height: height + LABEL_ROOM || 1 }]}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
     >
       {width > 0 && (
@@ -78,7 +83,7 @@ export function PokerTableView({
               {
                 left: SEAT_W * 0.35,
                 right: SEAT_W * 0.35,
-                top: SEAT_H * 0.4,
+                top: LABEL_ROOM + SEAT_H * 0.4,
                 bottom: SEAT_H * 0.4,
                 borderRadius: width,
               },
@@ -88,6 +93,14 @@ export function PokerTableView({
           {/* The middle: the pot, the round, whose turn, and the timer. */}
           <View style={styles.middle} pointerEvents="none">
             {hand && <Text style={styles.street}>{STREETS[hand.street]}</Text>}
+            {hand && boardCount(hand) > 0 && (
+              <View style={styles.board}>
+                {Array.from({ length: boardCount(hand) }, (_, i) => (
+                  // A new key each hand, so the cards come in again.
+                  <CardShape key={`${hand.number}-${i}`} size="board" delay={(i % 3) * 120} />
+                ))}
+              </View>
+            )}
             {playing && hand.turn_ends_at && table.turn_seconds ? (
               <Countdown until={hand.turn_ends_at} seconds={table.turn_seconds} />
             ) : playing && hand.waiting_for_cards ? (
@@ -107,7 +120,10 @@ export function PokerTableView({
             const turn = playing && hand.to_act === number && !hand.waiting_for_cards;
             const box = { left: at.x - SEAT_W / 2, top: at.y - SEAT_H / 2 };
             const bet = inHand && inHand.street_bet > 0 ? inHand.street_bet : 0;
-            const betAt = place(number, 0.55);
+            const betAt = place(number, 0.5);
+            const cardsAt = place(number, 0.83);
+            const buttonAt = place(number, 0.66);
+            const action = seat && hand ? lastAction(hand, number) : null;
             return (
               <View key={number} style={StyleSheet.absoluteFill} pointerEvents="box-none">
                 {bet > 0 && (
@@ -115,13 +131,17 @@ export function PokerTableView({
                     <Text style={styles.betText}>{bet.toLocaleString()}</Text>
                   </View>
                 )}
-                {hand?.button === number && seat && (
+                {inHand && !inHand.folded && (
                   <View
-                    style={[
-                      styles.button,
-                      { left: place(number, 0.72).x - 11, top: place(number, 0.72).y - 11 },
-                    ]}
+                    style={[styles.hole, { left: cardsAt.x - 16, top: cardsAt.y - 12 }]}
+                    pointerEvents="none"
                   >
+                    <CardShape key={`${hand?.number}-a`} size="hole" tilt={-10} />
+                    <CardShape key={`${hand?.number}-b`} size="hole" tilt={10} delay={120} />
+                  </View>
+                )}
+                {hand?.button === number && seat && (
+                  <View style={[styles.button, { left: buttonAt.x - 11, top: buttonAt.y - 11 }]}>
                     <Text style={styles.buttonText}>D</Text>
                   </View>
                 )}
@@ -143,7 +163,17 @@ export function PokerTableView({
                       {seatNote(table, number, inHand)}
                     </Text>
                   </View>
-                ) : (
+                ) : null}
+                {action && (
+                  <ActionLabel
+                    key={action.label}
+                    label={action.label}
+                    color={action.color}
+                    left={box.left}
+                    top={box.top - 12}
+                  />
+                )}
+                {seat ? null : (
                   <Tappable
                     disabled={table.my_seat !== null}
                     onPress={() => onPick(number)}
@@ -166,7 +196,7 @@ export function PokerTableView({
   );
 }
 
-/** Under a player's stack: small or big blind, folded, all-in, or sitting out. */
+/** Under a player's stack: small or big blind, or sitting this hand out. */
 function seatNote(
   table: PokerTable,
   number: number,
@@ -175,11 +205,108 @@ function seatNote(
   const hand = table.hand;
   if (!hand || hand.street === "done") return "";
   if (!inHand) return "next hand";
-  if (inHand.folded) return "folded";
-  if (inHand.all_in) return "ALL-IN";
+  if (inHand.folded) return "";
   if (hand.small_blind_seat === number) return "small blind";
   if (hand.big_blind_seat === number) return "big blind";
   return "";
+}
+
+function boardCount(hand: PokerHand): number {
+  if (hand.street !== "done") return BOARD[hand.street];
+  // A hand that ended at a showdown had the whole board out; one everyone folded, only what
+  // was dealt by then.
+  const showedDown = hand.players.filter((p) => !p.folded).length > 1;
+  return showedDown ? 5 : (BOARD[hand.reached] ?? 0);
+}
+
+/** A seat's label: what they did last in this round, or folded or all-in for the whole hand,
+ * or what they won once it's over. */
+function lastAction(hand: PokerHand, seat: number): { label: string; color: string } | null {
+  if (hand.street === "done") {
+    const won = hand.payouts[String(seat)] ?? 0;
+    return won > 0 ? { label: `Won ${won.toLocaleString()}`, color: POKER.gold[0] } : null;
+  }
+  const player = hand.players.find((p) => p.seat === seat);
+  if (!player) return null;
+  if (player.folded) return { label: "Fold", color: POKER.fold[0] };
+  if (player.all_in) return { label: "All-in", color: POKER.gold[0] };
+  const round = hand.log.filter((e) => e.street === hand.street);
+  const mine = round.filter((e) => e.seat === seat && !e.action.endsWith("_blind")).at(-1);
+  if (!mine) return null;
+  const amount = mine.amount.toLocaleString();
+  const raisedBefore = round
+    .slice(0, round.indexOf(mine))
+    .some((e) => e.action === "raise" || e.action === "big_blind");
+  const time = mine.timed_out ? " ⏱" : "";
+  if (mine.action === "check") return { label: `Check${time}`, color: POKER.check[0] };
+  if (mine.action === "call") return { label: `Call ${amount}`, color: POKER.call[0] };
+  if (mine.action === "raise") {
+    return { label: `${raisedBefore ? "Raise" : "Bet"} ${amount}`, color: POKER.gold[0] };
+  }
+  return null;
+}
+
+/** A colored label above a seat. It pops in each time it changes. */
+function ActionLabel({
+  label,
+  color,
+  left,
+  top,
+}: {
+  label: string;
+  color: string;
+  left: number;
+  top: number;
+}) {
+  const styles = useStyles(makeStyles);
+  const [pop] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+  }, [pop]);
+  const dark = color === POKER.gold[0];
+  return (
+    <View style={[styles.labelSpot, { left, top }]} pointerEvents="none">
+      <Animated.View
+        style={[
+          styles.label,
+          { backgroundColor: color, opacity: pop, transform: [{ scale: pop }] },
+        ]}
+      >
+        <Text style={[styles.labelText, { color: dark ? POKER.gold[1] : "#FFFFFF" }]}>
+          {label}
+        </Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+/** Where a real card is: a soft white outline with a question mark. It slides in when dealt. */
+function CardShape({
+  size,
+  tilt = 0,
+  delay = 0,
+}: {
+  size: "board" | "hole";
+  tilt?: number;
+  delay?: number;
+}) {
+  const styles = useStyles(makeStyles);
+  const [arrive] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.timing(arrive, { toValue: 1, duration: 280, delay, useNativeDriver: true }).start();
+  }, [arrive, delay]);
+  const rise = arrive.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+  return (
+    <Animated.View
+      style={[
+        styles.card,
+        size === "board" ? styles.cardBoard : styles.cardHole,
+        { opacity: arrive, transform: [{ translateY: rise }, { rotate: `${tilt}deg` }] },
+      ]}
+    >
+      <Text style={size === "board" ? styles.cardMark : styles.cardMarkSmall}>?</Text>
+    </Animated.View>
+  );
 }
 
 /** A ring that empties as the turn's time runs out, with the seconds left in big numbers.
@@ -232,6 +359,27 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     area: { width: "100%" },
+    board: { flexDirection: "row", gap: 5, marginVertical: 2 },
+    card: {
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1.5,
+      borderColor: "rgba(255,255,255,0.7)",
+      backgroundColor: "rgba(255,255,255,0.08)",
+    },
+    cardBoard: { width: 28, height: 40, borderRadius: 5 },
+    cardHole: { width: 16, height: 22, borderRadius: 3 },
+    cardMark: { fontSize: 18, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    cardMarkSmall: { fontSize: 10, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    hole: { position: "absolute", flexDirection: "row", gap: 0 },
+    labelSpot: { position: "absolute", width: SEAT_W, alignItems: "center", zIndex: 2 },
+    label: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+    },
+    labelText: { fontSize: 11, fontFamily: t.fonts.bold },
     felt: {
       position: "absolute",
       backgroundColor: FELT,
@@ -279,7 +427,7 @@ const makeStyles = (t: Theme) =>
       borderWidth: 3,
       boxShadow: `0 0 16px ${POKER.gold[0]}`,
     },
-    folded: { opacity: 0.45 },
+    folded: { opacity: 0.35 },
     empty: { borderStyle: "dashed", backgroundColor: "transparent" },
     picked: { borderStyle: "solid", borderColor: POKER.gold[0], backgroundColor: POKER.gold[0] },
     emptyText: { fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.text },

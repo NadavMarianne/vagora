@@ -228,6 +228,9 @@ function MyTurn({
   // Folding takes two taps, so it never happens by accident.
   const [foldArmed, setFoldArmed] = useState(false);
   const [raising, setRaising] = useState(false);
+  // The amount picked in the raise pop-up. It stays when the pop-up closes, for this turn only
+  // (each turn gets a fresh MyTurn).
+  const [raiseTo, setRaiseTo] = useState(turn.raise_min ?? 0);
 
   const act = (body: { action: string; amount?: number }) =>
     run(() => api(`${url}/hands/current/act`, { method: "POST", body }));
@@ -288,6 +291,8 @@ function MyTurn({
           table={table}
           hand={hand}
           word={word}
+          amount={raiseTo}
+          setAmount={setRaiseTo}
           onClose={() => setRaising(false)}
           onRaise={(amount) => {
             setRaising(false);
@@ -307,19 +312,22 @@ function RaiseSheet({
   table,
   hand,
   word,
+  amount,
+  setAmount,
   onClose,
   onRaise,
 }: {
   table: PokerTable;
   hand: PokerHand;
   word: string;
+  amount: number;
+  setAmount: (amount: number) => void;
   onClose: () => void;
   onRaise: (amount: number) => void;
 }) {
   const styles = useStyles(makeStyles);
   const turn = hand.my_turn!;
   const max = turn.raise_max!;
-  const [amount, setAmount] = useState(turn.raise_min!);
   const pot = hand.pots.reduce((sum, p) => sum + p.amount, 0);
   // Part of the pot: call first, then raise by that part of the pot as it is after the call.
   const part = (share: number) => hand.current_bet + Math.round(share * (pot + turn.to_call));

@@ -258,6 +258,7 @@ def test_a_turn_that_runs_out_checks_or_folds(game, db):
         "seat": 0,
         "action": "fold",
         "amount": 5,
+        "street": "preflop",
         "timed_out": True,
     }
     assert stacks(table) == {0: 495, 1: 505}

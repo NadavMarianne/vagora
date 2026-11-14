@@ -1,9 +1,10 @@
 // Picks an amount of chips with a slider: shortcut buttons above it (like half the pot), and a
 // button at its end for the most (like all-in). Sliding all the way, or pressing that button,
-// moves the slider to the end and makes the button shine.
+// moves the slider to the end and makes the button shine. − and + at the slider's ends move it one
+// step; holding them keeps going.
 import Slider from "@react-native-community/slider";
-import { useEffect, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Tappable } from "@/components/tappable";
 import { useStyles, useTheme } from "@/lib/theme";
@@ -48,6 +49,7 @@ export function AmountSlider({
     const stepped = min + Math.round((raw - min) / step) * step;
     onChange(Math.max(min, Math.min(max, stepped)));
   }
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
 
   return (
     <View style={styles.block}>
@@ -73,6 +75,13 @@ export function AmountSlider({
         </View>
       )}
       <View style={styles.row}>
+        <StepButton
+          sign="−"
+          disabled={value <= min}
+          value={value}
+          onStep={(v) => clamp(v - step)}
+          onChange={onChange}
+        />
         <View style={styles.slider}>
           {max > min && (
             <Slider
@@ -86,9 +95,73 @@ export function AmountSlider({
             />
           )}
         </View>
+        <StepButton
+          sign="+"
+          disabled={value >= max}
+          value={value}
+          onStep={(v) => clamp(v + step)}
+          onChange={onChange}
+        />
         <MaxButton label={maxLabel} on={atMax} onPress={() => onChange(max)} />
       </View>
     </View>
+  );
+}
+
+/** − or +: one step per tap. Held down, it repeats faster and faster until let go. */
+function StepButton({
+  sign,
+  disabled,
+  value,
+  onStep,
+  onChange,
+}: {
+  sign: string;
+  disabled: boolean;
+  value: number;
+  /** The value one step on from the one given. */
+  onStep: (value: number) => number;
+  onChange: (value: number) => void;
+}) {
+  const styles = useStyles(makeStyles);
+  // The latest value, for the repeats while held (the timer outlives each draw).
+  const latest = useRef(value);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    latest.current = value;
+  }, [value]);
+  useEffect(() => stop, []);
+
+  function stop() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }
+  function step() {
+    const next = onStep(latest.current);
+    latest.current = next;
+    onChange(next);
+  }
+  function hold(wait: number) {
+    timer.current = setTimeout(() => {
+      step();
+      hold(Math.max(40, wait * 0.8));
+    }, wait);
+  }
+
+  return (
+    <Pressable
+      disabled={disabled}
+      onPressIn={() => {
+        step();
+        hold(400);
+      }}
+      onPressOut={stop}
+      accessibilityRole="button"
+      accessibilityLabel={sign === "+" ? "More" : "Less"}
+      style={({ pressed }) => [styles.step, pressed && styles.stepPressed, disabled && styles.dim]}
+    >
+      <Text style={styles.stepText}>{sign}</Text>
+    </Pressable>
   );
 }
 
@@ -174,13 +247,24 @@ const makeStyles = (t: Theme) =>
     shortcutText: { fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.text },
     shortcutTextOn: { color: POKER.gold[1] },
     dim: { opacity: 0.35 },
-    row: { flexDirection: "row", alignItems: "center", gap: 8 },
+    row: { flexDirection: "row", alignItems: "center", gap: 6 },
     slider: { flex: 1 },
+    step: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: POKER.gold[0],
+    },
+    stepPressed: { backgroundColor: POKER.gold[0] },
+    stepText: { fontSize: 20, lineHeight: 22, fontFamily: t.fonts.bold, color: t.colors.text },
     max: {
-      minWidth: 84,
+      minWidth: 70,
       alignItems: "center",
       paddingVertical: 10,
-      paddingHorizontal: 12,
+      paddingHorizontal: 8,
       borderRadius: t.radius.button,
       borderWidth: 2,
       borderColor: POKER.gold[0],

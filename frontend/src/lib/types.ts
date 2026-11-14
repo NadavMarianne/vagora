@@ -339,7 +339,14 @@ export type PokerHand = {
     folded: boolean;
     all_in: boolean;
   }[];
-  log: { seat: number; action: string; amount: number; timed_out?: boolean }[];
+  /** Every action. `street` is the betting round it was in (missing in the oldest hands). */
+  log: {
+    seat: number;
+    action: string;
+    amount: number;
+    street?: PokerStreet;
+    timed_out?: boolean;
+  }[];
   /** When done: how many chips each seat got. */
   payouts: Record<string, number>;
   claim: { by: number; winners: number[][]; confirmed: number[] } | null;
