@@ -4,10 +4,18 @@
 // page. On each seat's top edge their last action, on its bottom edge their bet; in front of
 // each player on the felt, their cards and their chips. The cards are real, so the table only
 // shows where they are: outlines with a question mark. Where everything goes is worked out in
-// poker-layout.ts, so nothing overlaps.
-import { useEffect, useState } from "react";
+// poker-layout.ts, so nothing overlaps, and the whole table is drawn as big as its space allows.
+// Chips move where they go: from a player's pile to their bet, from the bets to the pot when a
+// round ends, and from the pot to the winner.
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import Reanimated, { FadeIn, FadeOut, ZoomIn } from "react-native-reanimated";
+import Reanimated, {
+  Easing as ReEasing,
+  FadeIn,
+  FadeOut,
+  Keyframe,
+  ZoomIn,
+} from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
 
 import { POKER } from "@/components/amount-slider";
@@ -16,19 +24,19 @@ import {
   BET_H,
   BOARD_CARD,
   BOARD_GAP,
+  fitTable,
   LABEL_H,
   MIDDLE_GAP,
   MIDDLE_W,
   type Rect,
+  RIM_W,
   RING,
   SEAT_H,
   SEAT_W,
-  tableLayout,
   TOP_LINE_H,
-  TOP_ROOM,
 } from "@/components/poker-layout";
 import { Tappable } from "@/components/tappable";
-import { useStyles } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { PokerHand, PokerTable } from "@/lib/types";
 
@@ -40,7 +48,7 @@ const FOLDED = 0.35;
 const BOARD: Record<string, number> = { preflop: 0, flop: 3, turn: 4, river: 5, showdown: 5 };
 
 const STREETS: Record<string, string> = {
-  preflop: "Before the flop",
+  preflop: "Pre-flop",
   flop: "Flop",
   turn: "Turn",
   river: "River",
@@ -56,11 +64,74 @@ export function short(amount: number, from = 100_000): string {
   return `${millions < 10 ? Math.floor(millions * 10) / 10 : Math.floor(millions)}M`;
 }
 
+type Point = { x: number; y: number };
+
+/** How many times its normal size the table is drawn, for every part of it. */
+const Scale = createContext(1);
+
+/** The table's styles at its size. */
+function useTableStyles() {
+  const t = useTheme();
+  const scale = useContext(Scale);
+  return useMemo(() => makeStyles(t, scale), [t, scale]);
+}
+
+/** How long chips take to fly to a bet. */
+const FLIGHT = 450;
+
+/** The middle of a rectangle. */
+function center(r: Rect): Point {
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+/** How to get from one point to another. */
+function offset(from: Point, to: Point): Point {
+  return { x: to.x - from.x, y: to.y - from.y };
+}
+
+/** Comes in from `from` (an offset from where it ends up). Keyframes run on the UI thread, so
+ * they take Reanimated's Easing. */
+function arrive(from: Point, duration: number, delay = 0) {
+  return new Keyframe({
+    0: { opacity: 0.6, transform: [{ translateX: from.x }, { translateY: from.y }] },
+    100: {
+      opacity: 1,
+      transform: [{ translateX: 0 }, { translateY: 0 }],
+      easing: ReEasing.out(ReEasing.cubic),
+    },
+  })
+    .duration(duration)
+    .delay(delay);
+}
+
+/** Goes away to `to` (an offset from where it is), fading at the very end. */
+function leave(to: Point, duration: number) {
+  return new Keyframe({
+    0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
+    85: { opacity: 1, transform: [{ translateX: to.x }, { translateY: to.y }] },
+    100: { opacity: 0, transform: [{ translateX: to.x }, { translateY: to.y }] },
+  }).duration(duration);
+}
+
+/** Chips flying in from `from` and vanishing as they land (where the bet then shows). It ends
+ * see-through, which is also how it's drawn, so it stays hidden afterwards. */
+function flight(from: Point) {
+  return new Keyframe({
+    0: { opacity: 1, transform: [{ translateX: from.x }, { translateY: from.y }] },
+    90: {
+      opacity: 1,
+      transform: [{ translateX: 0 }, { translateY: 0 }],
+      easing: ReEasing.out(ReEasing.quad),
+    },
+    100: { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }] },
+  }).duration(FLIGHT);
+}
+
 export function PokerTableView({
   table,
   picked,
   onPick,
   onOpenPlayer,
+  fill = false,
 }: {
   table: PokerTable;
   /** The empty seat picked to sit in, before sitting down. */
@@ -68,16 +139,29 @@ export function PokerTableView({
   onPick: (seat: number) => void;
   /** Tapping a player: opens their page in the market. */
   onOpenPlayer: (username: string) => void;
+  /** Fill the space it's given (else it takes about half the screen). */
+  fill?: boolean;
 }) {
-  const styles = useStyles(makeStyles);
-  const [width, setWidth] = useState(0);
+  const t = useTheme();
+  const [space, setSpace] = useState({ width: 0, height: 0 });
   const screen = useWindowDimensions();
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
   const n = table.max_players;
+  const bottomSeat = table.my_seat ?? 0;
+  const boxWidth = space.width;
+  const boxHeight = fill
+    ? space.height
+    : Math.min(space.width * 1.3, screen.height * 0.55);
   // Your seat at the bottom; otherwise seat 1. Seats go clockwise from there.
-  const layout = tableLayout(width, screen.height, n, table.my_seat ?? 0);
-  const height = layout.height;
+  const fitted = useMemo(
+    () => fitTable(boxWidth, boxHeight, n, bottomSeat),
+    [boxWidth, boxHeight, n, bottomSeat],
+  );
+  // Everything below is in points on the screen, already at the table's size.
+  const { layout, scale } = fitted;
+  const styles = useMemo(() => makeStyles(t, scale), [t, scale]);
+  const ready = boxWidth > 0 && boxHeight > 0;
 
   const pot = hand ? hand.pots.reduce((sum, p) => sum + p.amount, 0) : 0;
   const turnName =
@@ -94,24 +178,25 @@ export function PokerTableView({
 
   return (
     <View
-      style={[styles.area, { height: width > 0 ? layout.areaHeight : 1 }]}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={[styles.area, fill ? styles.fill : { height: ready ? layout.areaHeight : 1 }]}
+      onLayout={(e) =>
+        setSpace({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+      }
     >
-      {width > 0 && (
-        <>
+      {ready && (
+        // The table, in the middle of its space.
+        <Scale.Provider value={scale}>
+        <View
+          style={{
+            position: "absolute",
+            width: layout.width,
+            height: layout.areaHeight,
+            left: (boxWidth - layout.width) / 2,
+            top: ((fill ? boxHeight : layout.areaHeight) - layout.areaHeight) / 2,
+          }}
+        >
           {/* The felt, with the seats round its edge. */}
-          <View
-            style={[
-              styles.felt,
-              {
-                left: SEAT_W / 2,
-                right: SEAT_W / 2,
-                top: TOP_ROOM + SEAT_H / 2,
-                height: height - SEAT_H,
-                borderRadius: Math.min(width - SEAT_W, height - SEAT_H) / 2,
-              },
-            ]}
-          />
+          <View style={[styles.felt, box(layout.felt), { borderRadius: layout.feltRadius }]} />
 
           {/* The middle: the round and whose turn, the board, the timer and the pot. */}
           <View style={[styles.middle, box(layout.middleRect)]} pointerEvents="none">
@@ -138,7 +223,7 @@ export function PokerTableView({
               ) : null}
               {playing && pot > 0 && (
                 <View style={styles.pot}>
-                  <ChipStack amount={pot} smallBlind={table.small_blind} size="medium" />
+                  <ChipStack amount={pot} smallBlind={table.small_blind} size="medium" scale={scale} />
                   <Text style={styles.potLabel}>Pot</Text>
                   <Text style={styles.potAmount} numberOfLines={1}>
                     <CountUp value={pot} format={(v) => short(v, 1_000_000)} />
@@ -213,29 +298,58 @@ export function PokerTableView({
                     <HoleCard tilt={8} />
                   </Reanimated.View>
                 )}
-                {seat.stack > 0 && <ChipStack amount={seat.stack} smallBlind={table.small_blind} />}
+                {seat.stack > 0 && (
+                  <ChipStack amount={seat.stack} smallBlind={table.small_blind} scale={scale} />
+                )}
               </View>
             );
           })}
 
-          {/* On each seat's bottom edge: its bet this round, or what it won. */}
+          {/* Each time a player puts chips in, a pile flies from their chips to their bet. */}
+          {playing &&
+            layout.spots.map((spot, number) => {
+              const bet = hand.players.find((p) => p.seat === number)?.street_bet ?? 0;
+              if (bet <= 0) return null;
+              return (
+                <Reanimated.View
+                  key={`fly-${number}-${hand.number}-${hand.street}-${bet}`}
+                  entering={flight(offset(center(spot.bet), center(spot.front)))}
+                  style={[styles.betSpot, styles.flying, box(spot.bet)]}
+                  pointerEvents="none"
+                >
+                  <ChipStack amount={bet} smallBlind={table.small_blind} scale={scale} still />
+                </Reanimated.View>
+              );
+            })}
+
+          {/* On each seat's bottom edge: its bet this round, which goes to the pot when the round
+              ends; or what it won, which comes from the pot and goes on to their chips. */}
           {hand &&
             layout.spots.map((spot, number) => {
               const inHand = playing ? hand.players.find((p) => p.seat === number) : undefined;
               const bet = inHand?.street_bet ?? 0;
               const won = hand.street === "done" ? (hand.payouts[String(number)] ?? 0) : 0;
               if (bet <= 0 && won <= 0) return null;
+              const at = center(spot.bet);
               return (
                 <Reanimated.View
                   // A new key each round, so the next round's bet comes in again.
                   key={`bet-${number}-${hand.number}-${hand.street}`}
-                  entering={ZoomIn.duration(250).delay(won > 0 ? 300 : 0)}
-                  exiting={FadeOut.duration(200)}
+                  entering={
+                    won > 0
+                      ? arrive(offset(at, layout.middle), 600, FLIGHT)
+                      : ZoomIn.duration(150).delay(FLIGHT - 50)
+                  }
+                  exiting={
+                    won > 0
+                      ? leave(offset(at, center(spot.front)), 500)
+                      : leave(offset(at, layout.middle), FLIGHT)
+                  }
                   style={[styles.betSpot, box(spot.bet)]}
                   pointerEvents="none"
                 >
                   <View style={styles.bet}>
-                    <ChipStack amount={bet || won} smallBlind={table.small_blind} />
+                    <ChipStack amount={bet || won} smallBlind={table.small_blind} scale={scale} />
                     <Text style={styles.betText} numberOfLines={1}>
                       {won > 0 ? `+${short(won)}` : short(bet)}
                     </Text>
@@ -260,7 +374,8 @@ export function PokerTableView({
                 />
               );
             })}
-        </>
+        </View>
+        </Scale.Provider>
       )}
     </View>
   );
@@ -296,7 +411,7 @@ function SeatBox({
   folded: boolean;
   onPress: () => void;
 }) {
-  const styles = useStyles(makeStyles);
+  const styles = useTableStyles();
   const [fade] = useState(() => new Animated.Value(folded ? FOLDED : 1));
   useEffect(() => {
     Animated.timing(fade, {
@@ -408,7 +523,7 @@ function lastAction(hand: PokerHand, seat: number): { label: string; color: stri
 
 /** A colored label on a seat's top edge. It pops in each time it changes. */
 function ActionLabel({ label, color, spot }: { label: string; color: string; spot: Rect }) {
-  const styles = useStyles(makeStyles);
+  const styles = useTableStyles();
   const [pop] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, friction: 5, useNativeDriver: true }).start();
@@ -435,7 +550,7 @@ function ActionLabel({ label, color, spot }: { label: string; color: string; spo
 
 /** One of a player's real cards, lying in front of them: a small outline with a question mark. */
 function HoleCard({ tilt }: { tilt: number }) {
-  const styles = useStyles(makeStyles);
+  const styles = useTableStyles();
   return (
     <View style={[styles.holeCard, { transform: [{ rotate: `${tilt}deg` }] }]}>
       <Text style={styles.holeMark}>?</Text>
@@ -446,12 +561,13 @@ function HoleCard({ tilt }: { tilt: number }) {
 /** Where a real card is on the board: a soft white outline with a question mark. It slides in
  * when dealt. */
 function CardShape({ delay }: { delay: number }) {
-  const styles = useStyles(makeStyles);
+  const styles = useTableStyles();
+  const scale = useContext(Scale);
   const [arrive] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(arrive, { toValue: 1, duration: 280, delay, useNativeDriver: true }).start();
   }, [arrive, delay]);
-  const rise = arrive.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+  const rise = arrive.interpolate({ inputRange: [0, 1], outputRange: [10 * scale, 0] });
   return (
     <Animated.View style={[styles.card, { opacity: arrive, transform: [{ translateY: rise }] }]}>
       <Text style={styles.cardMark}>?</Text>
@@ -462,7 +578,9 @@ function CardShape({ delay }: { delay: number }) {
 /** A ring that empties as the turn's time runs out, with the seconds left in big numbers.
  * Green, then gold, then red for the last few seconds, which beat. */
 function Countdown({ until, seconds }: { until: string; seconds: number }) {
-  const styles = useStyles(makeStyles);
+  const styles = useTableStyles();
+  const ring = RING * useContext(Scale);
+  const stroke = ring / 8;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 200);
@@ -471,32 +589,32 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const left = Math.max(0, Date.parse(until) - now);
   const share = Math.min(1, left / (seconds * 1000));
   const color = share > 0.5 ? POKER.check[0] : left > 5000 ? POKER.gold[0] : POKER.fold[0];
-  const radius = RING / 2 - 5;
+  const radius = ring / 2 - stroke / 2 - 1;
   const around = 2 * Math.PI * radius;
   // The last five seconds: each one starts a little big and shrinks.
   const beat = left <= 5000 && left > 0 ? 1 + 0.25 * ((left % 1000) / 1000) : 1;
   return (
-    <View style={{ width: RING, height: RING }}>
-      <Svg width={RING} height={RING}>
+    <View style={{ width: ring, height: ring }}>
+      <Svg width={ring} height={ring}>
         <Circle
-          cx={RING / 2}
-          cy={RING / 2}
+          cx={ring / 2}
+          cy={ring / 2}
           r={radius}
           stroke="rgba(0,0,0,0.3)"
-          strokeWidth={7}
+          strokeWidth={stroke}
           fill="rgba(0,0,0,0.2)"
         />
         <Circle
-          cx={RING / 2}
-          cy={RING / 2}
+          cx={ring / 2}
+          cy={ring / 2}
           r={radius}
           stroke={color}
-          strokeWidth={7}
+          strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
           strokeDasharray={`${around} ${around}`}
           strokeDashoffset={around * (1 - share)}
-          transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
+          transform={`rotate(-90 ${ring / 2} ${ring / 2})`}
         />
       </Svg>
       <View style={[StyleSheet.absoluteFill, styles.ringMiddle]}>
@@ -513,143 +631,148 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
   );
 }
 
-const makeStyles = (t: Theme) =>
-  StyleSheet.create({
+const makeStyles = (t: Theme, scale: number) => {
+  /** A size at the table's size. */
+  const u = (n: number) => n * scale;
+  return StyleSheet.create({
     // Reaches a little into the page's margins, for room on narrow phones.
     area: { alignSelf: "stretch", marginHorizontal: -12 },
+    fill: { flex: 1, marginHorizontal: 0 },
+    flying: { opacity: 0 },
     felt: {
       position: "absolute",
       backgroundColor: FELT,
-      borderWidth: 10,
+      borderWidth: u(RIM_W),
       borderColor: RIM,
-      boxShadow: "inset 0 0 30px rgba(0,0,0,0.45)",
+      boxShadow: `inset 0 0 ${u(30)}px rgba(0,0,0,0.45)`,
     },
     middle: {
       position: "absolute",
       alignItems: "center",
       justifyContent: "center",
-      gap: MIDDLE_GAP,
+      gap: u(MIDDLE_GAP),
     },
     topLine: {
-      maxWidth: MIDDLE_W,
-      height: TOP_LINE_H,
-      fontSize: 13,
+      maxWidth: u(MIDDLE_W),
+      height: u(TOP_LINE_H),
+      fontSize: u(13),
       fontFamily: t.fonts.bold,
       color: ON_FELT,
       textAlign: "center",
     },
-    board: { flexDirection: "row", alignItems: "center", gap: BOARD_GAP, height: BOARD_CARD.h },
-    street: { fontSize: 13, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    board: { flexDirection: "row", alignItems: "center", gap: u(BOARD_GAP), height: u(BOARD_CARD.h) },
+    street: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
     card: {
-      width: BOARD_CARD.w,
-      height: BOARD_CARD.h,
-      borderRadius: 4,
+      width: u(BOARD_CARD.w),
+      height: u(BOARD_CARD.h),
+      borderRadius: u(4),
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1.5,
+      borderWidth: u(1.5),
       borderColor: "rgba(255,255,255,0.7)",
       backgroundColor: "rgba(255,255,255,0.08)",
     },
-    cardMark: { fontSize: 13, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    cardMark: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
     timeAndPot: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 6,
-      height: RING,
+      gap: u(6),
+      height: u(RING),
     },
-    dealing: { fontSize: 16, fontFamily: t.fonts.bold, color: ON_FELT },
-    pot: { alignItems: "center", maxWidth: MIDDLE_W - RING - 6 },
-    potLabel: { fontSize: 10, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
-    potAmount: { fontSize: 15, fontFamily: t.fonts.bold, color: POKER.gold[0] },
+    dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT },
+    pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
+    potLabel: { fontSize: u(10), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    potAmount: { fontSize: u(15), fontFamily: t.fonts.bold, color: POKER.gold[0] },
     ringMiddle: { alignItems: "center", justifyContent: "center" },
-    seconds: { fontSize: 22, fontFamily: t.fonts.bold },
+    seconds: { fontSize: u(22), fontFamily: t.fonts.bold },
     seatSpot: { position: "absolute" },
     seat: {
       position: "absolute",
-      width: SEAT_W,
-      height: SEAT_H,
+      width: u(SEAT_W),
+      height: u(SEAT_H),
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 12,
-      borderWidth: 2,
+      borderRadius: u(12),
+      borderWidth: u(2),
       borderColor: t.colors.border,
       backgroundColor: t.colors.surface,
-      paddingHorizontal: 4,
+      paddingHorizontal: u(4),
     },
     seatFill: { left: 0, top: 0 },
     mine: { borderColor: t.colors.primary },
     turn: {
       borderColor: POKER.gold[0],
-      borderWidth: 3,
-      boxShadow: `0 0 12px ${POKER.gold[0]}`,
+      borderWidth: u(3),
+      boxShadow: `0 0 ${u(12)}px ${POKER.gold[0]}`,
     },
     empty: { borderStyle: "dashed", backgroundColor: "transparent" },
     picked: { borderStyle: "solid", borderColor: POKER.gold[0], backgroundColor: POKER.gold[0] },
-    emptyText: { fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.text },
+    emptyText: { fontSize: u(13), fontFamily: t.fonts.bold, color: t.colors.text },
     pickedText: { color: POKER.gold[1] },
-    nameRow: { flexDirection: "row", alignItems: "center", gap: 3, maxWidth: SEAT_W - 10 },
-    name: { flexShrink: 1, fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.text },
-    stack: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
-    note: { fontSize: 10, fontFamily: t.fonts.regular, color: t.colors.muted },
+    nameRow: { flexDirection: "row", alignItems: "center", gap: u(3), maxWidth: u(SEAT_W - 10) },
+    name: { flexShrink: 1, fontSize: u(13), fontFamily: t.fonts.bold, color: t.colors.text },
+    stack: { fontSize: u(15), fontFamily: t.fonts.bold, color: t.colors.text },
+    note: { fontSize: u(10), fontFamily: t.fonts.regular, color: t.colors.muted },
     front: {
       position: "absolute",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 4,
+      gap: u(4),
     },
-    frontTall: { flexDirection: "column", gap: 3 },
+    frontTall: { flexDirection: "column", gap: u(3) },
     holeCards: { flexDirection: "row" },
     holeCard: {
-      width: 11,
-      height: 16,
-      marginHorizontal: -0.5,
-      borderRadius: 2,
+      width: u(11),
+      height: u(16),
+      marginHorizontal: u(-0.5),
+      borderRadius: u(2),
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1,
+      borderWidth: u(1),
       borderColor: "rgba(255,255,255,0.8)",
       backgroundColor: "rgba(255,255,255,0.12)",
     },
     holeMark: {
-      fontSize: 8,
-      lineHeight: 10,
+      fontSize: u(8),
+      lineHeight: u(10),
       fontFamily: t.fonts.bold,
       color: "rgba(255,255,255,0.8)",
     },
     button: {
-      width: 14,
-      height: 14,
-      borderRadius: 7,
+      width: u(14),
+      height: u(14),
+      borderRadius: u(7),
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "#FFFFFF",
-      borderWidth: 1,
+      borderWidth: u(1),
       borderColor: "#999999",
     },
-    buttonText: { fontSize: 8, lineHeight: 10, fontFamily: t.fonts.bold, color: "#111111" },
+    buttonText: { fontSize: u(8), lineHeight: u(10), fontFamily: t.fonts.bold, color: "#111111" },
     labelSpot: { position: "absolute", alignItems: "center", justifyContent: "center" },
     label: {
-      height: LABEL_H,
-      maxWidth: SEAT_W,
+      height: u(LABEL_H),
+      maxWidth: u(SEAT_W),
       justifyContent: "center",
-      paddingHorizontal: 7,
-      borderRadius: LABEL_H / 2,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+      paddingHorizontal: u(7),
+      borderRadius: u(LABEL_H / 2),
+      boxShadow: `0 ${u(1)}px ${u(4)}px rgba(0,0,0,0.35)`,
     },
-    labelText: { fontSize: 11, fontFamily: t.fonts.bold },
+    labelText: { fontSize: u(11), fontFamily: t.fonts.bold },
     betSpot: { position: "absolute", alignItems: "center", justifyContent: "center" },
     bet: {
-      height: BET_H,
-      maxWidth: SEAT_W,
+      height: u(BET_H),
+      maxWidth: u(SEAT_W),
       flexDirection: "row",
       alignItems: "center",
-      gap: 3,
-      paddingLeft: 3,
-      paddingRight: 7,
-      borderRadius: BET_H / 2,
+      gap: u(3),
+      paddingLeft: u(3),
+      paddingRight: u(7),
+      borderRadius: u(BET_H / 2),
       backgroundColor: "rgba(0,0,0,0.6)",
     },
-    betText: { fontSize: 12, fontFamily: t.fonts.bold, color: POKER.gold[0] },
+    betText: { fontSize: u(12), fontFamily: t.fonts.bold, color: POKER.gold[0] },
   });
+};

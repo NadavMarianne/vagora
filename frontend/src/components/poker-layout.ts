@@ -2,8 +2,8 @@
 // its action label on its top edge and its bet on its bottom edge. In front of it on the felt lie
 // its cards and its chips: beside the seat toward the middle for seats on the sides, and below or
 // above it for seats at the top and bottom. The middle holds whose turn, the board, the timer and
-// the pot. Seats sit on fixed spots for each number of players, and the table's height is the
-// first one, from what fits the screen, where nothing overlaps (checked by `overlaps`).
+// the pot. Seats sit on fixed spots for each number of players. `fitTable` draws it all as big
+// as the space allows while nothing overlaps (checked by `overlaps`).
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };
@@ -62,9 +62,16 @@ export type TableLayout = {
   middle: Point;
   middleRect: Rect;
   spots: SeatSpot[];
+  /** The felt's outside edge (its rim included) and how round its corners are. */
+  felt: Rect;
+  feltRadius: number;
+  width: number;
   height: number;
   areaHeight: number;
 };
+
+/** The felt's rim, inside its outside edge. */
+export const RIM_W = 10;
 
 function centered(c: Point, w: number, h: number): Rect {
   return { x: c.x - w / 2, y: c.y - h / 2, w, h };
@@ -76,8 +83,18 @@ export function placeAll(
   height: number,
   seats: number,
   bottomSeat: number,
+  /** Side seats' cards and chips under the seat (narrow spaces), instead of beside it. */
+  sideFrontBelow = false,
 ): TableLayout {
   const middle = { x: width / 2, y: TOP_ROOM + height / 2 };
+  // The felt runs through the seats' middles, with rounded corners.
+  const felt = {
+    x: SEAT_W / 2,
+    y: TOP_ROOM + SEAT_H / 2,
+    w: width - SEAT_W,
+    h: height - SEAT_H,
+  };
+  const feltRadius = Math.min(felt.w, felt.h) * 0.42;
   const spotList = SPOTS[Math.max(2, Math.min(9, seats))];
   const spots: SeatSpot[] = Array.from({ length: seats }, (_, seat) => {
     const [across, down] = spotList[(seat - bottomSeat + seats) % seats] ?? [0.5, 0.5];
@@ -90,7 +107,13 @@ export function placeAll(
     const bet = { x: box.x, y: box.y + SEAT_H + BET_DROP - BET_H, w: SEAT_W, h: BET_H };
     const side = across === 0 || across === 1;
     let front: Rect;
-    if (side) {
+    if (side && sideFrontBelow) {
+      // Just inside the felt's rim, under the seat (top half) or over it (bottom half), so it
+      // lies toward the middle.
+      const x = across === 0 ? at.x + RIM_W + CLEAR : at.x - RIM_W - CLEAR - FRONT_WIDE.w;
+      const y = down < 0.5 ? bet.y + BET_H + CLEAR : label.y - CLEAR - FRONT_WIDE.h;
+      front = { x, y, w: FRONT_WIDE.w, h: FRONT_WIDE.h };
+    } else if (side) {
       // Beside the seat, toward the middle.
       const x = across === 0 ? box.x + SEAT_W + CLEAR : box.x - CLEAR - FRONT_TALL.w;
       front = { x, y: at.y - FRONT_TALL.h / 2, w: FRONT_TALL.w, h: FRONT_TALL.h };
@@ -103,14 +126,72 @@ export function placeAll(
       const y = label.y - CLEAR - FRONT_WIDE.h;
       front = { x: at.x - FRONT_WIDE.w / 2, y, w: FRONT_WIDE.w, h: FRONT_WIDE.h };
     }
-    return { at, box, label, bet, front, frontTall: side };
+    // Near a rounded corner it can stick out past the felt: slide it toward the middle.
+    for (let step = 0; step < 40 && !onFelt(front, felt, feltRadius); step++) {
+      const c = { x: front.x + front.w / 2, y: front.y + front.h / 2 };
+      const length = Math.hypot(middle.x - c.x, middle.y - c.y) || 1;
+      front = {
+        ...front,
+        x: front.x + ((middle.x - c.x) / length) * 2,
+        y: front.y + ((middle.y - c.y) / length) * 2,
+      };
+    }
+    return { at, box, label, bet, front, frontTall: side && !sideFrontBelow };
   });
   return {
     middle,
     middleRect: centered(middle, MIDDLE_W, MIDDLE_H),
     spots,
+    felt,
+    feltRadius,
+    width,
     height,
     areaHeight: TOP_ROOM + height + BOTTOM_ROOM,
+  };
+}
+
+/** Whether a rectangle lies on the felt, inside its rim. */
+function onFelt(r: Rect, felt: Rect, feltRadius: number) {
+  const f = {
+    x: felt.x + RIM_W,
+    y: felt.y + RIM_W,
+    w: felt.w - 2 * RIM_W,
+    h: felt.h - 2 * RIM_W,
+  };
+  const radius = Math.max(0, feltRadius - RIM_W);
+  return [
+    [r.x, r.y],
+    [r.x + r.w, r.y],
+    [r.x, r.y + r.h],
+    [r.x + r.w, r.y + r.h],
+  ].every(([x, y]) => {
+    if (x < f.x || x > f.x + f.w || y < f.y || y > f.y + f.h) return false;
+    // In a corner: within its rounding.
+    const cx = Math.min(Math.max(x, f.x + radius), f.x + f.w - radius);
+    const cy = Math.min(Math.max(y, f.y + radius), f.y + f.h - radius);
+    return Math.hypot(x - cx, y - cy) <= radius;
+  });
+}
+
+/** The same layout `scale` times bigger, in points on the screen. */
+function scaled(layout: TableLayout, scale: number): TableLayout {
+  const r = (x: Rect): Rect => ({ x: x.x * scale, y: x.y * scale, w: x.w * scale, h: x.h * scale });
+  return {
+    middle: { x: layout.middle.x * scale, y: layout.middle.y * scale },
+    middleRect: r(layout.middleRect),
+    spots: layout.spots.map((s) => ({
+      ...s,
+      at: { x: s.at.x * scale, y: s.at.y * scale },
+      box: r(s.box),
+      label: r(s.label),
+      bet: r(s.bet),
+      front: r(s.front),
+    })),
+    felt: r(layout.felt),
+    feltRadius: layout.feltRadius * scale,
+    width: layout.width * scale,
+    height: layout.height * scale,
+    areaHeight: layout.areaHeight * scale,
   };
 }
 
@@ -126,6 +207,10 @@ function apart(a: Rect, b: Rect) {
 /** Whether anything covers anything else, or leaves the table's area. A seat's label and bet
  * sit on its edges on purpose. */
 export function overlaps(layout: TableLayout, width: number): boolean {
+  // The cards and chips in front of each seat, and the middle, lie on the felt.
+  const { felt, feltRadius } = layout;
+  if (!onFelt(layout.middleRect, felt, feltRadius)) return true;
+  if (layout.spots.some((s) => !onFelt(s.front, felt, feltRadius))) return true;
   const items: { seat: number; part: string; r: Rect }[] = [
     { seat: -1, part: "middle", r: layout.middleRect },
   ];
@@ -145,18 +230,33 @@ export function overlaps(layout: TableLayout, width: number): boolean {
   return false;
 }
 
-/** The table for a width and a screen: about as tall as fits the screen with the game around it
- * (a little taller than wide, like a real table), then taller if needed until nothing overlaps. */
-export function tableLayout(
-  width: number,
-  screenHeight: number,
+/** How the table is drawn in a box: `layout` in points on the screen, everything `scale` times
+ * its normal size. */
+export type FittedTable = { layout: TableLayout; scale: number };
+
+const BIGGEST = 1.7;
+const SMALLEST = 0.5;
+/** Never taller than this times its width, so it still looks like a table. */
+const TALLEST = 1.5;
+
+/** The biggest the table can be drawn in a box with nothing overlapping: tries sizes from the
+ * biggest down, each with side seats' things beside them and then under them. */
+export function fitTable(
+  boxWidth: number,
+  boxHeight: number,
   seats: number,
   bottomSeat: number,
-): TableLayout {
-  const wanted = Math.round(Math.max(width, Math.min(width * 1.3, screenHeight * 0.55 - TOP_ROOM)));
-  let layout = placeAll(width, wanted, seats, bottomSeat);
-  for (let height = wanted; height <= wanted + 600 && overlaps(layout, width); height += 4) {
-    layout = placeAll(width, height, seats, bottomSeat);
+): FittedTable {
+  let last: FittedTable | null = null;
+  for (let scale = BIGGEST; scale >= SMALLEST; scale -= 0.02) {
+    const width = boxWidth / scale;
+    const height = Math.min(boxHeight / scale - TOP_ROOM - BOTTOM_ROOM, width * TALLEST);
+    if (height < SEAT_H * 2) continue;
+    for (const below of [false, true]) {
+      const layout = placeAll(width, height, seats, bottomSeat, below);
+      last = { layout: scaled(layout, scale), scale };
+      if (!overlaps(layout, width)) return last;
+    }
   }
-  return layout;
+  return last ?? { layout: placeAll(boxWidth, boxWidth, seats, bottomSeat), scale: 1 };
 }

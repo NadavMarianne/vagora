@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import Reanimated, { FadeInDown, FadeOut } from "react-native-reanimated";
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AmountSlider, POKER } from "@/components/amount-slider";
 import { PokerTableView } from "@/components/poker-table";
@@ -41,7 +42,7 @@ const STILL_TO_DEAL: Record<string, string> = {
 };
 
 const STREET_NAMES: Record<string, string> = {
-  preflop: "Before the flop",
+  preflop: "Pre-flop",
   flop: "The flop",
   turn: "The turn",
   river: "The river",
@@ -64,6 +65,8 @@ export default function TableScreen() {
   useReloadAt([data?.table.hand?.turn_ends_at], reload);
   // Before sitting down: the empty seat tapped on the table.
   const [picked, setPicked] = useState<number | null>(null);
+  const styles = useStyles(makeStyles);
+  const insets = useSafeAreaInsets();
 
   if (!data) {
     return (
@@ -76,44 +79,57 @@ export default function TableScreen() {
   const { market, table } = data;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
-  // Playing a hand: only what the hand needs, so it all fits on the screen without scrolling.
-  const inGame = playing && table.my_seat !== null;
+  const openPlayer = (username: string) => router.push(`/markets/${id}/members/${username}`);
+
+  // Sitting at the table: one screen without scrolling. The table takes all the room the
+  // buttons below it leave.
+  if (table.my_seat !== null) {
+    return (
+      <View style={[styles.seated, { paddingBottom: 10 + insets.bottom }]}>
+        <Stack.Screen options={{ title: table.name }} />
+        <PokerTableView
+          table={table}
+          picked={null}
+          onPick={() => {}}
+          onOpenPlayer={openPlayer}
+          fill
+        />
+        {hand && <HandPanel table={table} hand={hand} url={url} reload={reload} />}
+        {!playing && <DealButton table={table} url={url} reload={reload} />}
+        {!playing && (
+          <MySeat
+            table={table}
+            url={url}
+            balance={market.my_balance}
+            currency={market.currency_name}
+            reload={reload}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <Screen>
       <Stack.Screen options={{ title: table.name }} />
-      {!inGame && (
       <Body>
         Blinds {table.small_blind}/{table.big_blind} · buy-in {table.min_buy_in.toLocaleString()} to{" "}
         {table.max_buy_in.toLocaleString()} {market.currency_name}
         {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
-      )}
 
-      <PokerTableView
-        table={table}
-        picked={picked}
-        onPick={setPicked}
-        onOpenPlayer={(username) => router.push(`/markets/${id}/members/${username}`)}
-      />
+      <PokerTableView table={table} picked={picked} onPick={setPicked} onOpenPlayer={openPlayer} />
 
       {hand && <HandPanel table={table} hand={hand} url={url} reload={reload} />}
 
-      {table.my_seat !== null && !playing && <DealButton table={table} url={url} reload={reload} />}
-
-      {table.my_seat === null ? (
-        <SitDown
-          table={table}
-          seat={picked}
-          url={url}
-          balance={market.my_balance}
-          currency={market.currency_name}
-          reload={reload}
-        />
-      ) : (
-        !inGame && <MySeat table={table} url={url} balance={market.my_balance}
-          currency={market.currency_name} reload={reload} />
-      )}
+      <SitDown
+        table={table}
+        seat={picked}
+        url={url}
+        balance={market.my_balance}
+        currency={market.currency_name}
+        reload={reload}
+      />
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
     </Screen>
@@ -679,26 +695,25 @@ function MySeat({
       </Card>
     );
   }
+  // One row, so the table keeps its room.
   return (
-    <Card style={styles.mySeat}>
-      {(canTopUp || canCashOut) && (
-        <View style={styles.buttons}>
-          {canTopUp && (
-            <View style={styles.half}>
-              <Button title="Add chips" kind="secondary" onPress={() => start("top-up")} />
-            </View>
-          )}
-          {canCashOut && (
-            <View style={styles.half}>
-              <Button title="Cash out" kind="secondary" onPress={() => start("cash-out")} />
-            </View>
-          )}
+    <View style={styles.buttons}>
+      {canTopUp && (
+        <View style={styles.half}>
+          <Button title="Add chips" kind="secondary" onPress={() => start("top-up")} />
+        </View>
+      )}
+      {canCashOut && (
+        <View style={styles.half}>
+          <Button title="Cash out" kind="secondary" onPress={() => start("cash-out")} />
         </View>
       )}
       {canLeave && (
-        <Button title="Get up from the table" kind="secondary" onPress={() => start("leave")} />
+        <View style={styles.half}>
+          <Button title="Get up" kind="secondary" onPress={() => start("leave")} />
+        </View>
       )}
-    </Card>
+    </View>
   );
 }
 
@@ -732,6 +747,13 @@ function CloseTable({
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
+    seated: {
+      flex: 1,
+      gap: 10,
+      paddingTop: 6,
+      paddingHorizontal: 12,
+      backgroundColor: t.colors.background,
+    },
     small: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     panel: { gap: 10 },
     street: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
