@@ -9,9 +9,9 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     services:
-      # A throwaway database for the tests, same version as the dev container.
+      # A throwaway database for the tests, same version as the dev container and production.
       db:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: vagora
           POSTGRES_PASSWORD: vagora
