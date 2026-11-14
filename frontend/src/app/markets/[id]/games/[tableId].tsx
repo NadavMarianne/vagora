@@ -16,7 +16,6 @@ import {
   Info,
   Loading,
   Screen,
-  TimeLeft,
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useStyles } from "@/lib/theme";
@@ -77,15 +76,19 @@ export default function TableScreen() {
   const { market, table } = data;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
+  // Playing a hand: only what the hand needs, so it all fits on the screen without scrolling.
+  const inGame = playing && table.my_seat !== null;
 
   return (
     <Screen>
       <Stack.Screen options={{ title: table.name }} />
+      {!inGame && (
       <Body>
         Blinds {table.small_blind}/{table.big_blind} · buy-in {table.min_buy_in.toLocaleString()} to{" "}
         {table.max_buy_in.toLocaleString()} {market.currency_name}
         {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
+      )}
 
       <Balances
         currency={market.currency_name}
@@ -113,7 +116,7 @@ export default function TableScreen() {
           reload={reload}
         />
       ) : (
-        <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
+        !inGame && <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
       )}
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
@@ -185,9 +188,12 @@ function HandPanel({
   const betting = hand.street !== "showdown" && hand.street !== "done";
   return (
     <Card style={styles.panel}>
-      <Text style={styles.street}>
-        Hand {hand.number} · {STREET_NAMES[hand.street]}
-      </Text>
+      {/* During the hand the table shows the round. */}
+      {hand.street === "done" && (
+        <Text style={styles.street}>
+          Hand {hand.number} · {STREET_NAMES[hand.street]}
+        </Text>
+      )}
       {betting && (hand.waiting_for_cards || !table.turn_seconds) && (
         <Info>{DEAL[hand.street]}</Info>
       )}
@@ -227,7 +233,7 @@ function HandPanel({
 
       {hand.street !== "done" && hand.log.length > 0 && (
         <View style={styles.log}>
-          {hand.log.slice(-4).map((entry, i) => (
+          {hand.log.slice(-2).map((entry, i) => (
             <Text key={i} style={styles.small}>
               {describe(table, entry)}
             </Text>
@@ -296,15 +302,6 @@ function MyTurn({
 
   return (
     <View style={styles.turn}>
-      <Text style={styles.yourTurn}>
-        Your turn
-        {hand.turn_ends_at && (
-          <Text style={styles.small}>
-            {" · "}
-            <TimeLeft until={hand.turn_ends_at} />
-          </Text>
-        )}
-      </Text>
       {foldArmed ? (
         <View style={styles.buttons}>
           <View style={styles.half}>

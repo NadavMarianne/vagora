@@ -5,8 +5,14 @@
 // Everything moves: cards fly out from the middle when dealt, the board flips in, bets slide
 // into the pot when a round ends, winnings slide to the winner, and whoever's turn it is glows.
 import { useEffect, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
-import Reanimated, { FadeIn, FadeOut, FlipInYRight, Keyframe } from "react-native-reanimated";
+import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import Reanimated, {
+  Easing as ReEasing,
+  FadeIn,
+  FadeOut,
+  FlipInYRight,
+  Keyframe,
+} from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
 
 import { POKER } from "@/components/amount-slider";
@@ -53,7 +59,8 @@ function flyIn(from: Point, turn: number, duration: number, delay = 0) {
     100: {
       opacity: 1,
       transform: [{ translateX: 0 }, { translateY: 0 }, { rotate: "0deg" }],
-      easing: Easing.out(Easing.cubic),
+      // Keyframes run on the UI thread, so they need Reanimated's Easing.
+      easing: ReEasing.out(ReEasing.cubic),
     },
   })
     .duration(duration)
@@ -84,7 +91,12 @@ export function PokerTableView({
 }) {
   const styles = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
-  const height = Math.round(width * 1.5);
+  // Tall like a real table, but at most about half the screen, so the whole game fits without
+  // scrolling.
+  const screen = useWindowDimensions();
+  const height = Math.round(
+    Math.max(width * 0.95, Math.min(width * 1.5, screen.height * 0.5 - TOP_ROOM - BOTTOM_ROOM)),
+  );
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
   const n = table.max_players;
