@@ -2,6 +2,7 @@
 // The cards are real; this screen tells the dealer what to deal and keeps the chips.
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
+import Reanimated, { FadeInDown, FadeOut } from "react-native-reanimated";
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountSlider, POKER } from "@/components/amount-slider";
@@ -86,7 +87,18 @@ export default function TableScreen() {
         {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
 
-      <PokerTableView table={table} picked={picked} onPick={setPicked} />
+      <Balances
+        currency={market.currency_name}
+        balance={market.my_balance}
+        atTable={table.seats.find((s) => s.number === table.my_seat)?.stack ?? null}
+      />
+
+      <PokerTableView
+        table={table}
+        picked={picked}
+        onPick={setPicked}
+        onOpenPlayer={(username) => router.push(`/markets/${id}/members/${username}`)}
+      />
 
       {hand && <HandPanel table={table} hand={hand} url={url} reload={reload} />}
 
@@ -106,6 +118,33 @@ export default function TableScreen() {
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
     </Screen>
+  );
+}
+
+/** Your coins: in the market's balance, at this table, and the two together. */
+function Balances({
+  currency,
+  balance,
+  atTable,
+}: {
+  currency: string;
+  balance: number;
+  atTable: number | null;
+}) {
+  const styles = useStyles(makeStyles);
+  const parts = [{ label: `Your ${currency}`, value: balance }];
+  if (atTable !== null) {
+    parts.push({ label: "At this table", value: atTable }, { label: "Total", value: balance + atTable });
+  }
+  return (
+    <View style={styles.balances}>
+      {parts.map((part, i) => (
+        <View key={part.label} style={[styles.balance, i === parts.length - 1 && styles.balanceTotal]}>
+          <Text style={styles.balanceLabel}>{part.label}</Text>
+          <Text style={styles.balanceValue}>{part.value.toLocaleString()}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -153,7 +192,11 @@ function HandPanel({
         <Info>{DEAL[hand.street]}</Info>
       )}
       {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
-      {hand.waiting_for_cards && <CardsOut table={table} hand={hand} url={url} reload={reload} />}
+      {hand.waiting_for_cards && (
+        <Reanimated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(150)}>
+          <CardsOut table={table} hand={hand} url={url} reload={reload} />
+        </Reanimated.View>
+      )}
       {hand.street !== "done" && hand.pots.length > 1 && (
         <Text style={styles.small}>
           {hand.pots
@@ -162,11 +205,25 @@ function HandPanel({
         </Text>
       )}
       {/* A fresh one each turn, so an old raise amount doesn't stay. */}
-      {hand.my_turn && <MyTurn key={hand.log.length} table={table} hand={hand} url={url} reload={reload} />}
-      {hand.street === "showdown" && (
-        <Showdown key={hand.number} table={table} hand={hand} url={url} reload={reload} />
+      {hand.my_turn && (
+        <Reanimated.View
+          key={hand.log.length}
+          entering={FadeInDown.duration(300)}
+          exiting={FadeOut.duration(150)}
+        >
+          <MyTurn table={table} hand={hand} url={url} reload={reload} />
+        </Reanimated.View>
       )}
-      {hand.street === "done" && <Result table={table} hand={hand} />}
+      {hand.street === "showdown" && (
+        <Reanimated.View key={hand.number} entering={FadeInDown.duration(300)}>
+          <Showdown table={table} hand={hand} url={url} reload={reload} />
+        </Reanimated.View>
+      )}
+      {hand.street === "done" && (
+        <Reanimated.View entering={FadeInDown.duration(300).delay(500)}>
+          <Result table={table} hand={hand} />
+        </Reanimated.View>
+      )}
 
       {hand.street !== "done" && hand.log.length > 0 && (
         <View style={styles.log}>
@@ -708,4 +765,17 @@ const makeStyles = (t: Theme) =>
     claimLine: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
     log: { gap: 2, borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
     mySeat: { gap: 10 },
+    balances: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+    balance: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: t.radius.card,
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.surface,
+    },
+    balanceTotal: { borderColor: POKER.gold[0] },
+    balanceLabel: { fontSize: 11, fontFamily: t.fonts.regular, color: t.colors.muted },
+    balanceValue: { fontSize: 17, fontFamily: t.fonts.bold, color: t.colors.text },
   });
