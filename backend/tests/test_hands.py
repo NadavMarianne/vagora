@@ -40,6 +40,24 @@ def act(client, url, action, amount=None):
     return response.json()
 
 
+def timed(dana, url):
+    """Gives the table a 30 second turn timer."""
+    dana.put(url, json={"name": "Hotel", "small_blind": 5, "min_buy_in": 100, "turn_seconds": 30})
+
+
+def cards_out(client, url):
+    response = client.post(f"{url}/hands/current/cards-out")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def move_turn_start_back(db, **ago):
+    db.execute(
+        update(PokerHand).values(turn_started_at=PokerHand.turn_started_at - timedelta(**ago))
+    )
+    db.flush()
+
+
 def stacks(table):
     return {s["number"]: s["stack"] for s in table["seats"]}
 
@@ -225,15 +243,13 @@ def test_leaving_the_market_folds_you_out_of_the_hand(game, db):
 
 def test_a_turn_that_runs_out_checks_or_folds(game, db):
     dana, noa, url, market_id = game
-    dana.put(url, json={"name": "Hotel", "small_blind": 5, "min_buy_in": 100, "turn_seconds": 30})
-    table = dana.post(f"{url}/hands").json()
+    timed(dana, url)
+    dana.post(f"{url}/hands")
+    table = cards_out(dana, url)
     assert table["hand"]["turn_ends_at"] is not None
 
     # Dana's turn (5 to call) ran out a minute ago.
-    db.execute(
-        update(PokerHand).values(turn_started_at=PokerHand.turn_started_at - timedelta(minutes=1))
-    )
-    db.flush()
+    move_turn_start_back(db, minutes=1)
 
     table = noa.get(url).json()
 
@@ -250,18 +266,16 @@ def test_a_turn_that_runs_out_checks_or_folds(game, db):
 
 def test_a_turn_that_runs_out_tells_everyone(game, db, monkeypatch):
     dana, noa, url, _ = game
-    dana.put(url, json={"name": "Hotel", "small_blind": 5, "min_buy_in": 100, "turn_seconds": 30})
+    timed(dana, url)
     dana.post(f"{url}/hands")
+    cards_out(dana, url)
     told = []
     monkeypatch.setattr(signals, "notify_market", lambda *args, **kwargs: told.append(args))
 
     noa.get(url)  # nothing ran out yet: nobody needs telling
     assert told == []
 
-    db.execute(
-        update(PokerHand).values(turn_started_at=PokerHand.turn_started_at - timedelta(minutes=1))
-    )
-    db.flush()
+    move_turn_start_back(db, minutes=1)
     noa.get(url)
 
     assert len(told) == 1
@@ -302,3 +316,111 @@ def test_no_cashing_out_more_than_the_stack_or_during_your_hand(game):
     dana.post(f"{url}/hands")
 
     assert dana.post(f"{url}/cash-out", json={"amount": 5}).status_code == 409
+
+
+def test_every_action_starts_the_next_turn_with_the_whole_time(game, db):
+    dana, noa, url, _ = game
+    timed(dana, url)
+    dana.post(f"{url}/hands")
+    cards_out(dana, url)
+    move_turn_start_back(db, seconds=25)  # Dana thinks for 25 of her 30 seconds
+
+    table = act(dana, url, "call")
+
+    # Noa gets 30 seconds of his own, not Dana's last 5.
+    assert table["hand"]["to_act"] == 1
+    move_turn_start_back(db, seconds=10)
+    assert noa.get(url).json()["hand"]["my_turn"] is not None
+
+
+def test_with_a_timer_each_round_waits_for_its_cards(game, db):
+    dana, noa, url, _ = game
+    timed(dana, url)
+
+    hand = dana.post(f"{url}/hands").json()["hand"]
+
+    assert (hand["waiting_for_cards"], hand["turn_ends_at"], hand["my_turn"]) == (True, None, None)
+    assert hand["i_say_cards_out"] is True and hand["dealer_seat"] == 0
+    assert noa.get(url).json()["hand"]["i_say_cards_out"] is False
+    # No time runs out while the cards are dealt, and nobody bets.
+    move_turn_start_back(db, minutes=5)
+    assert noa.get(url).json()["hand"]["to_act"] == 0
+    assert dana.post(f"{url}/hands/current/act", json={"action": "call"}).status_code == 409
+    assert noa.post(f"{url}/hands/current/cards-out").status_code == 409
+
+    hand = cards_out(dana, url)["hand"]
+    assert hand["waiting_for_cards"] is False and hand["turn_ends_at"] is not None
+    act(dana, url, "call")
+    hand = act(noa, url, "check")["hand"]
+
+    # The flop: dealt first, then bet on.
+    assert (hand["street"], hand["waiting_for_cards"]) == ("flop", True)
+    assert cards_out(dana, url)["hand"]["street"] == "flop"
+    assert dana.post(f"{url}/hands/current/cards-out").status_code == 409
+
+
+def test_without_a_timer_nobody_waits_for_cards(game):
+    dana, _, url, _ = game
+
+    hand = dana.post(f"{url}/hands").json()["hand"]
+
+    assert hand["waiting_for_cards"] is False
+    assert hand["my_turn"] is not None
+
+
+def test_when_the_dealer_gets_up_anyone_in_the_hand_says_the_cards_are_out(member, game):
+    dana, noa, url, market_id = game
+    tal = member("tal_b")
+    invite = dana.post(f"/markets/{market_id}/invites", json={"username": "tal_b"}).json()
+    tal.post(f"/invites/{invite['id']}/accept")
+    tal.post(f"{url}/sit", json={"buy_in": 300, "seat": 2})
+    timed(dana, url)
+    tal.post(f"{url}/hands")  # Tal deals: button 0, small blind 1, big blind 2 (Tal)
+    cards_out(tal, url)
+    act(dana, url, "call")
+    act(noa, url, "call")
+    hand = act(tal, url, "fold")["hand"]
+    assert (hand["street"], hand["waiting_for_cards"]) == ("flop", True)
+
+    tal.post(f"{url}/leave")
+
+    hand = noa.get(url).json()["hand"]
+    assert hand["dealer_seat"] is None and hand["i_say_cards_out"] is True
+    assert cards_out(dana, url)["hand"]["waiting_for_cards"] is False
+
+
+def test_the_big_blind_can_still_raise_when_everyone_just_called(game):
+    dana, noa, url, _ = game
+    dana.post(f"{url}/hands")
+
+    table = act(dana, url, "call")  # the small blind (and button) only calls
+
+    hand = table["hand"]
+    assert (hand["street"], hand["to_act"]) == ("preflop", 1)
+    assert noa.get(url).json()["hand"]["my_turn"] == {
+        "to_call": 0,
+        "can_check": True,
+        "raise_min": 20,
+        "raise_max": 500,
+    }
+    # The big blind raises: the round goes on, back to the small blind.
+    hand = act(noa, url, "raise", 30)["hand"]
+    assert (hand["street"], hand["to_act"]) == ("preflop", 0)
+    hand = act(dana, url, "call")["hand"]
+    assert hand["street"] == "flop"
+
+
+def test_the_big_blind_checking_ends_the_round(member, game):
+    dana, noa, url, market_id = game
+    tal = member("tal_b")
+    invite = dana.post(f"/markets/{market_id}/invites", json={"username": "tal_b"}).json()
+    tal.post(f"/invites/{invite['id']}/accept")
+    tal.post(f"{url}/sit", json={"buy_in": 300, "seat": 2})
+    dana.post(f"{url}/hands")  # button 0, small blind 1, big blind 2
+    act(dana, url, "call")
+    hand = act(noa, url, "call")["hand"]
+    assert (hand["street"], hand["to_act"]) == ("preflop", 2)
+
+    hand = act(tal, url, "check")["hand"]
+
+    assert hand["street"] == "flop"

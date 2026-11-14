@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AmountSlider, POKER } from "@/components/amount-slider";
+import { PokerTableView } from "@/components/poker-table";
 import { Chips } from "@/components/controls";
 import {
   Body,
@@ -61,6 +62,8 @@ export default function TableScreen() {
     }, [id, url]),
   );
   useReloadAt([data?.table.hand?.turn_ends_at], reload);
+  // Before sitting down: the empty seat tapped on the table.
+  const [picked, setPicked] = useState<number | null>(null);
 
   if (!data) {
     return (
@@ -83,14 +86,20 @@ export default function TableScreen() {
         {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
 
-      <Seats table={table} />
+      <PokerTableView table={table} picked={picked} onPick={setPicked} />
 
       {hand && <HandPanel table={table} hand={hand} url={url} reload={reload} />}
 
       {table.my_seat !== null && !playing && <DealButton table={table} url={url} reload={reload} />}
 
       {table.my_seat === null ? (
-        <SitDown table={table} url={url} balance={market.my_balance} reload={reload} />
+        <SitDown
+          table={table}
+          seat={picked}
+          url={url}
+          balance={market.my_balance}
+          reload={reload}
+        />
       ) : (
         <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
       )}
@@ -105,52 +114,6 @@ function seatName(table: PokerTable, seat: number): string {
   const player = table.seats.find((s) => s.number === seat);
   if (!player) return `Seat ${seat + 1}`;
   return player.number === table.my_seat ? "You" : player.display_name;
-}
-
-function Seats({ table }: { table: PokerTable }) {
-  const styles = useStyles(makeStyles);
-  const hand = table.hand;
-  const playing = hand !== null && hand.street !== "done";
-  return (
-    <View style={styles.seats}>
-      {table.seats.map((seat) => {
-        const inHand = playing ? hand.players.find((p) => p.seat === seat.number) : undefined;
-        const marks = [
-          hand?.button === seat.number && "Dealer",
-          playing && hand.small_blind_seat === seat.number && "SB",
-          playing && hand.big_blind_seat === seat.number && "BB",
-        ].filter(Boolean);
-        const turn = playing && hand.to_act === seat.number;
-        const state = !playing
-          ? ""
-          : !inHand
-            ? "next hand"
-            : inHand.folded
-              ? "folded"
-              : inHand.all_in
-                ? "all-in"
-                : inHand.street_bet > 0
-                  ? `bet ${inHand.street_bet.toLocaleString()}`
-                  : "";
-        return (
-          <View
-            key={seat.number}
-            style={[styles.seat, turn && styles.seatTurn, inHand?.folded && styles.seatFolded]}
-          >
-            <View style={styles.seatText}>
-              <Text style={styles.seatName}>
-                {seat.number === table.my_seat ? "You" : seat.display_name}
-                {marks.length > 0 && <Text style={styles.marks}> · {marks.join(" · ")}</Text>}
-              </Text>
-              {state !== "" && <Text style={styles.small}>{state}</Text>}
-            </View>
-            <Text style={styles.stack}>{seat.stack.toLocaleString()}</Text>
-          </View>
-        );
-      })}
-      {table.seats.length === 0 && <Body>Nobody is sitting here yet.</Body>}
-    </View>
-  );
 }
 
 /** "Noa raised to 40", for the last few things that happened. */
@@ -180,37 +143,22 @@ function HandPanel({
   reload: () => void;
 }) {
   const styles = useStyles(makeStyles);
-  const pot = hand.pots.reduce((sum, p) => sum + p.amount, 0);
   const betting = hand.street !== "showdown" && hand.street !== "done";
   return (
     <Card style={styles.panel}>
       <Text style={styles.street}>
         Hand {hand.number} · {STREET_NAMES[hand.street]}
       </Text>
-      {betting && <Info>{DEAL[hand.street]}</Info>}
-      {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
-
-      {hand.street !== "done" && (
-        <Text style={styles.pot}>
-          Pot {pot.toLocaleString()}
-          {hand.pots.length > 1 && (
-            <Text style={styles.small}>
-              {" "}
-              ({hand.pots.map((p, i) => `${i === 0 ? "main" : "side"} ${p.amount}`).join(", ")})
-            </Text>
-          )}
-        </Text>
+      {betting && (hand.waiting_for_cards || !table.turn_seconds) && (
+        <Info>{DEAL[hand.street]}</Info>
       )}
-
-      {betting && hand.to_act !== null && !hand.my_turn && (
-        <Text style={styles.waiting}>
-          {seatName(table, hand.to_act)}’s turn
-          {hand.turn_ends_at && (
-            <Text style={styles.small}>
-              {" · "}
-              <TimeLeft until={hand.turn_ends_at} />
-            </Text>
-          )}
+      {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
+      {hand.waiting_for_cards && <CardsOut table={table} hand={hand} url={url} reload={reload} />}
+      {hand.street !== "done" && hand.pots.length > 1 && (
+        <Text style={styles.small}>
+          {hand.pots
+            .map((p, i) => `${i === 0 ? "Main pot" : `side pot ${i}`} ${p.amount.toLocaleString()}`)
+            .join(", ")}
         </Text>
       )}
       {/* A fresh one each turn, so an old raise amount doesn't stay. */}
@@ -230,6 +178,36 @@ function HandPanel({
         </View>
       )}
     </Card>
+  );
+}
+
+/** With a turn timer, each round waits for its cards: the dealer says when they're out. */
+function CardsOut({
+  table,
+  hand,
+  url,
+  reload,
+}: {
+  table: PokerTable;
+  hand: PokerHand;
+  url: string;
+  reload: () => void;
+}) {
+  const { run, error } = useAction(reload);
+  if (!hand.i_say_cards_out) {
+    const dealer = hand.dealer_seat !== null ? seatName(table, hand.dealer_seat) : "The dealer";
+    return <Body>{dealer} is dealing. Betting and the timer start once the cards are out.</Body>;
+  }
+  return (
+    <>
+      <Button
+        title="Cards are out"
+        colors={POKER.gold}
+        onPress={() => run(() => api(`${url}/hands/current/cards-out`, { method: "POST" }))}
+      />
+      <Body>You dealt this hand. Tap once the cards are on the table, and the timer starts.</Body>
+      <ErrorText>{error}</ErrorText>
+    </>
   );
 }
 
@@ -509,11 +487,14 @@ function DealButton({
 
 function SitDown({
   table,
+  seat,
   url,
   balance,
   reload,
 }: {
   table: PokerTable;
+  /** The empty seat picked on the table. */
+  seat: number | null;
   url: string;
   balance: number;
   reload: () => void;
@@ -530,10 +511,13 @@ function SitDown({
       </Body>
     );
   }
+  if (seat === null || table.seats.some((s) => s.number === seat)) {
+    return <Body>Tap an empty seat on the table to sit there.</Body>;
+  }
   return (
     <Card>
       <AmountSlider
-        label={`Buy-in (you have ${balance.toLocaleString()})`}
+        label={`Seat ${seat + 1}. Buy-in (you have ${balance.toLocaleString()})`}
         min={table.min_buy_in}
         max={most}
         value={buyIn}
@@ -543,7 +527,7 @@ function SitDown({
       />
       <Button
         title={`Sit down with ${buyIn.toLocaleString()}`}
-        onPress={() => run(() => api(`${url}/sit`, { method: "POST", body: { buy_in: buyIn } }))}
+        onPress={() => run(() => api(`${url}/sit`, { method: "POST", body: { buy_in: buyIn, seat } }))}
       />
       <ErrorText>{error}</ErrorText>
     </Card>
@@ -693,29 +677,9 @@ function CloseTable({
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
-    seats: { gap: 8 },
-    seat: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 14,
-      borderRadius: t.radius.card,
-      borderWidth: t.borderWidth,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.surface,
-    },
-    seatTurn: { borderColor: t.colors.primary, borderWidth: Math.max(2, t.borderWidth) },
-    seatFolded: { opacity: 0.5 },
-    seatText: { flex: 1, gap: 2 },
-    seatName: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
-    marks: { fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.primary },
-    stack: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
     small: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     panel: { gap: 10 },
     street: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
-    pot: { fontSize: 22, fontFamily: t.fonts.bold, color: t.colors.text },
-    waiting: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
     turn: { gap: 10 },
     yourTurn: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.primary },
     buttons: { flexDirection: "row", gap: 10 },

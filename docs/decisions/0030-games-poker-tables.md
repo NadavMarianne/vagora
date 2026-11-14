@@ -11,10 +11,12 @@ A market gets a **Games** section. The first game is a **poker table**: the card
   - **Small blind.** The big blind is always twice the small blind, and the smallest bet is one big blind.
   - **Minimum and maximum buy-in.** By default 20 and 100 big blinds.
   - **Turn timer:** off, or a number of seconds. When it runs out, the player checks if checking is allowed, and folds otherwise.
+  - With a timer, each betting round first waits for its cards. Whoever pressed deal taps "Cards are out", and only then betting and the timer start (if the dealer got up, anyone still in the hand can tap it). Without a timer there's no wait. Added after the second test game.
 - **Sitting down:** a player chooses a buy-in between the minimum and maximum, and those coins move from their balance onto the table (a ledger entry). Coins on a table can't be spent in the store.
 - **Topping up** between hands: allowed while the stack is below the maximum buy-in, and only up to it. **Winnings are not capped:** a stack can grow past the maximum, as in a real game.
 - **Leaving** between hands: the whole stack goes back to the balance (a ledger entry). A player with no chips left sits out until they top up or leave.
 - **Cashing out part** of a stack, between your hands: that much goes back to the balance and you stay seated (added after the first test game).
+- **Choosing a seat:** the table is drawn round, with as many seats as its most players. You sit down by tapping an empty seat.
 - A hand needs at least two players with chips.
 
 ### A hand

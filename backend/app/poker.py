@@ -8,6 +8,7 @@ rules easy to test on their own.
 Seats are numbered 0 to 8 clockwise. "After" a seat means the next one clockwise.
 """
 
+import copy
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
@@ -102,7 +103,8 @@ class Hand:
 
     @classmethod
     def from_data(cls, data: dict) -> "Hand":
-        data = dict(data)
+        # A deep copy: the hand changes as it's played, and the stored data mustn't change with it.
+        data = copy.deepcopy(data)
         data["players"] = [Player(**p) for p in data["players"]]
         data["payouts"] = {int(seat): amount for seat, amount in data.get("payouts", {}).items()}
         return cls(**data)

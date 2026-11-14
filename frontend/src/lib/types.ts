@@ -350,4 +350,10 @@ export type PokerHand = {
     raise_min: number | null;
     raise_max: number | null;
   } | null;
+  /** With a turn timer: this round's cards are being dealt, so nobody bets yet. */
+  waiting_for_cards: boolean;
+  /** The seat of whoever dealt, if they're still here. */
+  dealer_seat: number | null;
+  /** Whether you're the one who says the cards are out. */
+  i_say_cards_out: boolean;
 };
