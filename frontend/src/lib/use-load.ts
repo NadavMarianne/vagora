@@ -43,23 +43,37 @@ export function useLoad<T>(load: () => Promise<T>) {
 
 // setTimeout can't wait longer than about 24 days.
 const LONGEST_WAIT_MS = 2 ** 31 - 1;
+// After a moment passes with nothing changed: try again this often, this many times.
+const RETRY_MS = 2000;
+const RETRIES = 5;
 
 /** Reloads when the next of these moments comes, like a deadline running out, so the screen
  * shows what happened without anyone touching it. */
 export function useReloadAt(moments: (string | null | undefined)[], reload: () => void) {
   // One string, so the effect only restarts when the moments really change.
   const key = moments.filter(Boolean).join("|");
+  // Reloads since the moments last changed. A phone's clock can run a little ahead of the
+  // backend's, so a reload can come too early; then it tries again a few times.
+  const [reloads, setReloads] = useState({ key, count: 0 });
+  const tries = reloads.key === key ? reloads.count : 0;
   useEffect(() => {
     const now = Date.now();
-    const next = key
+    const times = key
       .split("|")
       .filter(Boolean)
-      .map((m) => Date.parse(m))
-      .filter((t) => t > now)
-      .sort((a, b) => a - b)[0];
-    if (next === undefined) return;
+      .map((m) => Date.parse(m));
+    const next = times.filter((t) => t > now).sort((a, b) => a - b)[0];
+    // Only one that just passed: older ones were reloaded for long ago.
+    const passed = times.some((t) => t <= now && now - t < RETRY_MS * (RETRIES + 2));
+    let wait: number;
+    if (passed && tries < RETRIES) wait = RETRY_MS;
+    else if (next !== undefined) wait = Math.min(next - now + 1000, LONGEST_WAIT_MS);
+    else return;
     // A second late, so the backend sees the time as passed.
-    const timer = setTimeout(reload, Math.min(next - now + 1000, LONGEST_WAIT_MS));
+    const timer = setTimeout(() => {
+      reload();
+      setReloads((r) => ({ key, count: (r.key === key ? r.count : 0) + 1 }));
+    }, wait);
     return () => clearTimeout(timer);
-  }, [key, reload]);
+  }, [key, reload, tries]);
 }

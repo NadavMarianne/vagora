@@ -8,6 +8,7 @@ rules easy to test on their own.
 Seats are numbered 0 to 8 clockwise. "After" a seat means the next one clockwise.
 """
 
+import copy
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
@@ -102,7 +103,8 @@ class Hand:
 
     @classmethod
     def from_data(cls, data: dict) -> "Hand":
-        data = dict(data)
+        # A deep copy: the hand changes as it's played, and the stored data mustn't change with it.
+        data = copy.deepcopy(data)
         data["players"] = [Player(**p) for p in data["players"]]
         data["payouts"] = {int(seat): amount for seat, amount in data.get("payouts", {}).items()}
         return cls(**data)
@@ -149,8 +151,13 @@ def start(stacks: dict[int, int], previous_button: int | None, small_blind: int)
     _pay(small, small_blind)
     _pay(big, hand.big_blind)
     hand.log += [
-        {"seat": small.seat, "action": "small_blind", "amount": small.street_bet},
-        {"seat": big.seat, "action": "big_blind", "amount": big.street_bet},
+        {
+            "seat": small.seat,
+            "action": "small_blind",
+            "amount": small.street_bet,
+            "street": "preflop",
+        },
+        {"seat": big.seat, "action": "big_blind", "amount": big.street_bet, "street": "preflop"},
     ]
     # The amount to call is the full big blind, even when the big blind was short.
     hand.current_bet = hand.big_blind
@@ -242,7 +249,7 @@ def act(hand: Hand, seat: int, action: Action, amount: int | None = None) -> Non
         raise NotAllowed("Unknown action.")
 
     p.acted = True
-    hand.log.append({"seat": seat, "action": action, "amount": p.street_bet})
+    hand.log.append({"seat": seat, "action": action, "amount": p.street_bet, "street": hand.street})
     _move_on(hand, after=seat)
 
 
@@ -262,7 +269,9 @@ def fold_out(hand: Hand, seat: int) -> None:
         return
     if hand.street == "showdown":
         p.folded = True
-        hand.log.append({"seat": seat, "action": "fold", "amount": p.street_bet})
+        hand.log.append(
+            {"seat": seat, "action": "fold", "amount": p.street_bet, "street": hand.street}
+        )
         if len(hand.in_hand()) == 1:
             _award_all(hand, hand.in_hand()[0].seat)
         elif not contested(hand):
@@ -272,7 +281,7 @@ def fold_out(hand: Hand, seat: int) -> None:
         act(hand, seat, "fold")
         return
     p.folded = True
-    hand.log.append({"seat": seat, "action": "fold", "amount": p.street_bet})
+    hand.log.append({"seat": seat, "action": "fold", "amount": p.street_bet, "street": hand.street})
     _move_on(hand, after=hand.to_act if hand.to_act is not None else seat, keep_turn=True)
 
 

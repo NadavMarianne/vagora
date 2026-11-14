@@ -44,17 +44,28 @@ def in_current_hand(db: Session, table: PokerTable, seat: PokerSeat) -> bool:
     )
 
 
-def save(db: Session, row: PokerHand, hand: poker.Hand, at: datetime | None = None) -> None:
+def save(
+    db: Session, row: PokerHand, hand: poker.Hand, table: PokerTable, at: datetime | None = None
+) -> None:
     """Stores the hand's new state and copies its stacks onto the seats.
 
-    A new turn restarts the turn timer, from `at` (when a turn ran out) or now.
+    A new turn restarts the turn timer, from `at` (when a turn ran out) or now. With a timer, a
+    new betting round first waits for its cards to be dealt.
     """
+    street_before = row.state["street"] if row.state else None
     # Every action starts a new turn, even when the same player acts next (heads-up, the big
     # blind can end one round and start the next).
     actions_before = len(row.state["log"]) if row.state else -1
     row.state = hand.to_data()
     if len(hand.log) != actions_before or at is not None:
         row.turn_started_at = at or now()
+    if (
+        table.turn_seconds is not None
+        and hand.street != street_before
+        and hand.street in poker.BETTING
+        and hand.to_act is not None
+    ):
+        row.waiting_for_cards = True
     for player in hand.players:
         seat = db.get(PokerSeat, row.seat_ids[str(player.seat)])
         # A player who already got up keeps what they took with them.
@@ -66,17 +77,25 @@ def save(db: Session, row: PokerHand, hand: poker.Hand, at: datetime | None = No
     db.flush()
 
 
-def catch_up(db: Session, table: PokerTable) -> None:
-    """Applies the turn timer: every turn that ran out checks if it can, or folds."""
+def catch_up(db: Session, table: PokerTable) -> bool:
+    """Applies the turn timer: every turn that ran out checks if it can, or folds.
+    Returns whether any did, so the other players can be told."""
     row = current(db, table)
     if row is None or table.turn_seconds is None:
-        return
+        return False
     limit = timedelta(seconds=table.turn_seconds)
     hand = poker.Hand.from_data(row.state)
-    while hand.to_act is not None and row.turn_started_at + limit <= now():
+    ran = False
+    while (
+        hand.to_act is not None
+        and not row.waiting_for_cards
+        and row.turn_started_at + limit <= now()
+    ):
         ran_out = row.turn_started_at + limit
         poker.time_out(hand)
-        save(db, row, hand, at=ran_out)
+        save(db, row, hand, table, at=ran_out)
+        ran = True
+    return ran
 
 
 class PotView(BaseModel):
@@ -129,6 +148,13 @@ class HandView(BaseModel):
     payouts: dict[int, int]
     claim: ClaimView | None
     my_turn: MyTurn | None
+    # With a turn timer: the round's cards are being dealt. Nobody bets until they're out.
+    waiting_for_cards: bool
+    # The seat of whoever dealt, if they're still sitting here.
+    dealer_seat: int | None
+    # Whether you're the one who says the cards are out (the dealer, or anyone in the hand once
+    # the dealer has gone).
+    i_say_cards_out: bool
 
 
 def view(row: PokerHand, table: PokerTable, user: User) -> HandView:
@@ -138,7 +164,8 @@ def view(row: PokerHand, table: PokerTable, user: User) -> HandView:
         None,
     )
     my_turn = None
-    if hand.to_act is not None and hand.to_act == my_number:
+    waiting = row.waiting_for_cards and hand.to_act is not None
+    if hand.to_act is not None and hand.to_act == my_number and not waiting:
         allowed = poker.raise_range(hand, my_number)
         owed = poker.to_call(hand, my_number)
         my_turn = MyTurn(
@@ -158,7 +185,7 @@ def view(row: PokerHand, table: PokerTable, user: User) -> HandView:
         to_act=hand.to_act,
         turn_ends_at=(
             row.turn_started_at + timedelta(seconds=timer)
-            if timer is not None and hand.to_act is not None
+            if timer is not None and hand.to_act is not None and not waiting
             else None
         ),
         current_bet=hand.current_bet,
@@ -181,6 +208,25 @@ def view(row: PokerHand, table: PokerTable, user: User) -> HandView:
         payouts=hand.payouts,
         claim=ClaimView(**row.claim) if row.claim else None,
         my_turn=my_turn,
+        waiting_for_cards=waiting,
+        dealer_seat=dealer_seat(table, row),
+        i_say_cards_out=waiting and says_cards_out(table, row, user),
+    )
+
+
+def dealer_seat(table: PokerTable, row: PokerHand) -> int | None:
+    return next(
+        (s.number for s in table.seats if s.left_at is None and s.user_id == row.dealer_id), None
+    )
+
+
+def says_cards_out(table: PokerTable, row: PokerHand, user: User) -> bool:
+    """The dealer says when the cards are out. If they got up, anyone in the hand can."""
+    if dealer_seat(table, row) is not None:
+        return user.id == row.dealer_id
+    return any(
+        s.user_id == user.id and s.left_at is None and row.seat_ids.get(str(s.number)) == s.id
+        for s in table.seats
     )
 
 

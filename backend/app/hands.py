@@ -83,10 +83,11 @@ def deal(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> Tab
         number=number,
         state={},
         seat_ids={str(s.number): s.id for s in seats if s.number in {p.seat for p in hand.players}},
+        dealer_id=user.id,
     )
     db.add(row)
     db.flush()
-    hand_state.save(db, row, hand)
+    hand_state.save(db, row, hand, table)
     table.button_seat = hand.button
     return done(db, market_id, table, user)
 
@@ -99,11 +100,27 @@ def act(
     table = open_table(db, user, market_id, table_id)
     row, hand = playing(db, table)
     seat = my_number(row, table, user)
+    if row.waiting_for_cards:
+        raise conflict("Wait until the cards are out.")
     try:
         poker.act(hand, seat, body.action, body.amount)
     except poker.NotAllowed as error:
         raise conflict(str(error)) from error
-    hand_state.save(db, row, hand)
+    hand_state.save(db, row, hand, table)
+    return done(db, market_id, table, user)
+
+
+@router.post("/current/cards-out")
+def cards_out(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> TableView:
+    """The dealer says this round's cards are dealt: betting starts, and so does the timer."""
+    table = open_table(db, user, market_id, table_id)
+    row, _ = playing(db, table)
+    if not row.waiting_for_cards:
+        raise conflict("The cards are already out.")
+    if not hand_state.says_cards_out(table, row, user):
+        raise conflict("Whoever dealt says when the cards are out.")
+    row.waiting_for_cards = False
+    row.turn_started_at = hand_state.now()
     return done(db, market_id, table, user)
 
 
@@ -125,7 +142,7 @@ def claim(
     except poker.NotAllowed as error:
         raise conflict(str(error)) from error
     row.claim = {"by": seat, "winners": body.winners, "confirmed": [seat]}
-    agreed(db, row, hand)
+    agreed(db, row, hand, table)
     return done(db, market_id, table, user)
 
 
@@ -141,7 +158,7 @@ def confirm(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> 
         raise conflict("You folded this hand.")
     if seat not in row.claim["confirmed"]:
         row.claim = {**row.claim, "confirmed": [*row.claim["confirmed"], seat]}
-    agreed(db, row, hand)
+    agreed(db, row, hand, table)
     return done(db, market_id, table, user)
 
 
@@ -159,13 +176,13 @@ def reject(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> T
     return done(db, market_id, table, user)
 
 
-def agreed(db: Session, row: PokerHand, hand: poker.Hand) -> None:
+def agreed(db: Session, row: PokerHand, hand: poker.Hand, table: PokerTable) -> None:
     """Pays out the pots once everyone still in the hand agrees with the claim."""
     still_in = {p.seat for p in hand.in_hand()}
     if row.claim is None or not still_in <= set(row.claim["confirmed"]):
         return
     poker.settle(hand, row.claim["winners"])
-    hand_state.save(db, row, hand)
+    hand_state.save(db, row, hand, table)
 
 
 def fold_out(db: Session, table: PokerTable, user: User) -> None:
@@ -178,4 +195,4 @@ def fold_out(db: Session, table: PokerTable, user: User) -> None:
     poker.fold_out(hand, seat.number)
     if row.claim is not None and hand.street == "showdown":
         row.claim = None
-    hand_state.save(db, row, hand)
+    hand_state.save(db, row, hand, table)

@@ -197,6 +197,11 @@ function MenuPanel({ markets: known, onClose }: { markets: Market[]; onClose: ()
                   onPress={() => go(`/markets/${marketId}/orders`)}
                 />
                 <Item
+                  title="Games"
+                  selected={on("games")}
+                  onPress={() => go(`/markets/${marketId}/games`)}
+                />
+                <Item
                   title="Members"
                   selected={on("members")}
                   onPress={() => go(`/markets/${marketId}/members`)}

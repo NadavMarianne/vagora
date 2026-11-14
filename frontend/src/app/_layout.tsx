@@ -145,6 +145,9 @@ function Screens() {
           options={{ title: "Asked to sell" }}
         />
         <Stack.Screen name="markets/[id]/orders/index" options={{ title: "Orders" }} />
+        <Stack.Screen name="markets/[id]/games/index" options={{ title: "Games" }} />
+        <Stack.Screen name="markets/[id]/games/new" options={{ title: "Open a table" }} />
+        <Stack.Screen name="markets/[id]/games/[tableId]" options={{ title: "" }} />
         <Stack.Screen name="markets/[id]/members/[username]" options={{ title: "" }} />
         <Stack.Screen
           name="markets/[id]/limits-setup"

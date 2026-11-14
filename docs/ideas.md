@@ -37,3 +37,7 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 ## Notifications and jobs
 - Push notifications, like "your allowance arrived". This brings a scheduled job.
 - In production on paid hosting, scheduled jobs take over timed work, such as deleting old empty markets.
+
+## Games
+- Virtual cards: the app deals the cards too, each player's hand hidden on their own phone. A mode chosen when opening a table: real cards (the app is only the chips, as now) or virtual cards.
+- Table skins: decorative looks for the table (felt colors, rims, patterns) to choose from.

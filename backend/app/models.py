@@ -575,6 +575,10 @@ class PokerHand(Base):
     # At the showdown: who someone said won each pot, and who agreed so far.
     # {"by": seat, "winners": [[seats], ...], "confirmed": [seats]}
     claim: Mapped[dict | None] = mapped_column(JSONB)
+    # Who dealt it. They tell the app when the cards of each round are out (with a turn timer).
+    dealer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # With a turn timer: the round's cards are being dealt, so nobody bets and no time runs yet.
+    waiting_for_cards: Mapped[bool] = mapped_column(server_default=text("false"))
     # When the current turn began, for the table's turn timer.
     turn_started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
