@@ -90,12 +90,6 @@ export default function TableScreen() {
       </Body>
       )}
 
-      <Balances
-        currency={market.currency_name}
-        balance={market.my_balance}
-        atTable={table.seats.find((s) => s.number === table.my_seat)?.stack ?? null}
-      />
-
       <PokerTableView
         table={table}
         picked={picked}
@@ -113,10 +107,12 @@ export default function TableScreen() {
           seat={picked}
           url={url}
           balance={market.my_balance}
+          currency={market.currency_name}
           reload={reload}
         />
       ) : (
-        !inGame && <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
+        !inGame && <MySeat table={table} url={url} balance={market.my_balance}
+          currency={market.currency_name} reload={reload} />
       )}
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
@@ -158,21 +154,6 @@ function seatName(table: PokerTable, seat: number): string {
   return player.number === table.my_seat ? "You" : player.display_name;
 }
 
-/** "Noa raised to 40", for the last few things that happened. */
-function describe(table: PokerTable, entry: PokerHand["log"][number]): string {
-  const who = seatName(table, entry.seat);
-  const amount = entry.amount.toLocaleString();
-  const what: Record<string, string> = {
-    small_blind: `posted the small blind (${amount})`,
-    big_blind: `posted the big blind (${amount})`,
-    fold: "folded",
-    check: "checked",
-    call: `called (${amount} in this round)`,
-    raise: `raised to ${amount}`,
-  };
-  return `${who} ${what[entry.action] ?? entry.action}${entry.timed_out ? ", time ran out" : ""}`;
-}
-
 function HandPanel({
   table,
   hand,
@@ -186,12 +167,14 @@ function HandPanel({
 }) {
   const styles = useStyles(makeStyles);
   const betting = hand.street !== "showdown" && hand.street !== "done";
-  // Whether anything shows above the last actions, so a line can go between them.
-  const somethingAbove =
-    (betting && (hand.waiting_for_cards || !table.turn_seconds)) ||
-    hand.street === "showdown" ||
-    (hand.street !== "done" && hand.pots.length > 1) ||
-    hand.my_turn !== null;
+  // Someone else's turn with nothing to deal or decide: the table says it all.
+  const empty =
+    betting &&
+    !hand.waiting_for_cards &&
+    !!table.turn_seconds &&
+    hand.pots.length <= 1 &&
+    hand.my_turn === null;
+  if (empty) return null;
   return (
     <Card style={styles.panel}>
       {/* During the hand the table shows the round. */}
@@ -235,17 +218,6 @@ function HandPanel({
         <Reanimated.View entering={FadeInDown.duration(300).delay(500)}>
           <Result table={table} hand={hand} />
         </Reanimated.View>
-      )}
-
-      {hand.street !== "done" && hand.log.length > 0 && (
-        // A line between it and anything above it.
-        <View style={[styles.log, hand.log.length > 0 && somethingAbove && styles.logLine]}>
-          {hand.log.slice(-4).map((entry, i) => (
-            <Text key={i} style={styles.small} numberOfLines={1}>
-              {describe(table, entry)}
-            </Text>
-          ))}
-        </View>
       )}
     </Card>
   );
@@ -563,6 +535,7 @@ function SitDown({
   seat,
   url,
   balance,
+  currency,
   reload,
 }: {
   table: PokerTable;
@@ -570,6 +543,7 @@ function SitDown({
   seat: number | null;
   url: string;
   balance: number;
+  currency: string;
   reload: () => void;
 }) {
   const most = Math.min(table.max_buy_in, balance);
@@ -589,6 +563,7 @@ function SitDown({
   }
   return (
     <Card>
+      <Balances currency={currency} balance={balance} atTable={null} />
       <AmountSlider
         label={`Seat ${seat + 1}. Buy-in (you have ${balance.toLocaleString()})`}
         min={table.min_buy_in}
@@ -612,11 +587,13 @@ function MySeat({
   table,
   url,
   balance,
+  currency,
   reload,
 }: {
   table: PokerTable;
   url: string;
   balance: number;
+  currency: string;
   reload: () => void;
 }) {
   const styles = useStyles(makeStyles);
@@ -644,9 +621,13 @@ function MySeat({
       setDoing(null);
     });
 
+  const balances = (
+    <Balances currency={currency} balance={balance} atTable={me.stack} />
+  );
   if (doing === "top-up" && canTopUp) {
     return (
       <Card style={styles.mySeat}>
+        {balances}
         <AmountSlider
           label={`Add chips (up to ${room.toLocaleString()})`}
           min={1}
@@ -668,6 +649,7 @@ function MySeat({
   if (doing === "cash-out" && canCashOut) {
     return (
       <Card style={styles.mySeat}>
+        {balances}
         <AmountSlider
           label="Take chips back to your balance"
           min={1}
@@ -768,8 +750,6 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.colors.background,
     },
     claimLine: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
-    log: { gap: 2 },
-    logLine: { borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
     mySeat: { gap: 10 },
     balances: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
     balance: {

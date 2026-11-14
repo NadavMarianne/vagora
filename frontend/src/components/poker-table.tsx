@@ -1,9 +1,10 @@
 // A poker table drawn from above: a felt table with a place for every seat (as many as the table's
-// most players), your seat at the bottom, and in the middle the round, the board, the turn timer
+// most players), your seat at the bottom, and in the middle whose turn, the board, the turn timer
 // and the pot. Before you sit down, tapping an empty seat picks it; tapping a player opens their
-// page. On each seat: their last action on top, their bet in chips underneath, and outlines of
-// their two cards. The cards are real, so the table only shows where they are: outlines with a
-// question mark. Where everything goes is worked out in poker-layout.ts, so nothing overlaps.
+// page. On each seat's top edge their last action, on its bottom edge their bet; in front of
+// each player on the felt, their cards and their chips. The cards are real, so the table only
+// shows where they are: outlines with a question mark. Where everything goes is worked out in
+// poker-layout.ts, so nothing overlaps.
 import { useEffect, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Reanimated, { FadeIn, FadeOut, ZoomIn } from "react-native-reanimated";
@@ -14,6 +15,7 @@ import { ChipStack } from "@/components/poker-chips";
 import {
   BET_H,
   BOARD_CARD,
+  BOARD_GAP,
   LABEL_H,
   MIDDLE_GAP,
   MIDDLE_W,
@@ -21,8 +23,8 @@ import {
   RING,
   SEAT_H,
   SEAT_W,
-  tableHeight,
   tableLayout,
+  TOP_LINE_H,
   TOP_ROOM,
 } from "@/components/poker-layout";
 import { Tappable } from "@/components/tappable";
@@ -70,12 +72,12 @@ export function PokerTableView({
   const styles = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
   const screen = useWindowDimensions();
-  const height = tableHeight(width, screen.height, table.max_players);
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
   const n = table.max_players;
   // Your seat at the bottom; otherwise seat 1. Seats go clockwise from there.
-  const layout = tableLayout(width, height, n, table.my_seat ?? 0);
+  const layout = tableLayout(width, screen.height, n, table.my_seat ?? 0);
+  const height = layout.height;
 
   const pot = hand ? hand.pots.reduce((sum, p) => sum + p.amount, 0) : 0;
   const turnName =
@@ -136,7 +138,7 @@ export function PokerTableView({
               ) : null}
               {playing && pot > 0 && (
                 <View style={styles.pot}>
-                  <ChipStack amount={pot} smallBlind={table.small_blind} size="big" />
+                  <ChipStack amount={pot} smallBlind={table.small_blind} size="medium" />
                   <Text style={styles.potLabel}>Pot</Text>
                   <Text style={styles.potAmount} numberOfLines={1}>
                     <CountUp value={pot} format={(v) => short(v, 1_000_000)} />
@@ -179,14 +181,40 @@ export function PokerTableView({
                 name={number === table.my_seat ? "You" : seat.display_name}
                 stack={seat.stack}
                 note={seatNote(table, number, inHand)}
-                cards={inHand && !inHand.folded ? `${hand?.number}` : null}
-                cardsDelay={dealOrder(number) * 80}
                 dealer={hand?.button === number ? `${hand.number}` : null}
                 mine={number === table.my_seat}
                 turn={playing && hand.to_act === number && !hand.waiting_for_cards}
                 folded={inHand?.folded ?? false}
                 onPress={() => onOpenPlayer(seat.username)}
               />
+            );
+          })}
+
+          {/* In front of each player: their cards while they're in the hand, and their chips. */}
+          {layout.spots.map((spot, number) => {
+            const seat = table.seats.find((s) => s.number === number);
+            if (!seat) return null;
+            const inHand = playing ? hand.players.find((p) => p.seat === number) : undefined;
+            return (
+              <View
+                key={`front-${number}`}
+                style={[styles.front, spot.frontTall && styles.frontTall, box(spot.front)]}
+                pointerEvents="none"
+              >
+                {inHand && !inHand.folded && (
+                  <Reanimated.View
+                    // A new key each hand, so each hand deals them again.
+                    key={`cards-${hand?.number}`}
+                    entering={ZoomIn.duration(300).delay(dealOrder(number) * 90)}
+                    exiting={FadeOut.duration(250)}
+                    style={styles.holeCards}
+                  >
+                    <HoleCard tilt={-8} />
+                    <HoleCard tilt={8} />
+                  </Reanimated.View>
+                )}
+                {seat.stack > 0 && <ChipStack amount={seat.stack} smallBlind={table.small_blind} />}
+              </View>
             );
           })}
 
@@ -243,7 +271,7 @@ function box(r: Rect) {
   return { left: r.x, top: r.y, width: r.w, height: r.h };
 }
 
-/** A player's seat: the dealer button and name, the stack, and their cards and blind. Fades when
+/** A player's seat: the dealer button and name, the stack, and their blind. Fades when
  * they fold, glows on their turn, and opens their page when tapped. The stack counts up or down
  * when it changes. */
 function SeatBox({
@@ -251,8 +279,6 @@ function SeatBox({
   name,
   stack,
   note,
-  cards,
-  cardsDelay,
   dealer,
   mine,
   turn,
@@ -263,9 +289,6 @@ function SeatBox({
   name: string;
   stack: number;
   note: string;
-  /** While they hold cards: a key for this hand's cards, so each hand deals them again. */
-  cards: string | null;
-  cardsDelay: number;
   /** When they're the dealer: a key for this hand. */
   dealer: string | null;
   mine: boolean;
@@ -303,24 +326,11 @@ function SeatBox({
         <Text style={styles.stack} numberOfLines={1}>
           <CountUp value={stack} format={(v) => short(v, 1_000_000)} />
         </Text>
-        <View style={styles.noteRow}>
-          {cards && (
-            <Reanimated.View
-              key={cards}
-              entering={FadeIn.duration(300).delay(cardsDelay)}
-              exiting={FadeOut.duration(200)}
-              style={styles.miniCards}
-            >
-              <View style={[styles.miniCard, { transform: [{ rotate: "-8deg" }] }]} />
-              <View style={[styles.miniCard, { transform: [{ rotate: "8deg" }] }]} />
-            </Reanimated.View>
-          )}
-          {note !== "" && (
-            <Text style={styles.note} numberOfLines={1}>
-              {note}
-            </Text>
-          )}
-        </View>
+        {note !== "" && (
+          <Text style={styles.note} numberOfLines={1}>
+            {note}
+          </Text>
+        )}
       </Tappable>
     </Animated.View>
   );
@@ -346,7 +356,7 @@ function CountUp({ value, format }: { value: number; format: (value: number) => 
   return <>{format(shown)}</>;
 }
 
-/** Next to a player's cards: small or big blind, or sitting this hand out. */
+/** Under a player's stack: small or big blind, or sitting this hand out. */
 function seatNote(
   table: PokerTable,
   number: number,
@@ -356,8 +366,8 @@ function seatNote(
   if (!hand || hand.street === "done") return "";
   if (!inHand) return "next hand";
   if (inHand.folded) return "";
-  if (hand.small_blind_seat === number) return "SB";
-  if (hand.big_blind_seat === number) return "BB";
+  if (hand.small_blind_seat === number) return "small blind";
+  if (hand.big_blind_seat === number) return "big blind";
   return "";
 }
 
@@ -419,6 +429,16 @@ function ActionLabel({ label, color, spot }: { label: string; color: string; spo
           {label}
         </Text>
       </Animated.View>
+    </View>
+  );
+}
+
+/** One of a player's real cards, lying in front of them: a small outline with a question mark. */
+function HoleCard({ tilt }: { tilt: number }) {
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={[styles.holeCard, { transform: [{ rotate: `${tilt}deg` }] }]}>
+      <Text style={styles.holeMark}>?</Text>
     </View>
   );
 }
@@ -495,7 +515,8 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
-    area: { width: "100%" },
+    // Reaches a little into the page's margins, for room on narrow phones.
+    area: { alignSelf: "stretch", marginHorizontal: -12 },
     felt: {
       position: "absolute",
       backgroundColor: FELT,
@@ -511,13 +532,13 @@ const makeStyles = (t: Theme) =>
     },
     topLine: {
       maxWidth: MIDDLE_W,
-      height: 18,
+      height: TOP_LINE_H,
       fontSize: 13,
       fontFamily: t.fonts.bold,
       color: ON_FELT,
       textAlign: "center",
     },
-    board: { flexDirection: "row", alignItems: "center", gap: 4, height: BOARD_CARD.h },
+    board: { flexDirection: "row", alignItems: "center", gap: BOARD_GAP, height: BOARD_CARD.h },
     street: { fontSize: 13, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
     card: {
       width: BOARD_CARD.w,
@@ -529,20 +550,20 @@ const makeStyles = (t: Theme) =>
       borderColor: "rgba(255,255,255,0.7)",
       backgroundColor: "rgba(255,255,255,0.08)",
     },
-    cardMark: { fontSize: 16, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    cardMark: { fontSize: 13, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
     timeAndPot: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
+      gap: 6,
       height: RING,
     },
     dealing: { fontSize: 16, fontFamily: t.fonts.bold, color: ON_FELT },
-    pot: { alignItems: "center", minWidth: 50 },
-    potLabel: { fontSize: 11, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
-    potAmount: { fontSize: 17, fontFamily: t.fonts.bold, color: POKER.gold[0] },
+    pot: { alignItems: "center", maxWidth: MIDDLE_W - RING - 6 },
+    potLabel: { fontSize: 10, fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    potAmount: { fontSize: 15, fontFamily: t.fonts.bold, color: POKER.gold[0] },
     ringMiddle: { alignItems: "center", justifyContent: "center" },
-    seconds: { fontSize: 26, fontFamily: t.fonts.bold },
+    seconds: { fontSize: 22, fontFamily: t.fonts.bold },
     seatSpot: { position: "absolute" },
     seat: {
       position: "absolute",
@@ -570,15 +591,32 @@ const makeStyles = (t: Theme) =>
     nameRow: { flexDirection: "row", alignItems: "center", gap: 3, maxWidth: SEAT_W - 10 },
     name: { flexShrink: 1, fontSize: 13, fontFamily: t.fonts.bold, color: t.colors.text },
     stack: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
-    noteRow: { flexDirection: "row", alignItems: "center", gap: 4, height: 14 },
     note: { fontSize: 10, fontFamily: t.fonts.regular, color: t.colors.muted },
-    miniCards: { flexDirection: "row", gap: 1 },
-    miniCard: {
-      width: 9,
-      height: 13,
+    front: {
+      position: "absolute",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+    },
+    frontTall: { flexDirection: "column", gap: 3 },
+    holeCards: { flexDirection: "row" },
+    holeCard: {
+      width: 11,
+      height: 16,
+      marginHorizontal: -0.5,
       borderRadius: 2,
+      alignItems: "center",
+      justifyContent: "center",
       borderWidth: 1,
-      borderColor: t.colors.muted,
+      borderColor: "rgba(255,255,255,0.8)",
+      backgroundColor: "rgba(255,255,255,0.12)",
+    },
+    holeMark: {
+      fontSize: 8,
+      lineHeight: 10,
+      fontFamily: t.fonts.bold,
+      color: "rgba(255,255,255,0.8)",
     },
     button: {
       width: 14,

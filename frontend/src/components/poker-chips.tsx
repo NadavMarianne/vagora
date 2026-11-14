@@ -1,52 +1,57 @@
-// Casino chips, seen from the side and stacked in one pile. More chips the more there is: one more
-// each time the amount doubles (a little slower in a small pile), up to the most a pile holds.
-// Their colors come from real chip values (white, red, green, black, purple, gold), counted in
-// small blinds.
+// Casino chips: tiny stacks seen a little from above, one stack per chip color, like a real pile.
+// An amount is paid out in real chip values (white, red, green, black, purple, gold, counted in
+// small blinds), biggest first, so more money means more and pricier chips. When the amount
+// changes, chips drop onto the stacks or lift off them.
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
+import Reanimated, { FadeOutUp, ZoomIn } from "react-native-reanimated";
+import Svg, { Ellipse, Rect as SvgRect } from "react-native-svg";
 
-const CHIP_W = 20;
-const CHIP_H = 7;
-/** A small pile fits in a bet's pill; a big one is the pot. `layer` is how much of each chip
- * shows above the one under it, `doublings` how many times the amount doubles per extra chip. */
-const PILES = {
-  small: { most: 5, layer: 2.5, doublings: 1.5 },
-  big: { most: 10, layer: 3, doublings: 1 },
-};
-
-/** Chip values in small blinds, biggest first, with each one's color and edge. */
+/** Chip values in small blinds, biggest first: face color, edge (side and shade) color. */
 const KINDS = [
-  { worth: 2500, color: "#E8B923", edge: "#9C7A10" },
-  { worth: 500, color: "#7B2FBE", edge: "#4A1A75" },
-  { worth: 100, color: "#232323", edge: "#000000" },
-  { worth: 25, color: "#1F8A4C", edge: "#0F5730" },
-  { worth: 5, color: "#D23B3B", edge: "#8A1E1E" },
-  { worth: 1, color: "#F2F2F2", edge: "#A8A8A8" },
+  { worth: 2500, face: "#F2C230", edge: "#A07C12" },
+  { worth: 500, face: "#8B3FD0", edge: "#55207F" },
+  { worth: 100, face: "#2E2E2E", edge: "#0B0B0B" },
+  { worth: 25, face: "#22A05A", edge: "#11603A" },
+  { worth: 5, face: "#E04646", edge: "#8F2222" },
+  { worth: 1, face: "#F4F4F4", edge: "#9C9C9C" },
 ];
 
-/** The chips for an amount: how many grows with the amount, colors from the biggest values in it. */
-function chipsFor(amount: number, smallBlind: number, most: number, doublings: number) {
-  const blinds = Math.max(1, amount / Math.max(1, smallBlind));
-  const count = Math.min(most, 1 + Math.floor(Math.log2(blinds) / doublings));
-  // Pay the amount out in real chip values, biggest first (at the bottom of the pile).
-  const kinds: (typeof KINDS)[number][] = [];
-  let left = blinds;
-  for (const kind of KINDS) {
-    while (left >= kind.worth && kinds.length < count) {
-      kinds.push(kind);
-      left -= kind.worth;
+/** A chip's size: width, how thick it is, and how round its face looks from this angle. */
+const SIZES = {
+  small: { w: 11, thick: 2.4, most: 5, stacks: 2 },
+  medium: { w: 12, thick: 2.6, most: 6, stacks: 3 },
+  big: { w: 15, thick: 3, most: 8, stacks: 4 },
+};
+type Size = keyof typeof SIZES;
+
+/** Stacks for an amount: how many chips of each color. It starts from the biggest value that
+ * makes at least two chips (one lone chip looks like little), then pays out the rest. */
+export function stacksFor(amount: number, smallBlind: number, size: Size) {
+  const { most, stacks } = SIZES[size];
+  let left = Math.max(0, Math.floor(amount / Math.max(1, smallBlind)));
+  const first = KINDS.findIndex((kind) => left / kind.worth >= 2);
+  const result: { kind: (typeof KINDS)[number]; count: number }[] = [];
+  for (const kind of KINDS.slice(first === -1 ? 0 : first)) {
+    const count = Math.floor(left / kind.worth);
+    if (count > 0) {
+      result.push({ kind, count: Math.min(most, count) });
+      left -= count * kind.worth;
     }
+    if (result.length === stacks) break;
   }
-  // Fewer real chips than the count: fill up with the smallest one used.
-  while (kinds.length < count) kinds.push(kinds[kinds.length - 1] ?? KINDS[KINDS.length - 1]);
-  return kinds;
+  // Less than a small blind still shows one white chip.
+  if (result.length === 0 && amount > 0) result.push({ kind: KINDS[KINDS.length - 1], count: 1 });
+  return result;
 }
 
-/** The tallest a pile gets. */
-export function pileHeight(size: keyof typeof PILES) {
-  return CHIP_H + PILES[size].layer * (PILES[size].most - 1);
+/** How big a pile can get, so the space for it can be kept. */
+export function pileSize(size: Size) {
+  const { w, thick, most, stacks } = SIZES[size];
+  return { w: stacks * (w + 1), h: w * 0.6 + thick * most };
 }
 
-/** A pile of chips for an amount. */
+/** Tiny chip stacks for an amount, side by side. */
 export function ChipStack({
   amount,
   smallBlind,
@@ -54,46 +59,65 @@ export function ChipStack({
 }: {
   amount: number;
   smallBlind: number;
-  size?: keyof typeof PILES;
+  size?: Size;
 }) {
-  const { most, layer, doublings } = PILES[size];
-  const chips = chipsFor(amount, smallBlind, most, doublings);
+  const stacks = useMemo(() => stacksFor(amount, smallBlind, size), [amount, smallBlind, size]);
+  const { h } = pileSize(size);
   return (
-    <View style={[styles.pile, { height: CHIP_H + layer * (chips.length - 1) }]}>
-      {chips.map((chip, i) => (
-        <View
-          key={i}
-          style={[
-            styles.chip,
-            { bottom: i * layer, backgroundColor: chip.color, borderColor: chip.edge },
-          ]}
-        >
-          {/* The white stripes around a chip's edge. */}
-          <View style={[styles.stripe, { left: 2 }]} />
-          <View style={[styles.stripe, { left: CHIP_W / 2 - 2.5 }]} />
-          <View style={[styles.stripe, { right: 2 }]} />
+    <View style={[styles.pile, { height: h }]}>
+      {stacks.map(({ kind, count }) => (
+        <View key={kind.worth} style={{ width: SIZES[size].w, height: h }}>
+          {Array.from({ length: count }, (_, i) => (
+            // Keyed by color and height, so a new chip drops on top and a lost one lifts off.
+            <Reanimated.View
+              key={i}
+              entering={ZoomIn.duration(220).delay(i * 40)}
+              exiting={FadeOutUp.duration(220)}
+              style={{ position: "absolute", bottom: i * SIZES[size].thick }}
+            >
+              <Chip face={kind.face} edge={kind.edge} size={size} />
+            </Reanimated.View>
+          ))}
         </View>
       ))}
     </View>
   );
 }
 
+/** One chip seen a little from above: its side with white spots, its face with a dashed white
+ * ring and a darker middle. */
+function Chip({ face, edge, size }: { face: string; edge: string; size: Size }) {
+  const { w, thick } = SIZES[size];
+  const ry = w * 0.3;
+  const h = ry * 2 + thick;
+  const cx = w / 2;
+  const top = ry;
+  return (
+    <Svg width={w} height={h}>
+      {/* The side. */}
+      <Ellipse cx={cx} cy={top + thick} rx={cx} ry={ry} fill={edge} />
+      <SvgRect x={0} y={top} width={w} height={thick} fill={edge} />
+      {[0.12, 0.44, 0.76].map((at) => (
+        <SvgRect key={at} x={w * at} y={top} width={w * 0.12} height={thick} fill="#FFFFFF" opacity={0.85} />
+      ))}
+      {/* The face. */}
+      <Ellipse cx={cx} cy={top} rx={cx} ry={ry} fill={face} stroke={edge} strokeWidth={0.4} />
+      <Ellipse
+        cx={cx}
+        cy={top}
+        rx={cx * 0.74}
+        ry={ry * 0.74}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={w * 0.09}
+        strokeDasharray={`${w * 0.16} ${w * 0.16}`}
+        opacity={0.9}
+      />
+      <Ellipse cx={cx} cy={top} rx={cx * 0.42} ry={ry * 0.42} fill={edge} opacity={0.35} />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
-  pile: { width: CHIP_W },
-  chip: {
-    position: "absolute",
-    left: 0,
-    width: CHIP_W,
-    height: CHIP_H,
-    borderRadius: CHIP_H / 2,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  stripe: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: "rgba(255,255,255,0.8)",
-  },
+  pile: { flexDirection: "row", alignItems: "flex-end", gap: 1 },
 });

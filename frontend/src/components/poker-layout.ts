@@ -1,9 +1,9 @@
-// Where everything goes on the poker table. A player's things stay on their seat, so nothing can
-// cover anything else: the action label on the seat's top edge, the bet (chips and amount) on its
-// bottom edge, and the dealer button inside it, by the name. Seats sit on fixed spots for each
-// number of players, round the middle (the round and whose turn, the board, the timer and the
-// pot). A check (run by hand while building) tried every table size on phones from 360 points
-// wide and found no overlaps.
+// Where everything goes on the poker table, so that nothing covers anything else. Each seat has
+// its action label on its top edge and its bet on its bottom edge. In front of it on the felt lie
+// its cards and its chips: beside the seat toward the middle for seats on the sides, and below or
+// above it for seats at the top and bottom. The middle holds whose turn, the board, the timer and
+// the pot. Seats sit on fixed spots for each number of players, and the table's height is the
+// first one, from what fits the screen, where nothing overlaps (checked by `overlaps`).
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };
@@ -11,20 +11,28 @@ export type Point = { x: number; y: number };
 export const SEAT_W = 80;
 export const SEAT_H = 58;
 /** The action label sits on a seat's top edge: this much of it above the seat. */
-export const LABEL_RISE = 12;
+export const LABEL_RISE = 14;
 export const LABEL_H = 18;
 /** The bet sits on a seat's bottom edge: this much of it below the seat. */
-export const BET_DROP = 14;
+export const BET_DROP = 18;
 export const BET_H = 20;
-/** The middle: the round and whose turn, the board, then the timer next to the pot. */
-export const BOARD_CARD = { w: 26, h: 37 };
-export const RING = 70;
-export const MIDDLE_W = 150;
-export const MIDDLE_GAP = 4;
-export const MIDDLE_H = 18 + MIDDLE_GAP + BOARD_CARD.h + MIDDLE_GAP + RING;
+/** What lies in front of a seat: its cards and chips, one above the other (beside a side seat)
+ * or side by side (below or above a seat at the top or bottom). */
+export const FRONT_TALL = { w: 28, h: 46 };
+export const FRONT_WIDE = { w: 64, h: 26 };
+/** The middle: whose turn, the board, then the timer next to the pot. */
+export const BOARD_CARD = { w: 21, h: 30 };
+export const BOARD_GAP = 3;
+export const RING = 56;
+export const MIDDLE_W = 5 * BOARD_CARD.w + 4 * BOARD_GAP;
+export const MIDDLE_GAP = 3;
+export const TOP_LINE_H = 16;
+export const MIDDLE_H = TOP_LINE_H + MIDDLE_GAP + BOARD_CARD.h + MIDDLE_GAP + RING;
 /** Room above the table for the top seats' labels, and below it for the bottom seat's bet. */
 export const TOP_ROOM = LABEL_RISE;
 export const BOTTOM_ROOM = BET_DROP;
+/** The least space kept between any two things. */
+const CLEAR = 2;
 
 /** Each seat's spot, from your seat at the bottom going clockwise: across (0 = left edge,
  * 1 = right edge) and down (0 = top, 1 = bottom). */
@@ -45,14 +53,30 @@ export type SeatSpot = {
   box: Rect;
   label: Rect;
   bet: Rect;
+  /** Where its cards and chips lie, and which way round. */
+  front: Rect;
+  frontTall: boolean;
+};
+
+export type TableLayout = {
+  middle: Point;
+  middleRect: Rect;
+  spots: SeatSpot[];
+  height: number;
+  areaHeight: number;
 };
 
 function centered(c: Point, w: number, h: number): Rect {
   return { x: c.x - w / 2, y: c.y - h / 2, w, h };
 }
 
-/** The table is `width` wide and `height` tall, below TOP_ROOM. */
-export function tableLayout(width: number, height: number, seats: number, bottomSeat: number) {
+/** Everything's place on a table `width` wide and `height` tall (below TOP_ROOM). */
+export function placeAll(
+  width: number,
+  height: number,
+  seats: number,
+  bottomSeat: number,
+): TableLayout {
   const middle = { x: width / 2, y: TOP_ROOM + height / 2 };
   const spotList = SPOTS[Math.max(2, Math.min(9, seats))];
   const spots: SeatSpot[] = Array.from({ length: seats }, (_, seat) => {
@@ -64,40 +88,75 @@ export function tableLayout(width: number, height: number, seats: number, bottom
     const box = centered(at, SEAT_W, SEAT_H);
     const label = { x: box.x, y: box.y - LABEL_RISE, w: SEAT_W, h: LABEL_H };
     const bet = { x: box.x, y: box.y + SEAT_H + BET_DROP - BET_H, w: SEAT_W, h: BET_H };
-    return { at, box, label, bet };
+    const side = across === 0 || across === 1;
+    let front: Rect;
+    if (side) {
+      // Beside the seat, toward the middle.
+      const x = across === 0 ? box.x + SEAT_W + CLEAR : box.x - CLEAR - FRONT_TALL.w;
+      front = { x, y: at.y - FRONT_TALL.h / 2, w: FRONT_TALL.w, h: FRONT_TALL.h };
+    } else if (down < 0.5) {
+      // Below a seat at the top, under its bet.
+      const y = bet.y + BET_H + CLEAR;
+      front = { x: at.x - FRONT_WIDE.w / 2, y, w: FRONT_WIDE.w, h: FRONT_WIDE.h };
+    } else {
+      // Above a seat at the bottom, over its label.
+      const y = label.y - CLEAR - FRONT_WIDE.h;
+      front = { x: at.x - FRONT_WIDE.w / 2, y, w: FRONT_WIDE.w, h: FRONT_WIDE.h };
+    }
+    return { at, box, label, bet, front, frontTall: side };
   });
   return {
     middle,
     middleRect: centered(middle, MIDDLE_W, MIDDLE_H),
     spots,
+    height,
     areaHeight: TOP_ROOM + height + BOTTOM_ROOM,
   };
 }
 
-/** The least space kept between two seats' things (labels, boxes, bets). */
-const CLEAR = 2;
-
-/** The table's height for its width and the screen: a little taller than wide, like a real table,
- * but not much more than a third of the screen, so the whole game fits without scrolling. Never
- * less than its width, or than the seats need to stay apart (a seat with its label and bet is
- * taller than it is wide). */
-export function tableHeight(width: number, screenHeight: number, seats: number) {
-  const wanted = Math.min(width * 1.25, screenHeight * 0.45 - TOP_ROOM);
-  return Math.ceil(Math.max(width, wanted, leastHeight(width, seats)));
+function apart(a: Rect, b: Rect) {
+  return (
+    a.x + a.w + CLEAR <= b.x ||
+    b.x + b.w + CLEAR <= a.x ||
+    a.y + a.h + CLEAR <= b.y ||
+    b.y + b.h + CLEAR <= a.y
+  );
 }
 
-/** The least height that keeps seats apart: two seats that are side by side or overlap across
- * need to be a whole seat (with its label and bet) apart up and down. */
-function leastHeight(width: number, seats: number) {
-  const list = SPOTS[Math.max(2, Math.min(9, seats))];
-  const tall = LABEL_RISE + SEAT_H + BET_DROP + CLEAR;
-  let least = 0;
-  for (const [i, a] of list.entries()) {
-    for (const b of list.slice(i + 1)) {
-      const across = Math.abs(a[0] - b[0]) * (width - SEAT_W);
-      const down = Math.abs(a[1] - b[1]);
-      if (across < SEAT_W + CLEAR && down > 0) least = Math.max(least, SEAT_H + tall / down);
+/** Whether anything covers anything else, or leaves the table's area. A seat's label and bet
+ * sit on its edges on purpose. */
+export function overlaps(layout: TableLayout, width: number): boolean {
+  const items: { seat: number; part: string; r: Rect }[] = [
+    { seat: -1, part: "middle", r: layout.middleRect },
+  ];
+  layout.spots.forEach((s, seat) => {
+    for (const part of ["box", "label", "bet", "front"] as const) {
+      items.push({ seat, part, r: s[part] });
+    }
+  });
+  for (const [i, a] of items.entries()) {
+    const r = a.r;
+    if (r.x < 0 || r.y < 0 || r.x + r.w > width || r.y + r.h > layout.areaHeight) return true;
+    for (const b of items.slice(i + 1)) {
+      const onEdge = a.seat === b.seat && a.part === "box" && ["label", "bet"].includes(b.part);
+      if (!onEdge && !apart(a.r, b.r)) return true;
     }
   }
-  return least;
+  return false;
+}
+
+/** The table for a width and a screen: about as tall as fits the screen with the game around it
+ * (a little taller than wide, like a real table), then taller if needed until nothing overlaps. */
+export function tableLayout(
+  width: number,
+  screenHeight: number,
+  seats: number,
+  bottomSeat: number,
+): TableLayout {
+  const wanted = Math.round(Math.max(width, Math.min(width * 1.3, screenHeight * 0.55 - TOP_ROOM)));
+  let layout = placeAll(width, wanted, seats, bottomSeat);
+  for (let height = wanted; height <= wanted + 600 && overlaps(layout, width); height += 4) {
+    layout = placeAll(width, height, seats, bottomSeat);
+  }
+  return layout;
 }
