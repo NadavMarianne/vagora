@@ -1,13 +1,7 @@
 // What the backend sends and accepts. Mirrors backend/app/markets.py and app/allowance.py.
 
 export type Weekday =
-  | "monday"
-  | "tuesday"
-  | "wednesday"
-  | "thursday"
-  | "friday"
-  | "saturday"
-  | "sunday";
+  "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 
 export type AllowanceSchedule = {
   frequency: "daily" | "weekly" | "monthly";
@@ -289,4 +283,71 @@ export type AppNotification = {
   level: "info" | "good" | "warning" | "critical";
   created_at: string;
   read: boolean;
+};
+
+/** A poker table in a market's Games section. Mirrors backend/app/tables.py (decision 0030). */
+export type PokerTable = {
+  id: number;
+  name: string;
+  creator_username: string;
+  max_players: number;
+  small_blind: number;
+  big_blind: number;
+  min_buy_in: number;
+  max_buy_in: number;
+  /** Seconds per turn. Empty: no timer. */
+  turn_seconds: number | null;
+  seats: PokerSeat[];
+  /** Your seat number, if you're sitting here. */
+  my_seat: number | null;
+  /** The hand being played, or else the last one. */
+  hand: PokerHand | null;
+};
+
+export type PokerSeat = {
+  /** 0 to 8, clockwise. */
+  number: number;
+  username: string;
+  display_name: string;
+  stack: number;
+};
+
+export type PokerStreet = "preflop" | "flop" | "turn" | "river" | "showdown" | "done";
+
+export type PokerPot = { amount: number; eligible: number[] };
+
+/** A hand. Mirrors backend/app/hand_state.py. */
+export type PokerHand = {
+  number: number;
+  street: PokerStreet;
+  /** The last street bet on before the showdown. */
+  reached: PokerStreet;
+  button: number;
+  small_blind_seat: number;
+  big_blind_seat: number;
+  to_act: number | null;
+  turn_ends_at: string | null;
+  current_bet: number;
+  pots: PokerPot[];
+  /** The pots the showdown has to decide. */
+  contested: PokerPot[];
+  players: {
+    seat: number;
+    stack: number;
+    street_bet: number;
+    total: number;
+    folded: boolean;
+    all_in: boolean;
+  }[];
+  log: { seat: number; action: string; amount: number; timed_out?: boolean }[];
+  /** When done: how many chips each seat got. */
+  payouts: Record<string, number>;
+  claim: { by: number; winners: number[][]; confirmed: number[] } | null;
+  /** What you may do now, on your turn. */
+  my_turn: {
+    to_call: number;
+    can_check: boolean;
+    raise_min: number | null;
+    raise_max: number | null;
+  } | null;
 };

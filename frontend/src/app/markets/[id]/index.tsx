@@ -80,6 +80,7 @@ export default function MarketScreen() {
           />
         </View>
       </View>
+      <Button title="Games" kind="secondary" onPress={() => router.push(`/markets/${id}/games`)} />
       {proposals.length > 0 && (
         <Info>
           {proposals.length === 1
