@@ -31,3 +31,6 @@ Each file records one decision: what we chose, why, and what else we considered.
 | [0025](0025-extras.md) | Extras: mystery orders, auctions, bounties, streaks | Accepted |
 | [0026](0026-notifications-list.md) | The notifications list | Accepted |
 | [0027](0027-themes-and-menu.md) | Themes and the menu | Accepted |
+| [0028](0028-release-and-production.md) | Release and the production setup | Accepted |
+| [0029](0029-release-types-and-app-versions.md) | Release types and keeping app versions working | Accepted |
+| [0030](0030-games-poker-tables.md) | Games: poker tables | Accepted |
