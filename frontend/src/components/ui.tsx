@@ -20,6 +20,7 @@ import {
 } from "react-native";
 
 import { FoldRegistry } from "@/components/folds";
+import { GoldShine } from "@/components/shine";
 import { Tappable } from "@/components/tappable";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
@@ -319,6 +320,7 @@ export function Button({
   timed,
   fill = false,
   colors,
+  shine = false,
 }: ButtonProps & {
   /** Set by TimedButton: the time left, shown under the title over its time bar. */
   timed?: string;
@@ -326,6 +328,8 @@ export function Button({
   fill?: boolean;
   /** Its own colors, the button's and its text's, instead of the theme's for its kind. */
   colors?: [string, string];
+  /** A shiny gold finish, with a wave of light gliding over it (see shine.tsx). */
+  shine?: boolean;
 }) {
   const styles = useStyles(makeStyles);
   const t = useTheme();
@@ -357,8 +361,10 @@ export function Button({
         { backgroundColor: background },
         outlined && timed === undefined && { borderWidth: t.borderWidth, borderColor: color },
         (pressed || busy) && styles.buttonPressed,
+        shine && styles.buttonShine,
       ]}
     >
+      {shine && <GoldShine />}
       {busy ? (
         <ActivityIndicator color={textColor} />
       ) : (
@@ -429,6 +435,7 @@ const makeStyles = (t: Theme) =>
     buttonShadow: { boxShadow: t.shadow.button || undefined },
     buttonFill: { flex: 1, justifyContent: "center" },
     buttonPressed: { opacity: 0.7 },
+    buttonShine: { overflow: "hidden" },
     buttonText: { fontSize: 16, fontFamily: t.fonts.bold, letterSpacing: t.upperButtons ? 1 : 0 },
     timed: {
       borderWidth: Math.max(2, t.borderWidth),
