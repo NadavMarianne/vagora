@@ -630,9 +630,9 @@ const SandRect = Reanimated.createAnimatedComponent(SvgRect);
  * five seconds. */
 function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const styles = useTableStyles();
-  // The hourglass takes the top three quarters of the timer's space, the digits the rest.
+  // The hourglass takes the top two thirds of the timer's space, the digits the rest.
   const space = RING * useContext(Scale);
-  const h = space * 0.74;
+  const h = space * 0.66;
   const w = h * 0.72;
   // An id for this hourglass's shapes, so two on a screen don't mix.
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -712,7 +712,7 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
       </Svg>
       <Text
         style={[
-          styles.seconds,
+          styles.potAmount,
           late && styles.secondsLate,
           // The last five seconds: each one starts a little big and shrinks.
           late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
@@ -776,17 +776,16 @@ const makeStyles = (t: Theme, scale: number) => {
     dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT },
     pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
     potLabel: { fontSize: u(10), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
-    potAmount: { fontSize: u(15), fontFamily: t.fonts.bold, color: POKER.gold[0] },
-    timer: { alignItems: "center", justifyContent: "space-between" },
-    // The time under the hourglass, in gold digits.
-    seconds: {
-      fontSize: u(12),
-      lineHeight: u(14),
+    // The pot's amount and the timer's digits: one look for both.
+    potAmount: {
+      fontSize: u(15),
+      lineHeight: u(18),
       includeFontPadding: false,
       fontFamily: t.fonts.bold,
       fontVariant: ["tabular-nums"],
       color: POKER.gold[0],
     },
+    timer: { alignItems: "center", justifyContent: "space-between" },
     secondsLate: { color: "#FF6B5B" },
     seatSpot: { position: "absolute" },
     seat: {
