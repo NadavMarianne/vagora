@@ -183,14 +183,14 @@ function HandPanel({
 }) {
   const styles = useStyles(makeStyles);
   const betting = hand.street !== "showdown" && hand.street !== "done";
-  // Someone else's turn with nothing to deal or decide: the table says it all.
-  const empty =
-    betting &&
-    !hand.waiting_for_cards &&
-    !!table.turn_seconds &&
-    hand.pots.length <= 1 &&
-    hand.my_turn === null;
-  if (empty) return null;
+  // You, if you're playing this hand.
+  const me = hand.players.find((p) => p.seat === table.my_seat && p.still_here !== false);
+  const dealInfo = betting && (hand.waiting_for_cards || !table.turn_seconds);
+  // Sitting here during a hand: you can get up any time (it folds you).
+  const canGetUp = table.my_seat !== null && hand.street !== "done";
+  // Watching someone else's turn with nothing to deal or decide: the table says it all.
+  const shows = dealInfo || !betting || hand.waiting_for_cards || me !== undefined || canGetUp;
+  if (!shows) return null;
   return (
     <Card style={styles.panel}>
       {/* During the hand the table shows the round. */}
@@ -199,32 +199,19 @@ function HandPanel({
           Hand {hand.number} · {STREET_NAMES[hand.street]}
         </Text>
       )}
-      {betting && (hand.waiting_for_cards || !table.turn_seconds) && (
-        <Info>{DEAL[hand.street]}</Info>
-      )}
+      {dealInfo && <Info>{DEAL[hand.street]}</Info>}
       {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
       {hand.waiting_for_cards && (
         <Reanimated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(150)}>
           <CardsOut table={table} hand={hand} url={url} reload={reload} />
         </Reanimated.View>
       )}
-      {hand.street !== "done" && hand.pots.length > 1 && (
-        <Text style={styles.small}>
-          {hand.pots
-            .map((p, i) => `${i === 0 ? "Main pot" : `Side pot ${i}`}: ${p.amount.toLocaleString()}`)
-            .join(" · ")}
-        </Text>
+      {/* Your actions, always there during the betting and usable on your turn. A fresh one
+          each action, so an old raise amount doesn't stay. */}
+      {betting && me && (
+        <MyTurn key={hand.log.length} table={table} hand={hand} url={url} reload={reload} />
       )}
-      {/* A fresh one each turn, so an old raise amount doesn't stay. */}
-      {hand.my_turn && (
-        <Reanimated.View
-          key={hand.log.length}
-          entering={FadeInDown.duration(300)}
-          exiting={FadeOut.duration(150)}
-        >
-          <MyTurn table={table} hand={hand} url={url} reload={reload} />
-        </Reanimated.View>
-      )}
+      {canGetUp && <GetUp url={url} reload={reload} />}
       {hand.street === "showdown" && (
         <Reanimated.View key={hand.number} entering={FadeInDown.duration(300)}>
           <Showdown table={table} hand={hand} url={url} reload={reload} />
@@ -282,7 +269,12 @@ function MyTurn({
   reload: () => void;
 }) {
   const styles = useStyles(makeStyles);
-  const turn = hand.my_turn!;
+  const me = hand.players.find((p) => p.seat === table.my_seat)!;
+  // On your turn, what the backend says you may do; otherwise what it would be right now, so
+  // Check or Call already shows the right one.
+  const owed = Math.min(Math.max(0, hand.current_bet - me.street_bet), me.stack);
+  const turn = hand.my_turn ?? { to_call: owed, can_check: owed === 0, raise_min: 0, raise_max: 0 };
+  const active = hand.my_turn !== null;
   const { run, error } = useAction(reload);
   // Folding takes two taps, so it never happens by accident.
   const [foldArmed, setFoldArmed] = useState(false);
@@ -297,8 +289,9 @@ function MyTurn({
   const word = hand.current_bet === 0 ? "Bet" : "Raise";
 
   return (
-    <View style={styles.turn}>
-      {foldArmed ? (
+    // Not your turn: shown greyed out, and taps go nowhere.
+    <View style={[styles.turn, !active && styles.inactive]} pointerEvents={active ? "auto" : "none"}>
+      {foldArmed && active ? (
         <View style={styles.buttons}>
           <View style={styles.half}>
             <Button
@@ -334,7 +327,7 @@ function MyTurn({
           )}
         </View>
       )}
-      {!canRaise && turn.to_call > 0 && <Body>You can only call or fold now.</Body>}
+      {active && !canRaise && turn.to_call > 0 && <Body>You can only call or fold now.</Body>}
       <ErrorText>{error}</ErrorText>
       {raising && (
         <RaiseSheet
@@ -353,6 +346,36 @@ function MyTurn({
         />
       )}
     </View>
+  );
+}
+
+/** Getting up during a hand: a red button, and a second tap to be sure. It folds you if you're
+ * still in the hand, and your chips go back to your balance. */
+function GetUp({ url, reload }: { url: string; reload: () => void }) {
+  const styles = useStyles(makeStyles);
+  const [armed, setArmed] = useState(false);
+  const { run, error } = useAction(reload);
+  return (
+    <>
+      {armed ? (
+        <View style={styles.buttons}>
+          {/* Two thirds of the row, so its longer words fit. */}
+          <View style={styles.wide}>
+            <Button
+              title="Tap again to get up"
+              colors={POKER.fold}
+              onPress={() => run(() => api(`${url}/leave`, { method: "POST" }))}
+            />
+          </View>
+          <View style={styles.half}>
+            <Button title="Stay" kind="secondary" onPress={() => setArmed(false)} />
+          </View>
+        </View>
+      ) : (
+        <Button title="Get up" colors={POKER.fold} onPress={() => setArmed(true)} />
+      )}
+      <ErrorText>{error}</ErrorText>
+    </>
   );
 }
 
@@ -768,6 +791,8 @@ const makeStyles = (t: Theme) =>
     panel: { gap: 10 },
     street: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
     turn: { gap: 10 },
+    inactive: { opacity: 0.35 },
+    wide: { flex: 2 },
     yourTurn: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.primary },
     buttons: { flexDirection: "row", gap: 10 },
     half: { flex: 1 },

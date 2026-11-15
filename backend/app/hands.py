@@ -186,7 +186,8 @@ def agreed(db: Session, row: PokerHand, hand: poker.Hand, table: PokerTable) -> 
 
 
 def fold_out(db: Session, table: PokerTable, user: User) -> None:
-    """Takes someone who's leaving the market out of the hand being played at this table."""
+    """Takes someone who's getting up (or leaving the market) out of the hand being played at
+    this table: a fold, out of turn if need be."""
     row = hand_state.current(db, table)
     seat = next((s for s in tables.seated(table) if s.user_id == user.id), None)
     if row is None or seat is None or row.seat_ids.get(str(seat.number)) != seat.id:

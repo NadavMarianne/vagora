@@ -56,6 +56,21 @@ function pilesFor(amount: number, smallBlind: number, most: number, stacks: numb
   return result;
 }
 
+/** A mixed pile: stacks as tall as a pile's, but every chip its own color. The colors look
+ * random but stay the same for each place in the pile (so nothing flickers when it redraws), and
+ * no chip has the color of the one under it. */
+function mixedFor(amount: number, smallBlind: number, most: number, stacks: number): Kind[][] {
+  return pilesFor(amount, smallBlind, most, stacks).map((stack, s) => {
+    const mixed: Kind[] = [];
+    stack.forEach((_, level) => {
+      const pick = (Math.imul(s * 31 + level * 7 + 11, 2654435761) >>> 0) % KINDS.length;
+      const below = mixed[level - 1];
+      mixed.push(KINDS[pick] === below ? KINDS[(pick + 1) % KINDS.length] : KINDS[pick]);
+    });
+    return mixed;
+  });
+}
+
 /** A tower: one stack, taller the more there is, each level a different color. */
 function towerFor(amount: number, smallBlind: number, most: number): Kind[] {
   const blinds = Math.max(1, amount / Math.max(1, smallBlind));
@@ -72,7 +87,8 @@ export function pileSize(size: Size, stacks = 1) {
   return { w: stacks * (w + 1), h: w * 0.6 + thick * most };
 }
 
-/** Chips for an amount: `piles` of one color each side by side, or one `tower` of colors. */
+/** Chips for an amount: `piles` of one color each side by side, `mixed` piles with every chip
+ * its own color, or one `tower` of colors. */
 export function ChipStack({
   amount,
   smallBlind,
@@ -85,7 +101,7 @@ export function ChipStack({
   amount: number;
   smallBlind: number;
   size?: Size;
-  shape?: "piles" | "tower";
+  shape?: "piles" | "mixed" | "tower";
   /** For piles: at most this many side by side. */
   stacks?: number;
   /** No chips dropping in or lifting off (for a pile that's moving as a whole). */
@@ -98,7 +114,9 @@ export function ChipStack({
     () =>
       shape === "tower"
         ? [towerFor(amount, smallBlind, most)]
-        : pilesFor(amount, smallBlind, most, stacks),
+        : shape === "mixed"
+          ? mixedFor(amount, smallBlind, most, stacks)
+          : pilesFor(amount, smallBlind, most, stacks),
     [amount, smallBlind, most, shape, stacks],
   );
   const h = pileSize(size).h * scale;

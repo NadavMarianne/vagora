@@ -312,6 +312,7 @@ export function PokerTableView({
                   <ChipStack
                     amount={seat.stack}
                     smallBlind={table.small_blind}
+                    shape="mixed"
                     stacks={spot.frontTall ? 2 : 3}
                     scale={scale}
                   />
