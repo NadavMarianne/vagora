@@ -28,3 +28,4 @@
 - The chips in front of each player mix colors chip by chip (no two the same on top of each other), instead of one color per stack.
 - Chips, take two: piles and the pot are plain stacks again, one color each, paid out in as few chips as possible (a big pot shows a few pricey chips, not many cheap ones). Only the chip icon next to a bet is colorful: thin chips in every color up to the amount's priciest, cheapest at the bottom and round again. The values now run red, blue, green, orange, purple, gold.
 - While it's someone else's turn, the actions show as four small buttons in one row: Fold, Check or Call, Raise (plain grey, not tappable) and a red Get up. On your turn the big buttons stay, with Get up under them.
+- The pot no longer jumps up the moment someone bets. Like at a real table, a round's bets stay in front of the players and are gathered into the pot when the round ends: they fly to the middle and the pot counts up as they land.

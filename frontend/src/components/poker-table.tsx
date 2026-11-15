@@ -163,7 +163,13 @@ export function PokerTableView({
   const styles = useMemo(() => makeStyles(t, scale), [t, scale]);
   const ready = boxWidth > 0 && boxHeight > 0;
 
-  const pot = hand ? hand.pots.reduce((sum, p) => sum + p.amount, 0) : 0;
+  // Like at a real table, this round's bets stay in front of the players; the pot only holds what
+  // was gathered at the end of earlier rounds. It changes once the bets have flown in.
+  const gathered = hand
+    ? hand.pots.reduce((sum, p) => sum + p.amount, 0) -
+      hand.players.reduce((sum, p) => sum + p.street_bet, 0)
+    : 0;
+  const pot = useLater(gathered, FLIGHT);
   const turnName =
     playing && hand.to_act !== null && !hand.waiting_for_cards
       ? hand.to_act === table.my_seat
@@ -477,6 +483,16 @@ function SeatBox({
       </Tappable>
     </Animated.View>
   );
+}
+
+/** A value that follows another `wait` milliseconds later, like the pot once the bets land. */
+function useLater<T>(value: T, wait: number): T {
+  const [later, setLater] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setLater(value), wait);
+    return () => clearTimeout(timer);
+  }, [value, wait]);
+  return later;
 }
 
 /** A number that counts up or down to its new value instead of jumping. */
