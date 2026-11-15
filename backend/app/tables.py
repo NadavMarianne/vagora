@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import hand_state, ledger, poker, signals
+from app import hand_state, ledger, signals
 from app.hand_state import HandView
 from app.markets import get_membership
 from app.models import EntryKind, Membership, PokerSeat, PokerTable, User
@@ -331,15 +331,15 @@ def cash_out_some(
 
 @router.post("/{table_id}/leave")
 def leave_table(market_id: int, table_id: int, user: CurrentUser, db: DbSession) -> TableView:
-    """Gets up. Your whole stack goes back to your balance."""
+    """Gets up, even in the middle of a hand: that folds you (what you bet stays in the pot).
+    The rest of your stack goes back to your balance."""
+    from app import hands  # here, because hands uses this module
+
     get_membership(db, user, market_id)
     table = get_table(db, market_id, table_id, lock=True)
     hand_state.catch_up(db, table)
     seat = my_seat(table, user)
-    row = hand_state.current(db, table)
-    if row is not None and hand_state.in_current_hand(db, table, seat):
-        if not poker.Hand.from_data(row.state).player(seat.number).folded:
-            raise conflict("Finish this hand first, or fold.")
+    hands.fold_out(db, table, user)
     cash_out(db, seat)
     changed(db, market_id, user)
     db.refresh(table, ["seats"])

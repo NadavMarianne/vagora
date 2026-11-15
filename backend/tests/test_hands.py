@@ -195,13 +195,46 @@ def test_a_raise_too_small_is_refused(game):
     assert response.status_code == 409
 
 
-def test_no_topping_up_or_leaving_in_the_middle_of_your_hand(game):
+def test_no_topping_up_in_the_middle_of_your_hand(game):
     dana, noa, url, _ = game
     dana.post(f"{url}/hands")
 
     assert dana.post(f"{url}/top-up", json={"amount": 5}).status_code == 409
-    assert dana.post(f"{url}/leave").status_code == 409
     assert dana.put(url, json={"name": "Hotel", "small_blind": 10}).status_code == 409
+
+
+def test_getting_up_in_the_middle_of_your_hand_folds(game, db):
+    dana, noa, url, market_id = game
+    dana.post(f"{url}/hands")  # heads-up: Dana is the button and small blind, and acts first
+    act(dana, url, "raise", 40)
+
+    # Out of turn: Noa's turn, but Dana gets up. Her 40 stays in the pot and Noa wins it.
+    left = dana.post(f"{url}/leave")
+
+    assert left.status_code == 200
+    table = noa.get(url).json()
+    assert table["hand"]["street"] == "done"
+    assert table["hand"]["payouts"] == {"1": 50}
+    assert stacks(table) == {1: 540}
+    assert dana.get(f"/markets/{market_id}").json()["my_balance"] == 1000 - 40
+    coins_add_up(db)
+
+
+def test_getting_up_on_your_turn_folds_and_the_hand_goes_on(member, game, db):
+    dana, noa, url, market_id = game
+    tal = member("tal_b")
+    invite = dana.post(f"/markets/{market_id}/invites", json={"username": "tal_b"}).json()
+    tal.post(f"/invites/{invite['id']}/accept")
+    tal.post(f"{url}/sit", json={"buy_in": 300, "seat": 2})
+    dana.post(f"{url}/hands")  # button 0, small blind 1, big blind 2, and seat 0 starts
+
+    assert dana.post(f"{url}/leave").status_code == 200
+
+    hand = noa.get(url).json()["hand"]
+    assert hand["street"] == "preflop"
+    assert hand["to_act"] == 1
+    assert dana.get(f"/markets/{market_id}").json()["my_balance"] == 1000
+    coins_add_up(db)
 
 
 def test_a_player_who_folded_can_get_up_during_the_hand(member, game, db):
@@ -225,6 +258,27 @@ def test_a_player_who_folded_can_get_up_during_the_hand(member, game, db):
     table = act(noa, url, "call")
     assert stacks(table)[0] == 200
     coins_add_up(db)
+
+
+def test_a_player_who_gets_up_after_winning_is_no_longer_shown_in_the_hand(member, game):
+    dana, noa, url, market_id = game
+    dana.post(f"{url}/hands")
+    table = act(dana, url, "fold")  # Noa wins the blinds
+    players = {p["seat"]: p for p in table["hand"]["players"]}
+    assert players[1]["still_here"] and players[0]["still_here"]
+
+    noa.post(f"{url}/leave")
+    hand = dana.get(url).json()["hand"]
+    assert hand["payouts"] == {"1": 15}  # what happened stays the same
+    assert {p["seat"]: p["still_here"] for p in hand["players"]} == {0: True, 1: False}
+
+    # Someone new in that seat isn't the one who played it either.
+    sam = member("sam_p")
+    invite = dana.post(f"/markets/{market_id}/invites", json={"username": "sam_p"}).json()
+    sam.post(f"/invites/{invite['id']}/accept")
+    sam.post(f"{url}/sit", json={"buy_in": 200, "seat": 1})
+    hand = dana.get(url).json()["hand"]
+    assert {p["seat"]: p["still_here"] for p in hand["players"]} == {0: True, 1: False}
 
 
 def test_leaving_the_market_folds_you_out_of_the_hand(game, db):

@@ -2,10 +2,13 @@
 // The cards are real; this screen tells the dealer what to deal and keeps the chips.
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
+import Reanimated, { FadeInDown, FadeOut } from "react-native-reanimated";
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AmountSlider, POKER } from "@/components/amount-slider";
-import { PokerTableView } from "@/components/poker-table";
+import { PokerTableView, short } from "@/components/poker-table";
+import { Tappable } from "@/components/tappable";
 import { Chips } from "@/components/controls";
 import {
   Body,
@@ -15,7 +18,6 @@ import {
   Info,
   Loading,
   Screen,
-  TimeLeft,
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useStyles } from "@/lib/theme";
@@ -41,7 +43,7 @@ const STILL_TO_DEAL: Record<string, string> = {
 };
 
 const STREET_NAMES: Record<string, string> = {
-  preflop: "Before the flop",
+  preflop: "Pre-flop",
   flop: "The flop",
   turn: "The turn",
   river: "The river",
@@ -64,6 +66,8 @@ export default function TableScreen() {
   useReloadAt([data?.table.hand?.turn_ends_at], reload);
   // Before sitting down: the empty seat tapped on the table.
   const [picked, setPicked] = useState<number | null>(null);
+  const styles = useStyles(makeStyles);
+  const insets = useSafeAreaInsets();
 
   if (!data) {
     return (
@@ -76,6 +80,37 @@ export default function TableScreen() {
   const { market, table } = data;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
+  const openPlayer = (username: string) => router.push(`/markets/${id}/members/${username}`);
+
+  // Sitting at the table: one screen without scrolling. The table takes all the room the
+  // buttons below it leave.
+  if (table.my_seat !== null) {
+    return (
+      <View style={[styles.seated, { paddingBottom: 10 + insets.bottom }]}>
+        <Stack.Screen options={{ title: table.name }} />
+        <PokerTableView
+          table={table}
+          picked={null}
+          onPick={() => {}}
+          onOpenPlayer={openPlayer}
+          fill
+        />
+        {hand && (
+          <HandPanel key={hand.number} table={table} hand={hand} url={url} reload={reload} />
+        )}
+        {!playing && <DealButton table={table} url={url} reload={reload} />}
+        {!playing && (
+          <MySeat
+            table={table}
+            url={url}
+            balance={market.my_balance}
+            currency={market.currency_name}
+            reload={reload}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <Screen>
@@ -83,29 +118,53 @@ export default function TableScreen() {
       <Body>
         Blinds {table.small_blind}/{table.big_blind} · buy-in {table.min_buy_in.toLocaleString()} to{" "}
         {table.max_buy_in.toLocaleString()} {market.currency_name}
-        {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
+        {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
       </Body>
 
-      <PokerTableView table={table} picked={picked} onPick={setPicked} />
+      <PokerTableView table={table} picked={picked} onPick={setPicked} onOpenPlayer={openPlayer} />
 
-      {hand && <HandPanel table={table} hand={hand} url={url} reload={reload} />}
+      {hand && (
+          <HandPanel key={hand.number} table={table} hand={hand} url={url} reload={reload} />
+        )}
 
-      {table.my_seat !== null && !playing && <DealButton table={table} url={url} reload={reload} />}
-
-      {table.my_seat === null ? (
-        <SitDown
-          table={table}
-          seat={picked}
-          url={url}
-          balance={market.my_balance}
-          reload={reload}
-        />
-      ) : (
-        <MySeat table={table} url={url} balance={market.my_balance} reload={reload} />
-      )}
+      <SitDown
+        table={table}
+        seat={picked}
+        url={url}
+        balance={market.my_balance}
+        currency={market.currency_name}
+        reload={reload}
+      />
 
       {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
     </Screen>
+  );
+}
+
+/** Your coins: in the market's balance, at this table, and the two together. */
+function Balances({
+  currency,
+  balance,
+  atTable,
+}: {
+  currency: string;
+  balance: number;
+  atTable: number | null;
+}) {
+  const styles = useStyles(makeStyles);
+  const parts = [{ label: `Your ${currency}`, value: balance }];
+  if (atTable !== null) {
+    parts.push({ label: "At this table", value: atTable }, { label: "Total", value: balance + atTable });
+  }
+  return (
+    <View style={styles.balances}>
+      {parts.map((part, i) => (
+        <View key={part.label} style={[styles.balance, i === parts.length - 1 && styles.balanceTotal]}>
+          <Text style={styles.balanceLabel}>{part.label}</Text>
+          <Text style={styles.balanceValue}>{part.value.toLocaleString()}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -114,21 +173,6 @@ function seatName(table: PokerTable, seat: number): string {
   const player = table.seats.find((s) => s.number === seat);
   if (!player) return `Seat ${seat + 1}`;
   return player.number === table.my_seat ? "You" : player.display_name;
-}
-
-/** "Noa raised to 40", for the last few things that happened. */
-function describe(table: PokerTable, entry: PokerHand["log"][number]): string {
-  const who = seatName(table, entry.seat);
-  const amount = entry.amount.toLocaleString();
-  const what: Record<string, string> = {
-    small_blind: `posted the small blind (${amount})`,
-    big_blind: `posted the big blind (${amount})`,
-    fold: "folded",
-    check: "checked",
-    call: `called (${amount} in this round)`,
-    raise: `raised to ${amount}`,
-  };
-  return `${who} ${what[entry.action] ?? entry.action}${entry.timed_out ? ", time ran out" : ""}`;
 }
 
 function HandPanel({
@@ -144,38 +188,52 @@ function HandPanel({
 }) {
   const styles = useStyles(makeStyles);
   const betting = hand.street !== "showdown" && hand.street !== "done";
+  // You, if you're playing this hand.
+  const me = hand.players.find((p) => p.seat === table.my_seat && p.still_here !== false);
+  const dealInfo = betting && (hand.waiting_for_cards || !table.turn_seconds);
+  // Sitting here during a hand: you can get up any time (it folds you).
+  const canGetUp = table.my_seat !== null && hand.street !== "done";
+  // Getting up takes a second tap: after the first, it asks.
+  const [leaving, setLeaving] = useState(false);
+  const getUp = <GetUp url={url} reload={reload} armed={leaving} setArmed={setLeaving} />;
+  // Watching someone else's turn with nothing to deal or decide: the table says it all.
+  const shows = dealInfo || !betting || hand.waiting_for_cards || me !== undefined || canGetUp;
+  if (!shows) return null;
   return (
     <Card style={styles.panel}>
-      <Text style={styles.street}>
-        Hand {hand.number} · {STREET_NAMES[hand.street]}
-      </Text>
-      {betting && (hand.waiting_for_cards || !table.turn_seconds) && (
-        <Info>{DEAL[hand.street]}</Info>
-      )}
-      {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
-      {hand.waiting_for_cards && <CardsOut table={table} hand={hand} url={url} reload={reload} />}
-      {hand.street !== "done" && hand.pots.length > 1 && (
-        <Text style={styles.small}>
-          {hand.pots
-            .map((p, i) => `${i === 0 ? "Main pot" : `side pot ${i}`} ${p.amount.toLocaleString()}`)
-            .join(", ")}
+      {/* During the hand the table shows the round. */}
+      {hand.street === "done" && (
+        <Text style={styles.street}>
+          Hand {hand.number} · {STREET_NAMES[hand.street]}
         </Text>
       )}
-      {/* A fresh one each turn, so an old raise amount doesn't stay. */}
-      {hand.my_turn && <MyTurn key={hand.log.length} table={table} hand={hand} url={url} reload={reload} />}
-      {hand.street === "showdown" && (
-        <Showdown key={hand.number} table={table} hand={hand} url={url} reload={reload} />
+      {dealInfo && <Info>{DEAL[hand.street]}</Info>}
+      {hand.street === "showdown" && <Info>{STILL_TO_DEAL[hand.reached]}</Info>}
+      {hand.waiting_for_cards && (
+        <Reanimated.View entering={FadeInDown.duration(300)} exiting={FadeOut.duration(150)}>
+          <CardsOut table={table} hand={hand} url={url} reload={reload} />
+        </Reanimated.View>
       )}
-      {hand.street === "done" && <Result table={table} hand={hand} />}
-
-      {hand.street !== "done" && hand.log.length > 0 && (
-        <View style={styles.log}>
-          {hand.log.slice(-4).map((entry, i) => (
-            <Text key={i} style={styles.small}>
-              {describe(table, entry)}
-            </Text>
-          ))}
-        </View>
+      {/* Your turn: your actions (a fresh one each action, so an old raise amount doesn't stay),
+          and Get up under them. Someone else's turn: the same actions, small and grey, in one
+          row with Get up. */}
+      {betting && me && hand.my_turn && (
+        <MyTurn key={hand.log.length} table={table} hand={hand} url={url} reload={reload} />
+      )}
+      {betting && me && !hand.my_turn && !leaving ? (
+        <Waiting hand={hand} me={me} onGetUp={() => setLeaving(true)} />
+      ) : (
+        canGetUp && getUp
+      )}
+      {hand.street === "showdown" && (
+        <Reanimated.View key={hand.number} entering={FadeInDown.duration(300)}>
+          <Showdown table={table} hand={hand} url={url} reload={reload} />
+        </Reanimated.View>
+      )}
+      {hand.street === "done" && (
+        <Reanimated.View entering={FadeInDown.duration(300).delay(500)}>
+          <Result table={table} hand={hand} />
+        </Reanimated.View>
       )}
     </Card>
   );
@@ -193,6 +251,7 @@ function CardsOut({
   url: string;
   reload: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   const { run, error } = useAction(reload);
   if (!hand.i_say_cards_out) {
     const dealer = hand.dealer_seat !== null ? seatName(table, hand.dealer_seat) : "The dealer";
@@ -205,7 +264,7 @@ function CardsOut({
         colors={POKER.gold}
         onPress={() => run(() => api(`${url}/hands/current/cards-out`, { method: "POST" }))}
       />
-      <Body>You dealt this hand. Tap once the cards are on the table, and the timer starts.</Body>
+      <Text style={styles.small}>You dealt. Tap once they’re on the table; then the timer starts.</Text>
       <ErrorText>{error}</ErrorText>
     </>
   );
@@ -239,15 +298,6 @@ function MyTurn({
 
   return (
     <View style={styles.turn}>
-      <Text style={styles.yourTurn}>
-        Your turn
-        {hand.turn_ends_at && (
-          <Text style={styles.small}>
-            {" · "}
-            <TimeLeft until={hand.turn_ends_at} />
-          </Text>
-        )}
-      </Text>
       {foldArmed ? (
         <View style={styles.buttons}>
           <View style={styles.half}>
@@ -302,6 +352,82 @@ function MyTurn({
           }}
         />
       )}
+    </View>
+  );
+}
+
+/** Getting up during a hand: a red button, and a second tap to be sure. It folds you if you're
+ * still in the hand, and your chips go back to your balance. */
+function GetUp({
+  url,
+  reload,
+  armed,
+  setArmed,
+}: {
+  url: string;
+  reload: () => void;
+  armed: boolean;
+  setArmed: (armed: boolean) => void;
+}) {
+  const styles = useStyles(makeStyles);
+  const { run, error } = useAction(reload);
+  return (
+    <>
+      {armed ? (
+        <View style={styles.buttons}>
+          {/* Two thirds of the row, so its longer words fit. */}
+          <View style={styles.wide}>
+            <Button
+              title="Tap again to get up"
+              colors={POKER.fold}
+              onPress={() => run(() => api(`${url}/leave`, { method: "POST" }))}
+            />
+          </View>
+          <View style={styles.half}>
+            <Button title="Stay" kind="secondary" onPress={() => setArmed(false)} />
+          </View>
+        </View>
+      ) : (
+        <Button title="Get up" colors={POKER.fold} onPress={() => setArmed(true)} />
+      )}
+      <ErrorText>{error}</ErrorText>
+    </>
+  );
+}
+
+/** Someone else's turn: your actions small and grey (they can't be tapped yet), showing what
+ * they'd be right now, and a red Get up in the same row. */
+function Waiting({
+  hand,
+  me,
+  onGetUp,
+}: {
+  hand: PokerHand;
+  me: PokerHand["players"][number];
+  onGetUp: () => void;
+}) {
+  const styles = useStyles(makeStyles);
+  const owed = Math.min(Math.max(0, hand.current_bet - me.street_bet), me.stack);
+  const actions = ["Fold", owed > 0 ? `Call ${short(owed, 10_000)}` : "Check"];
+  actions.push(hand.current_bet === 0 ? "Bet" : "Raise");
+  return (
+    <View style={styles.buttons}>
+      {actions.map((title) => (
+        <View key={title} style={[styles.small4, styles.grey]} accessibilityState={{ disabled: true }}>
+          <Text style={[styles.small4Text, styles.greyText]} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+      ))}
+      <Tappable
+        onPress={onGetUp}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.small4, styles.getUp, pressed && styles.pressed]}
+      >
+        <Text style={[styles.small4Text, styles.getUpText]} numberOfLines={1}>
+          Get up
+        </Text>
+      </Tappable>
     </View>
   );
 }
@@ -380,7 +506,8 @@ function Showdown({
   const styles = useStyles(makeStyles);
   const { run, error } = useAction(reload);
   const [picks, setPicks] = useState<number[][]>(() => hand.contested.map(() => []));
-  const me = hand.players.find((p) => p.seat === table.my_seat);
+  // You, if you played this hand (not someone who sat in your seat before you).
+  const me = hand.players.find((p) => p.seat === table.my_seat && p.still_here !== false);
   const stillIn = me !== undefined && !me.folded;
   const claim = hand.claim;
   const potName = (i: number) => (i === 0 ? "Main pot" : `Side pot ${i}`);
@@ -461,12 +588,19 @@ function Result({ table, hand }: { table: PokerTable; hand: PokerHand }) {
   const wins = Object.entries(hand.payouts).filter(([, amount]) => amount > 0);
   return (
     <View style={styles.turn}>
-      {wins.map(([seat, amount]) => (
-        <Text key={seat} style={styles.claimLine}>
-          {seatName(table, Number(seat))} {seatName(table, Number(seat)) === "You" ? "get" : "gets"}{" "}
-          {amount.toLocaleString()}
-        </Text>
-      ))}
+      {wins.map(([seat, amount]) => {
+        const player = hand.players.find((p) => p.seat === Number(seat));
+        // Whoever won may have got up since, maybe with someone new in their seat.
+        const who =
+          player?.still_here === false
+            ? `The player in seat ${Number(seat) + 1}, who got up,`
+            : seatName(table, Number(seat));
+        return (
+          <Text key={seat} style={styles.claimLine}>
+            {who} {who === "You" ? "get" : "got"} {amount.toLocaleString()}
+          </Text>
+        );
+      })}
     </View>
   );
 }
@@ -501,6 +635,7 @@ function SitDown({
   seat,
   url,
   balance,
+  currency,
   reload,
 }: {
   table: PokerTable;
@@ -508,6 +643,7 @@ function SitDown({
   seat: number | null;
   url: string;
   balance: number;
+  currency: string;
   reload: () => void;
 }) {
   const most = Math.min(table.max_buy_in, balance);
@@ -527,6 +663,7 @@ function SitDown({
   }
   return (
     <Card>
+      <Balances currency={currency} balance={balance} atTable={null} />
       <AmountSlider
         label={`Seat ${seat + 1}. Buy-in (you have ${balance.toLocaleString()})`}
         min={table.min_buy_in}
@@ -550,18 +687,22 @@ function MySeat({
   table,
   url,
   balance,
+  currency,
   reload,
 }: {
   table: PokerTable;
   url: string;
   balance: number;
+  currency: string;
   reload: () => void;
 }) {
   const styles = useStyles(makeStyles);
   const me = table.seats.find((s) => s.number === table.my_seat)!;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
-  const inHand = playing ? hand.players.find((p) => p.seat === me.number) : undefined;
+  const inHand = playing
+    ? hand.players.find((p) => p.seat === me.number && p.still_here !== false)
+    : undefined;
   const room = Math.min(table.max_buy_in - me.stack, balance);
   const [doing, setDoing] = useState<"top-up" | "cash-out" | "leave" | null>(null);
   const [amount, setAmount] = useState(0);
@@ -582,9 +723,13 @@ function MySeat({
       setDoing(null);
     });
 
+  const balances = (
+    <Balances currency={currency} balance={balance} atTable={me.stack} />
+  );
   if (doing === "top-up" && canTopUp) {
     return (
       <Card style={styles.mySeat}>
+        {balances}
         <AmountSlider
           label={`Add chips (up to ${room.toLocaleString()})`}
           min={1}
@@ -606,6 +751,7 @@ function MySeat({
   if (doing === "cash-out" && canCashOut) {
     return (
       <Card style={styles.mySeat}>
+        {balances}
         <AmountSlider
           label="Take chips back to your balance"
           min={1}
@@ -635,26 +781,25 @@ function MySeat({
       </Card>
     );
   }
+  // One row, so the table keeps its room.
   return (
-    <Card style={styles.mySeat}>
-      {(canTopUp || canCashOut) && (
-        <View style={styles.buttons}>
-          {canTopUp && (
-            <View style={styles.half}>
-              <Button title="Add chips" kind="secondary" onPress={() => start("top-up")} />
-            </View>
-          )}
-          {canCashOut && (
-            <View style={styles.half}>
-              <Button title="Cash out" kind="secondary" onPress={() => start("cash-out")} />
-            </View>
-          )}
+    <View style={styles.buttons}>
+      {canTopUp && (
+        <View style={styles.half}>
+          <Button title="Add chips" kind="secondary" onPress={() => start("top-up")} />
+        </View>
+      )}
+      {canCashOut && (
+        <View style={styles.half}>
+          <Button title="Cash out" kind="secondary" onPress={() => start("cash-out")} />
         </View>
       )}
       {canLeave && (
-        <Button title="Get up from the table" kind="secondary" onPress={() => start("leave")} />
+        <View style={styles.half}>
+          <Button title="Get up" kind="secondary" onPress={() => start("leave")} />
+        </View>
       )}
-    </Card>
+    </View>
   );
 }
 
@@ -688,10 +833,32 @@ function CloseTable({
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
+    seated: {
+      flex: 1,
+      gap: 10,
+      paddingTop: 6,
+      paddingHorizontal: 12,
+      backgroundColor: t.colors.background,
+    },
     small: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     panel: { gap: 10 },
     street: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
     turn: { gap: 10 },
+    small4: {
+      flex: 1,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 4,
+      borderRadius: t.radius.button,
+    },
+    small4Text: { fontSize: 14, fontFamily: t.fonts.bold },
+    grey: { backgroundColor: "#2E2E36" },
+    greyText: { color: "#6B6B78" },
+    getUp: { backgroundColor: POKER.fold[0] },
+    getUpText: { color: POKER.fold[1] },
+    pressed: { opacity: 0.8 },
+    wide: { flex: 2 },
     yourTurn: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.primary },
     buttons: { flexDirection: "row", gap: 10 },
     half: { flex: 1 },
@@ -706,6 +873,18 @@ const makeStyles = (t: Theme) =>
       backgroundColor: t.colors.background,
     },
     claimLine: { fontSize: 16, fontFamily: t.fonts.regular, color: t.colors.text },
-    log: { gap: 2, borderTopWidth: 1, borderTopColor: t.colors.border, paddingTop: 8 },
     mySeat: { gap: 10 },
+    balances: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+    balance: {
+      flex: 1,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: t.radius.card,
+      borderWidth: t.borderWidth,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.surface,
+    },
+    balanceTotal: { borderColor: POKER.gold[0] },
+    balanceLabel: { fontSize: 11, fontFamily: t.fonts.regular, color: t.colors.muted },
+    balanceValue: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
   });
