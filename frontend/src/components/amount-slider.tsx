@@ -13,10 +13,11 @@ import type { Theme } from "@/lib/themes";
 
 /** The table's own colors, the same in every theme, like real chips and felt. */
 export const POKER = {
-  fold: ["#DC2626", "#FFFFFF"] as [string, string],
+  fold: ["#A91F1F", "#FFFFFF"] as [string, string],
   check: ["#16A34A", "#FFFFFF"] as [string, string],
-  call: ["#2563EB", "#FFFFFF"] as [string, string],
-  gold: ["#E8B923", "#2B1D00"] as [string, string],
+  call: ["#1D4AB8", "#FFFFFF"] as [string, string],
+  // Real gold, not yellow (shine.tsx has its highlight and shadow).
+  gold: ["#C9A227", "#2B1D00"] as [string, string],
 };
 
 export function AmountSlider({

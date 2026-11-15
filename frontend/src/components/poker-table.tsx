@@ -7,16 +7,19 @@
 // poker-layout.ts, so nothing overlaps, and the whole table is drawn as big as its space allows.
 // Chips move where they go: from a player's pile to their bet, from the bets to the pot when a
 // round ends, and from the pot to the winner.
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Reanimated, {
   Easing as ReEasing,
   FadeIn,
   FadeOut,
   Keyframe,
+  useAnimatedProps,
+  useSharedValue,
+  withTiming,
   ZoomIn,
 } from "react-native-reanimated";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { ClipPath, Defs, G, Path, Rect as SvgRect } from "react-native-svg";
 
 import { POKER } from "@/components/amount-slider";
 import { ChipStack } from "@/components/poker-chips";
@@ -619,58 +622,104 @@ function CardShape({ delay }: { delay: number }) {
   );
 }
 
-/** A ring that empties as the turn's time runs out, with the seconds left in big numbers.
- * Green, then gold, then red for the last few seconds, which beat. */
+/** Sand, drawn so its top edge can move smoothly on the UI thread. */
+const SandRect = Reanimated.createAnimatedComponent(SvgRect);
+
+/** An hourglass whose sand runs from the top to the bottom as the turn's time runs out, smoothly,
+ * with the time left in gold digits under it. The sand reddens and the digits beat in the last
+ * five seconds. */
 function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const styles = useTableStyles();
-  const ring = RING * useContext(Scale);
-  const stroke = ring / 8;
+  // The hourglass takes the top two thirds of the timer's space, the digits the rest.
+  const space = RING * useContext(Scale);
+  const h = space * 0.66;
+  const w = h * 0.72;
+  // An id for this hourglass's shapes, so two on a screen don't mix.
+  const id = useId().replace(/[^a-zA-Z0-9]/g, "");
+  // The digits and colors: four times a second is plenty.
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 200);
+    const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
   }, []);
   const left = Math.max(0, Date.parse(until) - now);
-  const share = Math.min(1, left / (seconds * 1000));
-  const color = share > 0.5 ? POKER.check[0] : left > 5000 ? POKER.gold[0] : POKER.fold[0];
-  const radius = ring / 2 - stroke / 2 - 1;
-  const around = 2 * Math.PI * radius;
-  // The last five seconds: each one starts a little big and shrinks.
-  const beat = left <= 5000 && left > 0 ? 1 + 0.25 * ((left % 1000) / 1000) : 1;
+  const secondsLeft = Math.ceil(left / 1000);
+  const late = left <= 5000;
+  const sandColor = late ? "#E05A47" : left > (seconds * 1000) / 2 ? "#EBC970" : "#E7A84A";
+
+  // The sand: how much is still on top, from now to empty at the deadline, in one smooth run.
+  const sand = useSharedValue(1);
+  useEffect(() => {
+    const leftNow = Math.max(0, Date.parse(until) - Date.now());
+    sand.set(Math.min(1, leftNow / (seconds * 1000)));
+    sand.set(withTiming(0, { duration: leftNow, easing: ReEasing.linear }));
+  }, [until, seconds, sand]);
+
+  // The glass, between a wooden cap at the top and one at the bottom.
+  const cap = h * 0.08;
+  const top = cap;
+  const bottom = h - cap;
+  const mid = h / 2;
+  const cx = w / 2;
+  const [left0, right0] = [w * 0.14, w * 0.86];
+  const neck = w * 0.06;
+  const bulb = (from: number) => {
+    const bend = from + (mid - from) * 0.55;
+    return `M${left0} ${from} L${right0} ${from} C${right0} ${bend} ${cx + neck} ${mid} ${cx + neck} ${mid} L${cx - neck} ${mid} C${cx - neck} ${mid} ${left0} ${bend} ${left0} ${from} Z`;
+  };
+  const topBulb = bulb(top);
+  const bottomBulb = bulb(bottom);
+  const room = mid - top - 1;
+  const topSand = useAnimatedProps(() => {
+    const height = room * sand.value;
+    return { y: mid - height, height };
+  });
+  const bottomSand = useAnimatedProps(() => {
+    const height = room * (1 - sand.value) * 0.9;
+    return { y: bottom - height, height };
+  });
+  const stream = useAnimatedProps(() => ({
+    opacity: sand.value > 0.002 && sand.value < 0.998 ? 1 : 0,
+    height: Math.max(0, bottom - mid - room * (1 - sand.value) * 0.9),
+  }));
   return (
-    <View style={{ width: ring, height: ring }}>
-      <Svg width={ring} height={ring}>
-        <Circle
-          cx={ring / 2}
-          cy={ring / 2}
-          r={radius}
-          stroke="rgba(0,0,0,0.3)"
-          strokeWidth={stroke}
-          fill="rgba(0,0,0,0.2)"
-        />
-        <Circle
-          cx={ring / 2}
-          cy={ring / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={stroke}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${around} ${around}`}
-          strokeDashoffset={around * (1 - share)}
-          transform={`rotate(-90 ${ring / 2} ${ring / 2})`}
-        />
+    <View style={[styles.timer, { height: space }]}>
+      <Svg width={w} height={h}>
+        <Defs>
+          <ClipPath id={`top${id}`}>
+            <Path d={topBulb} />
+          </ClipPath>
+          <ClipPath id={`bottom${id}`}>
+            <Path d={bottomBulb} />
+          </ClipPath>
+        </Defs>
+        {/* The glass. */}
+        <Path d={topBulb} fill="rgba(255,255,255,0.1)" />
+        <Path d={bottomBulb} fill="rgba(255,255,255,0.1)" />
+        {/* The sand: on top, falling through the neck, and piling up below. */}
+        <G clipPath={`url(#top${id})`}>
+          <SandRect x={0} width={w} fill={sandColor} animatedProps={topSand} />
+        </G>
+        <SandRect x={cx - w * 0.02} y={mid} width={w * 0.04} fill={sandColor} animatedProps={stream} />
+        <G clipPath={`url(#bottom${id})`}>
+          <SandRect x={0} width={w} fill={sandColor} animatedProps={bottomSand} />
+        </G>
+        <Path d={topBulb} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={h * 0.025} />
+        <Path d={bottomBulb} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={h * 0.025} />
+        {/* The wooden caps. */}
+        <SvgRect x={0} y={0} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
+        <SvgRect x={0} y={bottom} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
       </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.ringMiddle]}>
-        <Text
-          style={[
-            styles.seconds,
-            { color: left <= 5000 ? POKER.fold[0] : ON_FELT, transform: [{ scale: beat }] },
-          ]}
-        >
-          {Math.ceil(left / 1000)}
-        </Text>
-      </View>
+      <Text
+        style={[
+          styles.potAmount,
+          late && styles.secondsLate,
+          // The last five seconds: each one starts a little big and shrinks.
+          late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
+        ]}
+      >
+        {`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`}
+      </Text>
     </View>
   );
 }
@@ -717,9 +766,11 @@ const makeStyles = (t: Theme, scale: number) => {
       backgroundColor: "rgba(255,255,255,0.08)",
     },
     cardMark: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    // Lined up at the bottom, so the timer's digits and the pot's amount (the same text) share
+    // one line.
     timeAndPot: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-end",
       justifyContent: "center",
       gap: u(6),
       height: u(RING),
@@ -727,9 +778,17 @@ const makeStyles = (t: Theme, scale: number) => {
     dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT },
     pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
     potLabel: { fontSize: u(10), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
-    potAmount: { fontSize: u(15), fontFamily: t.fonts.bold, color: POKER.gold[0] },
-    ringMiddle: { alignItems: "center", justifyContent: "center" },
-    seconds: { fontSize: u(22), fontFamily: t.fonts.bold },
+    // The pot's amount and the timer's digits: one look for both.
+    potAmount: {
+      fontSize: u(15),
+      lineHeight: u(18),
+      includeFontPadding: false,
+      fontFamily: t.fonts.bold,
+      fontVariant: ["tabular-nums"],
+      color: POKER.gold[0],
+    },
+    timer: { alignItems: "center", justifyContent: "space-between" },
+    secondsLate: { color: "#FF6B5B" },
     seatSpot: { position: "absolute" },
     seat: {
       position: "absolute",

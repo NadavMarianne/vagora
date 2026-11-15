@@ -262,6 +262,7 @@ function CardsOut({
       <Button
         title="Cards are out"
         colors={POKER.gold}
+          shine
         onPress={() => run(() => api(`${url}/hands/current/cards-out`, { method: "POST" }))}
       />
       <Text style={styles.small}>You dealt. Tap once they’re on the table; then the timer starts.</Text>
@@ -329,7 +330,8 @@ function MyTurn({
           </View>
           {canRaise && (
             <View style={styles.half}>
-              <Button title={word} colors={POKER.gold} onPress={() => setRaising(true)} />
+              <Button title={word} colors={POKER.gold}
+          shine onPress={() => setRaising(true)} />
             </View>
           )}
         </View>
@@ -483,6 +485,7 @@ function RaiseSheet({
         <Button
           title={allIn ? `All-in ${max.toLocaleString()}` : `${word} ${amount.toLocaleString()}`}
           colors={POKER.gold}
+          shine
           onPress={() => onRaise(amount)}
         />
         <Button title="Cancel" kind="secondary" onPress={onClose} />
