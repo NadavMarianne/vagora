@@ -23,7 +23,7 @@ import Svg, { ClipPath, Defs, G, Path, Rect as SvgRect } from "react-native-svg"
 
 import { POKER } from "@/components/amount-slider";
 import { ChipStack } from "@/components/poker-chips";
-import { Felt } from "@/components/poker-skins";
+import { DEFAULT_SKIN, Felt, skinById } from "@/components/poker-skins";
 import {
   BET_H,
   BOARD_CARD,
@@ -69,6 +69,9 @@ type Point = { x: number; y: number };
 
 /** How many times its normal size the table is drawn, for every part of it. */
 const Scale = createContext(1);
+
+/** The table's skin, for colors that must show on its felt. */
+const SkinColors = createContext(skinById(DEFAULT_SKIN));
 
 /** The table's styles at its size. */
 function useTableStyles() {
@@ -132,6 +135,7 @@ export function PokerTableView({
   picked,
   onPick,
   onOpenPlayer,
+  bottomSeat = 0,
   fill = false,
 }: {
   table: PokerTable;
@@ -140,6 +144,8 @@ export function PokerTableView({
   onPick: (seat: number) => void;
   /** Tapping a player: opens their page in the market. */
   onOpenPlayer: (username: string) => void;
+  /** The seat drawn at the bottom; the others go clockwise from there. */
+  bottomSeat?: number;
   /** Fill the space it's given (else it takes about half the screen). */
   fill?: boolean;
 }) {
@@ -149,7 +155,7 @@ export function PokerTableView({
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
   const n = table.max_players;
-  const bottomSeat = table.my_seat ?? 0;
+  const skin = skinById(table.skin);
   const boxWidth = space.width;
   const boxHeight = fill
     ? space.height
@@ -197,6 +203,7 @@ export function PokerTableView({
       {ready && (
         // The table, in the middle of its space.
         <Scale.Provider value={scale}>
+        <SkinColors.Provider value={skin}>
         <View
           style={{
             position: "absolute",
@@ -250,7 +257,7 @@ export function PokerTableView({
                     scale={scale}
                   />
                   <Text style={styles.potLabel}>Pot</Text>
-                  <Text style={styles.potAmount} numberOfLines={1}>
+                  <Text style={[styles.potAmount, { color: skin.accent }]} numberOfLines={1}>
                     <CountUp value={pot} format={(v) => short(v, 1_000_000)} />
                   </Text>
                 </View>
@@ -418,6 +425,7 @@ export function PokerTableView({
               );
             })}
         </View>
+        </SkinColors.Provider>
         </Scale.Provider>
       )}
     </View>
@@ -651,7 +659,9 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const left = Math.max(0, Date.parse(until) - now);
   const secondsLeft = Math.ceil(left / 1000);
   const late = left <= 5000;
-  const sandColor = late ? "#E05A47" : left > (seconds * 1000) / 2 ? "#EBC970" : "#E7A84A";
+  // The table's own colors, so the sand and digits show on its felt.
+  const skin = useContext(SkinColors);
+  const sandColor = late ? skin.late : skin.accent;
 
   // The sand: how much is still on top, from now to empty at the deadline, in one smooth run.
   const sand = useSharedValue(1);
@@ -719,7 +729,7 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
       <Text
         style={[
           styles.potAmount,
-          late && styles.secondsLate,
+          { color: late ? skin.late : skin.accent },
           // The last five seconds: each one starts a little big and shrinks.
           late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
         ]}
@@ -806,7 +816,6 @@ const makeStyles = (t: Theme, scale: number) => {
       ...onFelt,
     },
     timer: { alignItems: "center", justifyContent: "space-between" },
-    secondsLate: { color: "#FF6B5B" },
     seatSpot: { position: "absolute" },
     seat: {
       position: "absolute",

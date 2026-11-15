@@ -1,11 +1,12 @@
 // Opening a poker table: its name, blinds, buy-ins, seats, turn timer and look (decision 0030).
-import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+// With `?table=` it changes that table's settings instead (only whoever opened it, between hands).
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 
 import { Chips } from "@/components/controls";
 import { DEFAULT_SKIN } from "@/components/poker-skins";
 import { SkinPicker } from "@/components/skin-picker";
-import { Body, Button, ErrorText, Field, Screen } from "@/components/ui";
+import { Body, Button, ErrorText, Field, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { PokerTable } from "@/lib/types";
 import { Mistake, useAction } from "@/lib/use-action";
@@ -23,7 +24,10 @@ const TIMERS = [
 const digits = (text: string) => text.replace(/\D/g, "");
 
 export default function NewTableScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, table: tableId } = useLocalSearchParams<{ id: string; table?: string }>();
+  const editing = tableId !== undefined;
+  // Changing a table: its settings are loaded into the form first.
+  const [loaded, setLoaded] = useState(!editing);
   const [name, setName] = useState("");
   const [smallBlind, setSmallBlind] = useState("5");
   const [players, setPlayers] = useState(2);
@@ -34,6 +38,23 @@ export default function NewTableScreen() {
   const [skin, setSkin] = useState(DEFAULT_SKIN);
   const { run, error } = useAction();
 
+  useEffect(() => {
+    if (!editing) return;
+    api<PokerTable>(`/markets/${id}/tables/${tableId}`).then(
+      (table) => {
+        setName(table.name);
+        setSmallBlind(String(table.small_blind));
+        setPlayers(table.max_players);
+        setMinBuyIn(String(table.min_buy_in));
+        setMaxBuyIn(String(table.max_buy_in));
+        setTimer(table.turn_seconds ?? 0);
+        setSkin(table.skin ?? DEFAULT_SKIN);
+        setLoaded(true);
+      },
+      () => setLoaded(true),
+    );
+  }, [editing, id, tableId]);
+
   const small = Number(smallBlind) || 0;
   const big = 2 * small;
 
@@ -41,8 +62,8 @@ export default function NewTableScreen() {
     return run(async () => {
       if (!name.trim()) throw new Mistake("Give the table a name.");
       if (small < 1) throw new Mistake("The small blind must be at least 1.");
-      const table = await api<PokerTable>(`/markets/${id}/tables`, {
-        method: "POST",
+      const table = await api<PokerTable>(`/markets/${id}/tables${editing ? `/${tableId}` : ""}`, {
+        method: editing ? "PUT" : "POST",
         body: {
           name,
           small_blind: small,
@@ -53,12 +74,26 @@ export default function NewTableScreen() {
           skin,
         },
       });
-      router.replace(`/markets/${id}/games/${table.id}`);
+      if (editing) router.back();
+      else router.replace(`/markets/${id}/games/${table.id}`);
     });
   }
 
+  if (!loaded) {
+    return (
+      <Screen>
+        <Loading />
+      </Screen>
+    );
+  }
   return (
     <Screen>
+      {editing && <Stack.Screen options={{ title: "Table settings" }} />}
+      {editing && (
+        <Body>
+          Changes apply between hands. Players keep their stacks, even above a lower biggest buy-in.
+        </Body>
+      )}
       <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Hotel game" />
       <Field
         label="Small blind"
@@ -100,7 +135,7 @@ export default function NewTableScreen() {
       {timer > 0 && <Body>When time runs out, the player checks if they can, or folds.</Body>}
       <SkinPicker skin={skin} onChange={setSkin} />
       <ErrorText>{error}</ErrorText>
-      <Button title="Open the table" onPress={open} />
+      <Button title={editing ? "Save" : "Open the table"} onPress={open} />
     </Screen>
   );
 }
