@@ -8,7 +8,7 @@ played in app/hands.py.
 """
 
 from datetime import UTC, datetime
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints, model_validator
@@ -38,6 +38,31 @@ def conflict(message: str) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, message)
 
 
+# How a table looks: its felt's color, an artistic painted felt, or a special one. The app draws
+# each of these; the list is checked here so a table can only have one the app knows.
+Skin = Literal[
+    # Colors.
+    "green",
+    "blue",
+    "red",
+    "orange",
+    "purple",
+    "black",
+    # Artistic.
+    "watercolor",
+    "ink",
+    "sunset",
+    "ocean",
+    "pastel",
+    # Special.
+    "suits",
+    "starry",
+    "royal",
+    "chips",
+    "casino",
+]
+
+
 class TableSettings(BaseModel):
     name: TableName
     max_players: Annotated[int, Field(ge=2, le=9)] = 9
@@ -47,6 +72,7 @@ class TableSettings(BaseModel):
     max_buy_in: Price | None = None
     # Seconds per turn. Empty: no timer.
     turn_seconds: Annotated[int, Field(ge=5, le=3600)] | None = None
+    skin: Skin = "green"
 
     @model_validator(mode="after")
     def buy_ins_in_order(self) -> Self:
@@ -93,6 +119,7 @@ class TableView(BaseModel):
     min_buy_in: int
     max_buy_in: int
     turn_seconds: int | None
+    skin: str
     seats: list[SeatView]
     # Your seat number, if you're sitting here.
     my_seat: int | None
@@ -118,6 +145,7 @@ def view(table: PokerTable, user: User, db: Session) -> TableView:
         min_buy_in=table.min_buy_in,
         max_buy_in=table.max_buy_in,
         turn_seconds=table.turn_seconds,
+        skin=table.skin,
         seats=[
             SeatView(
                 number=s.number,

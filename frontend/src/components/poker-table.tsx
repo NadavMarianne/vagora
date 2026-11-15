@@ -23,6 +23,7 @@ import Svg, { ClipPath, Defs, G, Path, Rect as SvgRect } from "react-native-svg"
 
 import { POKER } from "@/components/amount-slider";
 import { ChipStack } from "@/components/poker-chips";
+import { Felt } from "@/components/poker-skins";
 import {
   BET_H,
   BOARD_CARD,
@@ -32,7 +33,6 @@ import {
   MIDDLE_GAP,
   MIDDLE_W,
   type Rect,
-  RIM_W,
   RING,
   SEAT_H,
   SEAT_W,
@@ -43,8 +43,6 @@ import { useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { PokerHand, PokerTable } from "@/lib/types";
 
-const FELT = "#0E6B3C";
-const RIM = "#5A3A1F";
 const ON_FELT = "#FFFFFF";
 const FOLDED = 0.35;
 // How many cards are face up in the middle after each betting round.
@@ -209,7 +207,15 @@ export function PokerTableView({
           }}
         >
           {/* The felt, with the seats round its edge. */}
-          <View style={[styles.felt, box(layout.felt), { borderRadius: layout.feltRadius }]} />
+          <View style={[styles.felt, box(layout.felt)]}>
+            <Felt
+              skin={table.skin}
+              width={layout.felt.w}
+              height={layout.felt.h}
+              radius={layout.feltRadius}
+              scale={scale}
+            />
+          </View>
 
           {/* The middle: the round and whose turn, the board, the timer and the pot. */}
           <View style={[styles.middle, box(layout.middleRect)]} pointerEvents="none">
@@ -727,18 +733,18 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
 const makeStyles = (t: Theme, scale: number) => {
   /** A size at the table's size. */
   const u = (n: number) => n * scale;
+  // A soft dark edge round the writing on the felt, so it reads on every table skin.
+  const onFelt = {
+    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowOffset: { width: 0, height: u(1) },
+    textShadowRadius: u(3),
+  };
   return StyleSheet.create({
     // Reaches a little into the page's margins, for room on narrow phones.
     area: { alignSelf: "stretch", marginHorizontal: -12 },
     fill: { flex: 1, marginHorizontal: 0 },
     flying: { opacity: 0 },
-    felt: {
-      position: "absolute",
-      backgroundColor: FELT,
-      borderWidth: u(RIM_W),
-      borderColor: RIM,
-      boxShadow: `inset 0 0 ${u(30)}px rgba(0,0,0,0.45)`,
-    },
+    felt: { position: "absolute" },
     middle: {
       position: "absolute",
       alignItems: "center",
@@ -752,9 +758,15 @@ const makeStyles = (t: Theme, scale: number) => {
       fontFamily: t.fonts.bold,
       color: ON_FELT,
       textAlign: "center",
+      ...onFelt,
     },
     board: { flexDirection: "row", alignItems: "center", gap: u(BOARD_GAP), height: u(BOARD_CARD.h) },
-    street: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    street: {
+      fontSize: u(13),
+      fontFamily: t.fonts.bold,
+      color: "rgba(255,255,255,0.75)",
+      ...onFelt,
+    },
     card: {
       width: u(BOARD_CARD.w),
       height: u(BOARD_CARD.h),
@@ -775,9 +787,14 @@ const makeStyles = (t: Theme, scale: number) => {
       gap: u(6),
       height: u(RING),
     },
-    dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT },
+    dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT, ...onFelt },
     pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
-    potLabel: { fontSize: u(10), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    potLabel: {
+      fontSize: u(10),
+      fontFamily: t.fonts.bold,
+      color: "rgba(255,255,255,0.75)",
+      ...onFelt,
+    },
     // The pot's amount and the timer's digits: one look for both.
     potAmount: {
       fontSize: u(15),
@@ -786,6 +803,7 @@ const makeStyles = (t: Theme, scale: number) => {
       fontFamily: t.fonts.bold,
       fontVariant: ["tabular-nums"],
       color: POKER.gold[0],
+      ...onFelt,
     },
     timer: { alignItems: "center", justifyContent: "space-between" },
     secondsLate: { color: "#FF6B5B" },

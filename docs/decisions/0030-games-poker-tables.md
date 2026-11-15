@@ -30,6 +30,7 @@ A market gets a **Games** section. The first game is a **poker table**: the card
 6. Then the next hand can start.
 
 ### Bookkeeping
+- **Skins** (decided 2026-11-15): whoever opens a table picks how it looks, from "Table decorations" in the form. Three kinds: colors (green, the usual, blue, red, orange, purple, black), artistic painted felts (watercolor, ink, sunset, ocean, pastel) and special ones (suits, starry night, royal, chips, casino). The table stores the skin's name, the backend accepts only names on its list, and the app draws each one.
 - Stacks live on the table. The ledger records only sitting down, topping up, cashing out and leaving, so balances stay exact and every movement is in each person's history.
 - The total of all stacks and pots on a table always equals what was bought in minus what was taken out. The tests check this after every action.
 - Actions are checked on the backend (whose turn, the allowed amounts), and two taps at the same moment can't both count.

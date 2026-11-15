@@ -40,4 +40,4 @@ Good ideas that aren't being built yet. When one is picked up, it gets a decisio
 
 ## Games
 - Virtual cards: the app deals the cards too, each player's hand hidden on their own phone. A mode chosen when opening a table: real cards (the app is only the chips, as now) or virtual cards.
-- Table skins: decorative looks for the table (felt colors, rims, patterns) to choose from.
+- Table skins: decorative looks for the table (felt colors, rims, patterns) to choose from. Started 2026-11-15 with 16 skins picked when opening a table (decision 0030). Later: changing a table's skin in the app, and more skins.

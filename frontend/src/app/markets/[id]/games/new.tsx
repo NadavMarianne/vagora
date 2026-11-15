@@ -1,8 +1,10 @@
-// Opening a poker table: its name, blinds, buy-ins, seats and turn timer (decision 0030).
+// Opening a poker table: its name, blinds, buy-ins, seats, turn timer and look (decision 0030).
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 
 import { Chips } from "@/components/controls";
+import { DEFAULT_SKIN } from "@/components/poker-skins";
+import { SkinPicker } from "@/components/skin-picker";
 import { Body, Button, ErrorText, Field, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { PokerTable } from "@/lib/types";
@@ -29,6 +31,7 @@ export default function NewTableScreen() {
   const [minBuyIn, setMinBuyIn] = useState("");
   const [maxBuyIn, setMaxBuyIn] = useState("");
   const [timer, setTimer] = useState(0);
+  const [skin, setSkin] = useState(DEFAULT_SKIN);
   const { run, error } = useAction();
 
   const small = Number(smallBlind) || 0;
@@ -47,6 +50,7 @@ export default function NewTableScreen() {
           min_buy_in: minBuyIn ? Number(minBuyIn) : null,
           max_buy_in: maxBuyIn ? Number(maxBuyIn) : null,
           turn_seconds: timer || null,
+          skin,
         },
       });
       router.replace(`/markets/${id}/games/${table.id}`);
@@ -94,6 +98,7 @@ export default function NewTableScreen() {
         onChange={([seconds]) => setTimer(seconds)}
       />
       {timer > 0 && <Body>When time runs out, the player checks if they can, or folds.</Body>}
+      <SkinPicker skin={skin} onChange={setSkin} />
       <ErrorText>{error}</ErrorText>
       <Button title="Open the table" onPress={open} />
     </Screen>
