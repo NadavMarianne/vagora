@@ -766,9 +766,11 @@ const makeStyles = (t: Theme, scale: number) => {
       backgroundColor: "rgba(255,255,255,0.08)",
     },
     cardMark: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    // Lined up at the bottom, so the timer's digits and the pot's amount (the same text) share
+    // one line.
     timeAndPot: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-end",
       justifyContent: "center",
       gap: u(6),
       height: u(RING),
