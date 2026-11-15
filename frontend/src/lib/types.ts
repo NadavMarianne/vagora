@@ -338,6 +338,8 @@ export type PokerHand = {
     total: number;
     folded: boolean;
     all_in: boolean;
+    /** Whether whoever played this seat is still sitting in it (missing from older backends). */
+    still_here?: boolean;
   }[];
   /** Every action. `street` is the betting round it was in (missing in the oldest hands). */
   log: {

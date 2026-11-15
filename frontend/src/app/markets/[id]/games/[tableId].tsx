@@ -430,7 +430,8 @@ function Showdown({
   const styles = useStyles(makeStyles);
   const { run, error } = useAction(reload);
   const [picks, setPicks] = useState<number[][]>(() => hand.contested.map(() => []));
-  const me = hand.players.find((p) => p.seat === table.my_seat);
+  // You, if you played this hand (not someone who sat in your seat before you).
+  const me = hand.players.find((p) => p.seat === table.my_seat && p.still_here !== false);
   const stillIn = me !== undefined && !me.folded;
   const claim = hand.claim;
   const potName = (i: number) => (i === 0 ? "Main pot" : `Side pot ${i}`);
@@ -511,12 +512,19 @@ function Result({ table, hand }: { table: PokerTable; hand: PokerHand }) {
   const wins = Object.entries(hand.payouts).filter(([, amount]) => amount > 0);
   return (
     <View style={styles.turn}>
-      {wins.map(([seat, amount]) => (
-        <Text key={seat} style={styles.claimLine}>
-          {seatName(table, Number(seat))} {seatName(table, Number(seat)) === "You" ? "get" : "gets"}{" "}
-          {amount.toLocaleString()}
-        </Text>
-      ))}
+      {wins.map(([seat, amount]) => {
+        const player = hand.players.find((p) => p.seat === Number(seat));
+        // Whoever won may have got up since, maybe with someone new in their seat.
+        const who =
+          player?.still_here === false
+            ? `The player in seat ${Number(seat) + 1}, who got up,`
+            : seatName(table, Number(seat));
+        return (
+          <Text key={seat} style={styles.claimLine}>
+            {who} {who === "You" ? "get" : "got"} {amount.toLocaleString()}
+          </Text>
+        );
+      })}
     </View>
   );
 }
@@ -616,7 +624,9 @@ function MySeat({
   const me = table.seats.find((s) => s.number === table.my_seat)!;
   const hand = table.hand;
   const playing = hand !== null && hand.street !== "done";
-  const inHand = playing ? hand.players.find((p) => p.seat === me.number) : undefined;
+  const inHand = playing
+    ? hand.players.find((p) => p.seat === me.number && p.still_here !== false)
+    : undefined;
   const room = Math.min(table.max_buy_in - me.stack, balance);
   const [doing, setDoing] = useState<"top-up" | "cash-out" | "leave" | null>(null);
   const [amount, setAmount] = useState(0);

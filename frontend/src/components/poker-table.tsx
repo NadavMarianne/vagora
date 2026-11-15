@@ -173,6 +173,10 @@ export function PokerTableView({
   // Whose turn; otherwise the round (or the table's name, before the first hand).
   const topLine = turnName ?? (hand ? STREETS[hand.street] : table.name);
   const boardCards = hand ? boardCount(hand) : 0;
+  /** The hand's player in a seat, if whoever played it is still sitting there (someone who got
+   * up, or someone new in their seat, shows none of the hand). */
+  const playerAt = (number: number) =>
+    hand?.players.find((p) => p.seat === number && p.still_here !== false);
   // The order cards are dealt in: from the seat after the button, round the table.
   const dealOrder = (seat: number) => (hand ? (seat - hand.button - 1 + 2 * n) % n : 0);
 
@@ -223,7 +227,13 @@ export function PokerTableView({
               ) : null}
               {playing && pot > 0 && (
                 <View style={styles.pot}>
-                  <ChipStack amount={pot} smallBlind={table.small_blind} size="medium" scale={scale} />
+                  <ChipStack
+                    amount={pot}
+                    smallBlind={table.small_blind}
+                    size="medium"
+                    stacks={3}
+                    scale={scale}
+                  />
                   <Text style={styles.potLabel}>Pot</Text>
                   <Text style={styles.potAmount} numberOfLines={1}>
                     <CountUp value={pot} format={(v) => short(v, 1_000_000)} />
@@ -258,7 +268,7 @@ export function PokerTableView({
                 </Tappable>
               );
             }
-            const inHand = playing ? hand.players.find((p) => p.seat === number) : undefined;
+            const inHand = playing ? playerAt(number) : undefined;
             return (
               <SeatBox
                 key={`seat-${number}`}
@@ -279,7 +289,7 @@ export function PokerTableView({
           {layout.spots.map((spot, number) => {
             const seat = table.seats.find((s) => s.number === number);
             if (!seat) return null;
-            const inHand = playing ? hand.players.find((p) => p.seat === number) : undefined;
+            const inHand = playing ? playerAt(number) : undefined;
             return (
               <View
                 key={`front-${number}`}
@@ -299,7 +309,12 @@ export function PokerTableView({
                   </Reanimated.View>
                 )}
                 {seat.stack > 0 && (
-                  <ChipStack amount={seat.stack} smallBlind={table.small_blind} scale={scale} />
+                  <ChipStack
+                    amount={seat.stack}
+                    smallBlind={table.small_blind}
+                    stacks={spot.frontTall ? 2 : 3}
+                    scale={scale}
+                  />
                 )}
               </View>
             );
@@ -308,7 +323,7 @@ export function PokerTableView({
           {/* Each time a player puts chips in, a pile flies from their chips to their bet. */}
           {playing &&
             layout.spots.map((spot, number) => {
-              const bet = hand.players.find((p) => p.seat === number)?.street_bet ?? 0;
+              const bet = playerAt(number)?.street_bet ?? 0;
               if (bet <= 0) return null;
               return (
                 <Reanimated.View
@@ -317,7 +332,13 @@ export function PokerTableView({
                   style={[styles.betSpot, styles.flying, box(spot.bet)]}
                   pointerEvents="none"
                 >
-                  <ChipStack amount={bet} smallBlind={table.small_blind} scale={scale} still />
+                  <ChipStack
+                    amount={bet}
+                    smallBlind={table.small_blind}
+                    shape="tower"
+                    scale={scale}
+                    still
+                  />
                 </Reanimated.View>
               );
             })}
@@ -326,9 +347,10 @@ export function PokerTableView({
               ends; or what it won, which comes from the pot and goes on to their chips. */}
           {hand &&
             layout.spots.map((spot, number) => {
-              const inHand = playing ? hand.players.find((p) => p.seat === number) : undefined;
+              const inHand = playing ? playerAt(number) : undefined;
               const bet = inHand?.street_bet ?? 0;
-              const won = hand.street === "done" ? (hand.payouts[String(number)] ?? 0) : 0;
+              const won =
+                hand.street === "done" && playerAt(number) ? (hand.payouts[String(number)] ?? 0) : 0;
               if (bet <= 0 && won <= 0) return null;
               const at = center(spot.bet);
               return (
@@ -349,7 +371,12 @@ export function PokerTableView({
                   pointerEvents="none"
                 >
                   <View style={styles.bet}>
-                    <ChipStack amount={bet || won} smallBlind={table.small_blind} scale={scale} />
+                    <ChipStack
+                      amount={bet || won}
+                      smallBlind={table.small_blind}
+                      shape="tower"
+                      scale={scale}
+                    />
                     <Text style={styles.betText} numberOfLines={1}>
                       {won > 0 ? `+${short(won)}` : short(bet)}
                     </Text>
@@ -361,9 +388,10 @@ export function PokerTableView({
           {/* On each seat's top edge: what they did last. */}
           {hand &&
             layout.spots.map((spot, number) => {
-              const action = table.seats.some((s) => s.number === number)
-                ? lastAction(hand, number)
-                : null;
+              const action =
+                table.seats.some((s) => s.number === number) && playerAt(number)
+                  ? lastAction(hand, number)
+                  : null;
               if (!action) return null;
               return (
                 <ActionLabel
@@ -698,6 +726,8 @@ const makeStyles = (t: Theme, scale: number) => {
       borderColor: t.colors.border,
       backgroundColor: t.colors.surface,
       paddingHorizontal: u(4),
+      // A little more room under the text than over it.
+      paddingBottom: u(3),
     },
     seatFill: { left: 0, top: 0 },
     mine: { borderColor: t.colors.primary },
@@ -711,9 +741,30 @@ const makeStyles = (t: Theme, scale: number) => {
     emptyText: { fontSize: u(13), fontFamily: t.fonts.bold, color: t.colors.text },
     pickedText: { color: POKER.gold[1] },
     nameRow: { flexDirection: "row", alignItems: "center", gap: u(3), maxWidth: u(SEAT_W - 10) },
-    name: { flexShrink: 1, fontSize: u(13), fontFamily: t.fonts.bold, color: t.colors.text },
-    stack: { fontSize: u(15), fontFamily: t.fonts.bold, color: t.colors.text },
-    note: { fontSize: u(10), fontFamily: t.fonts.regular, color: t.colors.muted },
+    // Fixed line heights (and no extra font padding on Android), so the three lines always fit
+    // inside the seat with room under the last one.
+    name: {
+      flexShrink: 1,
+      fontSize: u(13),
+      lineHeight: u(16),
+      includeFontPadding: false,
+      fontFamily: t.fonts.bold,
+      color: t.colors.text,
+    },
+    stack: {
+      fontSize: u(15),
+      lineHeight: u(19),
+      includeFontPadding: false,
+      fontFamily: t.fonts.bold,
+      color: t.colors.text,
+    },
+    note: {
+      fontSize: u(10),
+      lineHeight: u(13),
+      includeFontPadding: false,
+      fontFamily: t.fonts.regular,
+      color: t.colors.muted,
+    },
     front: {
       position: "absolute",
       flexDirection: "row",

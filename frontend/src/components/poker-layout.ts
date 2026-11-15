@@ -13,8 +13,8 @@ export const SEAT_H = 58;
 /** The action label sits on a seat's top edge: this much of it above the seat. */
 export const LABEL_RISE = 14;
 export const LABEL_H = 18;
-/** The bet sits on a seat's bottom edge: this much of it below the seat. */
-export const BET_DROP = 18;
+/** The bet sits right under a seat: this much below the seat (all of it, so it covers nothing). */
+export const BET_DROP = 20;
 export const BET_H = 20;
 /** What lies in front of a seat: its cards and chips, one above the other (beside a side seat)
  * or side by side (below or above a seat at the top or bottom). */

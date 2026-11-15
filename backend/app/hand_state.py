@@ -110,6 +110,9 @@ class HandPlayerView(BaseModel):
     total: int
     folded: bool
     all_in: bool
+    # Whether whoever played this seat is still sitting in it. If not, the seat is empty or
+    # someone new sat down, and the hand's details there aren't theirs.
+    still_here: bool
 
 
 class ClaimView(BaseModel):
@@ -201,6 +204,7 @@ def view(row: PokerHand, table: PokerTable, user: User) -> HandView:
                 total=p.total,
                 folded=p.folded,
                 all_in=p.all_in,
+                still_here=_still_here(table, row, p.seat),
             )
             for p in hand.players
         ],
@@ -228,6 +232,11 @@ def says_cards_out(table: PokerTable, row: PokerHand, user: User) -> bool:
         s.user_id == user.id and s.left_at is None and row.seat_ids.get(str(s.number)) == s.id
         for s in table.seats
     )
+
+
+def _still_here(table: PokerTable, row: PokerHand, number: int) -> bool:
+    seat_id = row.seat_ids.get(str(number))
+    return any(s.id == seat_id and s.left_at is None for s in table.seats)
 
 
 def _seat_user(table: PokerTable, seat_id: int) -> int | None:
