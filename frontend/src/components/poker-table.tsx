@@ -626,11 +626,13 @@ function CardShape({ delay }: { delay: number }) {
 const SandRect = Reanimated.createAnimatedComponent(SvgRect);
 
 /** An hourglass whose sand runs from the top to the bottom as the turn's time runs out, smoothly,
- * with the time left over it in digits. The sand reddens and the digits beat in the last five
- * seconds. */
+ * with the time left in gold digits under it. The sand reddens and the digits beat in the last
+ * five seconds. */
 function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const styles = useTableStyles();
-  const h = RING * useContext(Scale);
+  // The hourglass takes the top three quarters of the timer's space, the digits the rest.
+  const space = RING * useContext(Scale);
+  const h = space * 0.74;
   const w = h * 0.72;
   // An id for this hourglass's shapes, so two on a screen don't mix.
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -681,7 +683,7 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
     height: Math.max(0, bottom - mid - room * (1 - sand.value) * 0.9),
   }));
   return (
-    <View style={{ width: w, height: h }}>
+    <View style={[styles.timer, { height: space }]}>
       <Svg width={w} height={h}>
         <Defs>
           <ClipPath id={`top${id}`}>
@@ -708,18 +710,16 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
         <SvgRect x={0} y={0} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
         <SvgRect x={0} y={bottom} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
       </Svg>
-      <View style={[StyleSheet.absoluteFill, styles.ringMiddle]}>
-        <Text
-          style={[
-            styles.seconds,
-            late && styles.secondsLate,
-            // The last five seconds: each one starts a little big and shrinks.
-            late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
-          ]}
-        >
-          {`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`}
-        </Text>
-      </View>
+      <Text
+        style={[
+          styles.seconds,
+          late && styles.secondsLate,
+          // The last five seconds: each one starts a little big and shrinks.
+          late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
+        ]}
+      >
+        {`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`}
+      </Text>
     </View>
   );
 }
@@ -777,17 +777,15 @@ const makeStyles = (t: Theme, scale: number) => {
     pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
     potLabel: { fontSize: u(10), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
     potAmount: { fontSize: u(15), fontFamily: t.fonts.bold, color: POKER.gold[0] },
-    ringMiddle: { alignItems: "center", justifyContent: "center" },
-    // The time over the hourglass, in digits on a dark pill so it reads over the sand.
+    timer: { alignItems: "center", justifyContent: "space-between" },
+    // The time under the hourglass, in gold digits.
     seconds: {
-      fontSize: u(15),
+      fontSize: u(12),
+      lineHeight: u(14),
+      includeFontPadding: false,
       fontFamily: t.fonts.bold,
       fontVariant: ["tabular-nums"],
-      color: ON_FELT,
-      paddingHorizontal: u(5),
-      borderRadius: u(6),
-      backgroundColor: "rgba(0,0,0,0.6)",
-      overflow: "hidden",
+      color: POKER.gold[0],
     },
     secondsLate: { color: "#FF6B5B" },
     seatSpot: { position: "absolute" },

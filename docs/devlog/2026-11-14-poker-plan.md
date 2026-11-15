@@ -32,4 +32,4 @@
 
 ## 2026-11-15: polish
 - Poker colors: the gold buttons (Raise or Bet, the raise pop-up's button, Cards are out) are real metallic gold with a wave of light gliding over them and tiny sparkles. The red (fold, get up) and the blue (call) are darker.
-- The turn timer is an hourglass now: the sand runs down smoothly (animated on the phone's UI thread, not redrawn a few times a second), with the time left in digits over it. In the last five seconds the sand turns red and the digits beat.
+- The turn timer is an hourglass now: the sand runs down smoothly (animated on the phone's UI thread, not redrawn a few times a second), with the time left in gold digits under it. In the last five seconds the sand and the digits turn red and the digits beat.
