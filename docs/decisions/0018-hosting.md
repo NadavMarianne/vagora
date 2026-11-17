@@ -8,6 +8,8 @@
 - **Separate databases per Vercel environment:** Production uses Neon's main branch, pull request previews use a permanent Neon `preview` branch. Both are still the development stage (with Firebase `vagora-dev`). Real production has its own Neon project, Firebase project, and Vercel project (decision 0028).
 - **Preview links are open** (Vercel's Deployment Protection is off, 2026-10-31), so the phones can test a pull request before it's merged: start Expo with `EXPO_PUBLIC_API_URL` set to the pull request's preview link. Everything except `/health` still needs a Firebase login. Turn protection back on before going live.
 - **Migrations run on every deploy,** as Vercel's build step (`[tool.vercel.scripts]` in `pyproject.toml`), before the new version goes live. A failed migration is undone by PostgreSQL and stops the deploy, so the old version keeps running.
+- **A push that doesn't change `backend/` builds nothing** (2026-11-17). Every build is kept as a copy, and the copies count toward the free plan's 10 GB of Function Storage. `ignoreCommand` in `backend/vercel.json` compares the push with the branch's last build and skips it when nothing under `backend/` changed. The first push of a branch always builds. Both Vercel projects use this file. A pull request that only changes the app has no preview link of its own; test it against the normal development backend.
+- **Old copies are deleted after a while** (Deployment Retention in the Vercel project settings): previews after 2 weeks, production ones kept longer.
 - **The app sends a warm-up request** (to `/health`) as soon as it opens, so the backend is awake by the time login finishes.
 - A web frontend can later be a second, separate Vercel project from the same repo.
 
