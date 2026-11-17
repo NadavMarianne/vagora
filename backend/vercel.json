@@ -1,5 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["fra1"],
-  "ignoreCommand": "[ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ] && git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- ."
+  "regions": ["fra1"]
 }

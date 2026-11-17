@@ -4,4 +4,5 @@
 - Decided two things (decision 0018 updated):
   - In the Vercel project settings, Deployment Retention deletes preview copies after 2 weeks and keeps production ones longer.
   - A push that changes nothing under `backend/` (only the app or the docs) no longer builds the backend. Most of our pushes are app-only, so this saves most copies and makes pushes faster.
+  - First try put this rule in `backend/vercel.json`. Both Vercel builds failed, and a rule in that shared file would also replace the real project's own "build only releases" rule. So it's set in the test project's dashboard instead.
 - The AI part planned for the court (decision 0024) hardly adds to this: the AI runs on its provider's servers, and its library adds only a few MB per copy.
