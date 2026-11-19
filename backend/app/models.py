@@ -499,6 +499,8 @@ class PokerTable(Base):
     max_buy_in: Mapped[int] = mapped_column(BigInteger)
     # How long each turn may take. Empty: no timer.
     turn_seconds: Mapped[int | None] = mapped_column()
+    # How the table looks (see Skin in tables.py).
+    skin: Mapped[str] = mapped_column(String(20), server_default="green")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Set when the table is closed. Only an empty table can be closed.
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

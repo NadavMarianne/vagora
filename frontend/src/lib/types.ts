@@ -297,6 +297,8 @@ export type PokerTable = {
   max_buy_in: number;
   /** Seconds per turn. Empty: no timer. */
   turn_seconds: number | null;
+  /** How the table looks (see poker-skins.tsx). Missing from older backends. */
+  skin?: string;
   seats: PokerSeat[];
   /** Your seat number, if you're sitting here. */
   my_seat: number | null;

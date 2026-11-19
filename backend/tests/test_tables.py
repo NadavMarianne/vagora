@@ -91,6 +91,20 @@ def test_impossible_settings_are_refused(home, settings):
     assert response.status_code == 422
 
 
+def test_a_table_has_a_skin(home):
+    dana, _, market_id = home
+    assert open_table(dana, market_id)["skin"] == "green"  # the usual felt
+
+    table = open_table(dana, market_id, skin="suits")
+    assert table["skin"] == "suits"
+    url = f"/markets/{market_id}/tables/{table['id']}"
+    changed = dana.put(url, json={**TABLE, "skin": "royal"})
+    assert changed.json()["skin"] == "royal"
+
+    unknown = dana.post(f"/markets/{market_id}/tables", json={**TABLE, "skin": "glitter"})
+    assert unknown.status_code == 422
+
+
 def test_sitting_down_moves_the_buy_in_onto_the_table(home, db):
     dana, noa, market_id = home
     table = open_table(dana, market_id)

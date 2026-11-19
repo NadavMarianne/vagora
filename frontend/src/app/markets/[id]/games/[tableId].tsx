@@ -6,6 +6,8 @@ import Reanimated, { FadeInDown, FadeOut } from "react-native-reanimated";
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSession } from "@/lib/session";
+
 import { AmountSlider, POKER } from "@/components/amount-slider";
 import { PokerTableView, short } from "@/components/poker-table";
 import { Tappable } from "@/components/tappable";
@@ -68,6 +70,9 @@ export default function TableScreen() {
   const [picked, setPicked] = useState<number | null>(null);
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { session } = useSession();
+  // How many seats the table has been turned, by the ↻ button (just on this phone).
+  const [rotation, setRotation] = useState(0);
 
   if (!data) {
     return (
@@ -82,62 +87,94 @@ export default function TableScreen() {
   const playing = hand !== null && hand.street !== "done";
   const openPlayer = (username: string) => router.push(`/markets/${id}/members/${username}`);
 
-  // Sitting at the table: one screen without scrolling. The table takes all the room the
-  // buttons below it leave.
-  if (table.my_seat !== null) {
-    return (
-      <View style={[styles.seated, { paddingBottom: 10 + insets.bottom }]}>
-        <Stack.Screen options={{ title: table.name }} />
-        <PokerTableView
-          table={table}
-          picked={null}
-          onPick={() => {}}
-          onOpenPlayer={openPlayer}
-          fill
+  const mine = session.state === "ready" && session.profile.username === table.creator_username;
+  // Turning the table: which seat is drawn at the bottom. Everyone starts with the same view.
+  const bottom = ((rotation % table.max_players) + table.max_players) % table.max_players;
+
+  // One screen without scrolling: a line about the table with its buttons, the table taking all
+  // the room the rest leaves, and under it what you can do.
+  return (
+    <View style={[styles.page, { paddingBottom: 10 + insets.bottom }]}>
+      <Stack.Screen options={{ title: table.name }} />
+      <View style={styles.tableBar}>
+        <Text style={[styles.small, styles.barText]} numberOfLines={2}>
+          Blinds {table.small_blind}/{table.big_blind} · buy-in{" "}
+          {table.min_buy_in.toLocaleString()}–{table.max_buy_in.toLocaleString()}
+          {table.turn_seconds ? ` · ${table.turn_seconds} s a turn` : ""}
+        </Text>
+        <RoundButton
+          label="↻"
+          accessibilityLabel="Turn the table"
+          // Clockwise: each seat moves on to the next place round the table.
+          onPress={() => setRotation((r) => r - 1)}
         />
-        {hand && (
-          <HandPanel key={hand.number} table={table} hand={hand} url={url} reload={reload} />
+        {mine && (
+          <RoundButton
+            label="⚙"
+            accessibilityLabel="Table settings"
+            onPress={() => router.push(`/markets/${id}/games/new?table=${table.id}`)}
+          />
         )}
-        {!playing && <DealButton table={table} url={url} reload={reload} />}
-        {!playing && (
-          <MySeat
+      </View>
+      <PokerTableView
+        table={table}
+        picked={table.my_seat === null ? picked : null}
+        onPick={setPicked}
+        onOpenPlayer={openPlayer}
+        bottomSeat={bottom}
+        fill
+      />
+      {hand && <HandPanel key={hand.number} table={table} hand={hand} url={url} reload={reload} />}
+      {table.my_seat !== null ? (
+        <>
+          {!playing && <DealButton table={table} url={url} reload={reload} />}
+          {!playing && (
+            <MySeat
+              table={table}
+              url={url}
+              balance={market.my_balance}
+              currency={market.currency_name}
+              reload={reload}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          <SitDown
             table={table}
+            seat={picked}
             url={url}
             balance={market.my_balance}
             currency={market.currency_name}
             reload={reload}
           />
-        )}
-      </View>
-    );
-  }
+          {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
+        </>
+      )}
+    </View>
+  );
+}
 
+/** A small round button with a symbol, for the table's own controls. */
+function RoundButton({
+  label,
+  accessibilityLabel,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  const styles = useStyles(makeStyles);
   return (
-    <Screen>
-      <Stack.Screen options={{ title: table.name }} />
-      <Body>
-        Blinds {table.small_blind}/{table.big_blind} · buy-in {table.min_buy_in.toLocaleString()} to{" "}
-        {table.max_buy_in.toLocaleString()} {market.currency_name}
-        {table.turn_seconds ? ` · ${table.turn_seconds} s per turn` : ""}
-      </Body>
-
-      <PokerTableView table={table} picked={picked} onPick={setPicked} onOpenPlayer={openPlayer} />
-
-      {hand && (
-          <HandPanel key={hand.number} table={table} hand={hand} url={url} reload={reload} />
-        )}
-
-      <SitDown
-        table={table}
-        seat={picked}
-        url={url}
-        balance={market.my_balance}
-        currency={market.currency_name}
-        reload={reload}
-      />
-
-      {table.seats.length === 0 && <CloseTable table={table} url={url} marketId={id} />}
-    </Screen>
+    <Tappable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [styles.round, pressed && styles.pressed]}
+    >
+      <Text style={styles.roundText}>{label}</Text>
+    </Tappable>
   );
 }
 
@@ -836,13 +873,26 @@ function CloseTable({
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
-    seated: {
+    page: {
       flex: 1,
       gap: 10,
       paddingTop: 6,
       paddingHorizontal: 12,
       backgroundColor: t.colors.background,
     },
+    tableBar: { flexDirection: "row", alignItems: "center", gap: 8 },
+    barText: { flex: 1 },
+    round: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: t.borderWidth || 1,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.surface,
+    },
+    roundText: { fontSize: 18, lineHeight: 22, color: t.colors.text },
     small: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
     panel: { gap: 10 },
     street: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text },
