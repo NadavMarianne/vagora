@@ -38,3 +38,11 @@
 - The table isn't turned to put you at the bottom any more: everyone starts with the same view, and a ↻ button turns it one seat clockwise (only on that phone).
 - Picking a seat uses the same full-screen table as playing, so it's big too.
 - Each skin has its own colors for the timer's digits and sand and the pot (gold on most, cream on orange, aqua on ocean, silver on ink...), and a warning color for the last seconds that shows on that felt.
+
+## 2026-11-19: skins, take two
+- Testing showed the colors on the felt looked random from table to table (cream here, aqua there). Now there's one rule for every felt: the writing, card outlines, hourglass, gold and warning red are all worked out from the felt's color with WCAG's contrast rule (the standard for readable text on screens). Gold is the same gold on almost every table, darker on light ones. Decision 0030 has the details.
+- Added a white table. With the rule it gets dark writing by itself.
+- The art felts were all faded blobs and brush strokes, which looked alike and not good. Replaced with five, each after a real art tradition: blocks (Mondrian), Japanese waves (seigaiha), black marble, a gold mosaic (Klimt) and paper cut-outs (Matisse). Solid shapes, no fading. The busy ones keep the middle calm for the board and the pot.
+- Special felts: the suits are fewer and fainter, the chips bigger and clearer and never on top of each other, the starry night got a moon and a small constellation, royal got gold dots where the lines cross, and casino a second gold line.
+- Found along the way: empty seats hang over the felt's edge, so on a white table "Sit here" vanished. Empty seats now have a solid background like taken ones. Card outlines got a soft edge, so they show on any patch of a busy felt.
+- Dense patterns draw each color as one shape, so the phone draws a few shapes instead of hundreds.

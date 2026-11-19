@@ -4,7 +4,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 
 import { Chips } from "@/components/controls";
-import { DEFAULT_SKIN } from "@/components/poker-skins";
+import { DEFAULT_SKIN, skinById } from "@/components/poker-skins";
 import { SkinPicker } from "@/components/skin-picker";
 import { Body, Button, ErrorText, Field, Loading, Screen } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -48,7 +48,8 @@ export default function NewTableScreen() {
         setMinBuyIn(String(table.min_buy_in));
         setMaxBuyIn(String(table.max_buy_in));
         setTimer(table.turn_seconds ?? 0);
-        setSkin(table.skin ?? DEFAULT_SKIN);
+        // A skin that's no longer offered shows (and saves) as the default.
+        setSkin(skinById(table.skin).id);
         setLoaded(true);
       },
       () => setLoaded(true),

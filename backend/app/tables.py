@@ -38,7 +38,7 @@ def conflict(message: str) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, message)
 
 
-# How a table looks: its felt's color, an artistic painted felt, or a special one. The app draws
+# How a table looks: its felt's color, an art felt, or a special one. The app draws
 # each of these; the list is checked here so a table can only have one the app knows.
 Skin = Literal[
     # Colors.
@@ -48,12 +48,13 @@ Skin = Literal[
     "orange",
     "purple",
     "black",
+    "white",
     # Artistic.
-    "watercolor",
-    "ink",
-    "sunset",
-    "ocean",
-    "pastel",
+    "blocks",
+    "waves",
+    "marble",
+    "mosaic",
+    "cutouts",
     # Special.
     "suits",
     "starry",

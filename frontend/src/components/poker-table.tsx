@@ -23,7 +23,7 @@ import Svg, { ClipPath, Defs, G, Path, Rect as SvgRect } from "react-native-svg"
 
 import { POKER } from "@/components/amount-slider";
 import { ChipStack } from "@/components/poker-chips";
-import { DEFAULT_SKIN, Felt, skinById } from "@/components/poker-skins";
+import { DEFAULT_SKIN, Felt, type Ink, skinById } from "@/components/poker-skins";
 import {
   BET_H,
   BOARD_CARD,
@@ -43,7 +43,6 @@ import { useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 import type { PokerHand, PokerTable } from "@/lib/types";
 
-const ON_FELT = "#FFFFFF";
 const FOLDED = 0.35;
 // How many cards are face up in the middle after each betting round.
 const BOARD: Record<string, number> = { preflop: 0, flop: 3, turn: 4, river: 5, showdown: 5 };
@@ -77,7 +76,8 @@ const SkinColors = createContext(skinById(DEFAULT_SKIN));
 function useTableStyles() {
   const t = useTheme();
   const scale = useContext(Scale);
-  return useMemo(() => makeStyles(t, scale), [t, scale]);
+  const { ink } = useContext(SkinColors);
+  return useMemo(() => makeStyles(t, scale, ink), [t, scale, ink]);
 }
 
 /** How long chips take to fly to a bet. */
@@ -167,7 +167,7 @@ export function PokerTableView({
   );
   // Everything below is in points on the screen, already at the table's size.
   const { layout, scale } = fitted;
-  const styles = useMemo(() => makeStyles(t, scale), [t, scale]);
+  const styles = useMemo(() => makeStyles(t, scale, skin.ink), [t, scale, skin.ink]);
   const ready = boxWidth > 0 && boxHeight > 0;
 
   // Like at a real table, this round's bets stay in front of the players; the pot only holds what
@@ -257,7 +257,7 @@ export function PokerTableView({
                     scale={scale}
                   />
                   <Text style={styles.potLabel}>Pot</Text>
-                  <Text style={[styles.potAmount, { color: skin.accent }]} numberOfLines={1}>
+                  <Text style={styles.potAmount} numberOfLines={1}>
                     <CountUp value={pot} format={(v) => short(v, 1_000_000)} />
                   </Text>
                 </View>
@@ -661,7 +661,7 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
   const late = left <= 5000;
   // The table's own colors, so the sand and digits show on its felt.
   const skin = useContext(SkinColors);
-  const sandColor = late ? skin.late : skin.accent;
+  const sandColor = late ? skin.ink.late : skin.ink.accent;
 
   // The sand: how much is still on top, from now to empty at the deadline, in one smooth run.
   const sand = useSharedValue(1);
@@ -710,8 +710,8 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
           </ClipPath>
         </Defs>
         {/* The glass. */}
-        <Path d={topBulb} fill="rgba(255,255,255,0.1)" />
-        <Path d={bottomBulb} fill="rgba(255,255,255,0.1)" />
+        <Path d={topBulb} fill={skin.ink.faint} />
+        <Path d={bottomBulb} fill={skin.ink.faint} />
         {/* The sand: on top, falling through the neck, and piling up below. */}
         <G clipPath={`url(#top${id})`}>
           <SandRect x={0} width={w} fill={sandColor} animatedProps={topSand} />
@@ -720,8 +720,8 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
         <G clipPath={`url(#bottom${id})`}>
           <SandRect x={0} width={w} fill={sandColor} animatedProps={bottomSand} />
         </G>
-        <Path d={topBulb} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={h * 0.025} />
-        <Path d={bottomBulb} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={h * 0.025} />
+        <Path d={topBulb} fill="none" stroke={skin.ink.line} strokeWidth={h * 0.025} />
+        <Path d={bottomBulb} fill="none" stroke={skin.ink.line} strokeWidth={h * 0.025} />
         {/* The wooden caps. */}
         <SvgRect x={0} y={0} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
         <SvgRect x={0} y={bottom} width={w} height={cap} rx={cap / 2} fill="#7A4E2A" />
@@ -729,7 +729,7 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
       <Text
         style={[
           styles.potAmount,
-          { color: late ? skin.late : skin.accent },
+          { color: late ? skin.ink.late : skin.ink.accent },
           // The last five seconds: each one starts a little big and shrinks.
           late && left > 0 && { transform: [{ scale: 1 + 0.25 * ((left % 1000) / 1000) }] },
         ]}
@@ -740,12 +740,13 @@ function Countdown({ until, seconds }: { until: string; seconds: number }) {
   );
 }
 
-const makeStyles = (t: Theme, scale: number) => {
+const makeStyles = (t: Theme, scale: number, ink: Ink) => {
   /** A size at the table's size. */
   const u = (n: number) => n * scale;
-  // A soft dark edge round the writing on the felt, so it reads on every table skin.
+  // A soft edge round the writing on the felt, in the opposite color, so it reads on busy felts.
+  // Every color on the felt comes from the skin's ink (see poker-skins).
   const onFelt = {
-    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowColor: ink.halo,
     textShadowOffset: { width: 0, height: u(1) },
     textShadowRadius: u(3),
   };
@@ -766,7 +767,7 @@ const makeStyles = (t: Theme, scale: number) => {
       height: u(TOP_LINE_H),
       fontSize: u(13),
       fontFamily: t.fonts.bold,
-      color: ON_FELT,
+      color: ink.text,
       textAlign: "center",
       ...onFelt,
     },
@@ -774,7 +775,7 @@ const makeStyles = (t: Theme, scale: number) => {
     street: {
       fontSize: u(13),
       fontFamily: t.fonts.bold,
-      color: "rgba(255,255,255,0.75)",
+      color: ink.soft,
       ...onFelt,
     },
     card: {
@@ -784,10 +785,12 @@ const makeStyles = (t: Theme, scale: number) => {
       alignItems: "center",
       justifyContent: "center",
       borderWidth: u(1.5),
-      borderColor: "rgba(255,255,255,0.7)",
-      backgroundColor: "rgba(255,255,255,0.08)",
+      borderColor: ink.line,
+      backgroundColor: ink.faint,
+      // A soft edge in the opposite color, so the outline shows on every patch of a busy felt.
+      boxShadow: `0 0 ${u(3)}px ${ink.halo}`,
     },
-    cardMark: { fontSize: u(13), fontFamily: t.fonts.bold, color: "rgba(255,255,255,0.75)" },
+    cardMark: { fontSize: u(13), fontFamily: t.fonts.bold, color: ink.soft },
     // Lined up at the bottom, so the timer's digits and the pot's amount (the same text) share
     // one line.
     timeAndPot: {
@@ -797,12 +800,12 @@ const makeStyles = (t: Theme, scale: number) => {
       gap: u(6),
       height: u(RING),
     },
-    dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ON_FELT, ...onFelt },
+    dealing: { fontSize: u(16), fontFamily: t.fonts.bold, color: ink.text, ...onFelt },
     pot: { alignItems: "center", maxWidth: u(MIDDLE_W - RING - 6) },
     potLabel: {
       fontSize: u(10),
       fontFamily: t.fonts.bold,
-      color: "rgba(255,255,255,0.75)",
+      color: ink.soft,
       ...onFelt,
     },
     // The pot's amount and the timer's digits: one look for both.
@@ -812,7 +815,7 @@ const makeStyles = (t: Theme, scale: number) => {
       includeFontPadding: false,
       fontFamily: t.fonts.bold,
       fontVariant: ["tabular-nums"],
-      color: POKER.gold[0],
+      color: ink.accent,
       ...onFelt,
     },
     timer: { alignItems: "center", justifyContent: "space-between" },
@@ -838,7 +841,9 @@ const makeStyles = (t: Theme, scale: number) => {
       borderWidth: u(3),
       boxShadow: `0 0 ${u(12)}px ${POKER.gold[0]}`,
     },
-    empty: { borderStyle: "dashed", backgroundColor: "transparent" },
+    // Seats hang over the felt's edge, so an empty one has a solid background like a taken one,
+    // which reads the same on any felt and on the page.
+    empty: { borderStyle: "dashed", borderColor: t.colors.muted },
     picked: { borderStyle: "solid", borderColor: POKER.gold[0], backgroundColor: POKER.gold[0] },
     emptyText: { fontSize: u(13), fontFamily: t.fonts.bold, color: t.colors.text },
     pickedText: { color: POKER.gold[1] },
@@ -884,14 +889,15 @@ const makeStyles = (t: Theme, scale: number) => {
       alignItems: "center",
       justifyContent: "center",
       borderWidth: u(1),
-      borderColor: "rgba(255,255,255,0.8)",
-      backgroundColor: "rgba(255,255,255,0.12)",
+      borderColor: ink.line,
+      backgroundColor: ink.faint,
+      boxShadow: `0 0 ${u(2)}px ${ink.halo}`,
     },
     holeMark: {
       fontSize: u(8),
       lineHeight: u(10),
       fontFamily: t.fonts.bold,
-      color: "rgba(255,255,255,0.8)",
+      color: ink.line,
     },
     button: {
       width: u(14),
