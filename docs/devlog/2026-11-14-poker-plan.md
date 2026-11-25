@@ -57,3 +57,6 @@
 - After trying it: the special felts come in a few colors each, picked with tiny dots under the preview (suits in cream, white, black, green or blue; chips in green, blue, red, black or cream; royal and casino in five felt colors each). Each color is its own skin name, like `suits-blue`, so nothing changed in the database.
 - The drawn chips had random lines inside, which looked lopsided. Each is now drawn like a real chip, all symmetric: six inlays round the edge, an inner ring, twelve dots and a small suit in the middle.
 - Tried calming the waves in the middle with a soft patch; it looked bad, so it's gone.
+- Waves removed: it was too busy under the cards.
+- One order for colors everywhere: white, black, red, orange, green, blue, purple. The plain colors follow it, and so do each special felt's colors.
+- The dots were too small to tap. Tapping a special felt now opens a small menu of its colors, each a bigger preview with its name. Suits had two near-white colors (cream and white); now it's white, black, red, green and blue.

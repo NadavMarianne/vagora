@@ -29,7 +29,6 @@ const GOLD = "#C9A227";
 
 type Paint =
     | { kind: "plain" }
-    | { kind: "waves" }
     | { kind: "marble" }
     | { kind: "mosaic" }
     | { kind: "cutouts" }
@@ -59,46 +58,56 @@ export type Ink = {
     edge: string;
 };
 
+/** The order colors are shown in everywhere: the plain felts and each special felt's colors. */
+export const TONES = ["white", "black", "red", "orange", "green", "blue", "purple"] as const;
+type Tone = (typeof TONES)[number];
+const byTone = (a: { tone?: Tone }, b: { tone?: Tone }) =>
+    TONES.indexOf(a.tone ?? "white") - TONES.indexOf(b.tone ?? "white");
+
 type SkinDef = {
     id: string;
     name: string;
+    /** Its color among `TONES` (plain and special felts). */
+    tone?: Tone;
     /** The felt's main color: what everything on it is measured against. */
     felt: string;
     rim: string;
     paint: Paint;
     /** The two colors a line-drawn pattern is drawn in. */
     lines?: [string, string];
-    /** The same pattern in other colors, each its own skin named `<id>-<key>`. */
+    /** The same pattern in other colors, each its own skin named `<id>-<tone>`. */
     colors?: Color[];
 };
 
 /** Another color of a special felt. */
-type Color = { key: string; name: string; felt: string; rim?: string; lines?: [string, string] };
+type Color = { tone: Tone; felt: string; rim?: string; lines?: [string, string] };
 
 export type Skin = Omit<SkinDef, "colors"> & {
     ink: Ink;
-    /** The skin and its other colors, the skin first (special felts only). */
+    /** The skin and its other colors, in the order of `TONES` (special felts only). */
     family: Skin[];
+    /** The color's own name, like "Blue" (special felts only). */
+    toneName?: string;
 };
+
+const nameOf = (tone: Tone) => tone[0].toUpperCase() + tone.slice(1);
 
 const DEFS: { title: string; skins: SkinDef[] }[] = [
     {
         title: "Colors",
         skins: [
-            { id: "green", name: "Green", felt: "#0E6B3C", rim: WOOD, paint: { kind: "plain" } },
-            { id: "blue", name: "Blue", felt: "#14507F", rim: WOOD, paint: { kind: "plain" } },
-            { id: "red", name: "Red", felt: "#7E1F2B", rim: WOOD, paint: { kind: "plain" } },
-            { id: "orange", name: "Orange", felt: "#A84E17", rim: WOOD, paint: { kind: "plain" } },
-            { id: "purple", name: "Purple", felt: "#4B2A7B", rim: WOOD, paint: { kind: "plain" } },
-            { id: "black", name: "Black", felt: "#1E2126", rim: "#3A2A1C", paint: { kind: "plain" } },
-            { id: "white", name: "White", felt: "#ECE8DF", rim: WOOD, paint: { kind: "plain" } },
+            { id: "white", name: "White", tone: "white", felt: "#ECE8DF", rim: WOOD, paint: { kind: "plain" } },
+            { id: "black", name: "Black", tone: "black", felt: "#1E2126", rim: "#3A2A1C", paint: { kind: "plain" } },
+            { id: "red", name: "Red", tone: "red", felt: "#7E1F2B", rim: WOOD, paint: { kind: "plain" } },
+            { id: "orange", name: "Orange", tone: "orange", felt: "#A84E17", rim: WOOD, paint: { kind: "plain" } },
+            { id: "green", name: "Green", tone: "green", felt: "#0E6B3C", rim: WOOD, paint: { kind: "plain" } },
+            { id: "blue", name: "Blue", tone: "blue", felt: "#14507F", rim: WOOD, paint: { kind: "plain" } },
+            { id: "purple", name: "Purple", tone: "purple", felt: "#4B2A7B", rim: WOOD, paint: { kind: "plain" } },
         ],
     },
     {
         title: "Artistic",
         skins: [
-            // The Japanese seigaiha wave pattern, in tones of indigo.
-            { id: "waves", name: "Waves", felt: "#1A3768", rim: "#3B2A1C", paint: { kind: "waves" } },
             // Black marble with white and gold veins.
             { id: "marble", name: "Marble", felt: "#1C1F22", rim: "#2B2B2E", paint: { kind: "marble" } },
             // Gold tiles and spirals on a dark ground, after Klimt's golden period.
@@ -117,56 +126,60 @@ const DEFS: { title: string; skins: SkinDef[] }[] = [
             {
                 id: "suits",
                 name: "Suits",
-                felt: "#F3EEE4",
+                tone: "white",
+                felt: "#F5F1E8",
                 rim: WOOD,
                 paint: { kind: "suits" },
                 lines: ["#C8323A", "#3A3A3A"],
                 colors: [
-                    { key: "white", name: "White", felt: "#FBFAF7", lines: ["#C8323A", "#3A3A3A"] },
-                    { key: "black", name: "Black", felt: "#1C1D21", rim: "#3A2A1C", lines: ["#E86A72", "#D6D3CC"] },
-                    { key: "green", name: "Green", felt: "#0E6B3C", lines: ["#F6B1B5", "#F3EBD3"] },
-                    { key: "blue", name: "Blue", felt: "#14507F", lines: ["#F6B1B5", "#F3EBD3"] },
+                    { tone: "black", felt: "#1C1D21", rim: "#3A2A1C", lines: ["#E86A72", "#D6D3CC"] },
+                    { tone: "red", felt: "#7E1F2B", lines: ["#F6B1B5", "#F3EBD3"] },
+                    { tone: "green", felt: "#0E6B3C", lines: ["#F6B1B5", "#F3EBD3"] },
+                    { tone: "blue", felt: "#14507F", lines: ["#F6B1B5", "#F3EBD3"] },
                 ],
             },
             // Chips drawn in fine lines, in even rows, the two colors taking turns.
             {
                 id: "chips",
                 name: "Chips",
+                tone: "green",
                 felt: "#0E5E36",
                 rim: WOOD,
                 paint: { kind: "chips" },
                 lines: ["#F3EBD3", GOLD],
                 colors: [
-                    { key: "blue", name: "Blue", felt: "#14507F", lines: ["#F3EBD3", GOLD] },
-                    { key: "red", name: "Red", felt: "#7E1F2B", lines: ["#F3EBD3", GOLD] },
-                    { key: "black", name: "Black", felt: "#1C1D21", rim: "#3A2A1C", lines: [GOLD, "#D6D3CC"] },
-                    { key: "cream", name: "Cream", felt: "#F3EEE4", lines: ["#C8323A", "#3A3A3A"] },
+                    { tone: "white", felt: "#F3EEE4", lines: ["#C8323A", "#3A3A3A"] },
+                    { tone: "black", felt: "#1C1D21", rim: "#3A2A1C", lines: [GOLD, "#D6D3CC"] },
+                    { tone: "red", felt: "#7E1F2B", lines: ["#F3EBD3", GOLD] },
+                    { tone: "blue", felt: "#14507F", lines: ["#F3EBD3", GOLD] },
                 ],
             },
             {
                 id: "royal",
                 name: "Royal",
+                tone: "red",
                 felt: "#5B0F1E",
                 rim: "#8A6510",
                 paint: { kind: "lattice" },
                 colors: [
-                    { key: "navy", name: "Navy", felt: "#13264D" },
-                    { key: "emerald", name: "Emerald", felt: "#0B4A33" },
-                    { key: "purple", name: "Purple", felt: "#3A1F5C" },
-                    { key: "black", name: "Black", felt: "#17171B" },
+                    { tone: "black", felt: "#17171B" },
+                    { tone: "green", felt: "#0B4A33" },
+                    { tone: "blue", felt: "#13264D" },
+                    { tone: "purple", felt: "#3A1F5C" },
                 ],
             },
             {
                 id: "casino",
                 name: "Casino",
+                tone: "green",
                 felt: "#0B5A32",
                 rim: "#3B2614",
                 paint: { kind: "ring" },
                 colors: [
-                    { key: "blue", name: "Blue", felt: "#124A78" },
-                    { key: "red", name: "Red", felt: "#741C28" },
-                    { key: "purple", name: "Purple", felt: "#432570" },
-                    { key: "black", name: "Black", felt: "#1C1F24" },
+                    { tone: "black", felt: "#1C1F24" },
+                    { tone: "red", felt: "#741C28" },
+                    { tone: "blue", felt: "#124A78" },
+                    { tone: "purple", felt: "#432570" },
                 ],
             },
         ],
@@ -243,14 +256,17 @@ export function inkFor(felt: string): Ink {
 /** A skin and its other colors, ready to draw. */
 function withColors({ colors = [], ...def }: SkinDef): Skin {
     const family: Skin[] = [];
-    const skin: Skin = { ...def, ink: inkFor(def.felt), family };
+    const tone = (t?: Tone) => (colors.length > 0 && t ? { toneName: nameOf(t) } : {});
+    const own = colors.length > 0 && def.tone ? { name: `${def.name} · ${nameOf(def.tone)}` } : {};
+    const skin: Skin = { ...def, ...own, ...tone(def.tone), ink: inkFor(def.felt), family };
     family.push(
         skin,
-        ...colors.map(({ key, name, ...color }) => {
-            const other = { ...def, ...color, id: `${def.id}-${key}`, name: `${def.name} · ${name}` };
-            return { ...other, ink: inkFor(other.felt), family };
+        ...colors.map((color) => {
+            const other = { ...def, ...color, id: `${def.id}-${color.tone}`, name: `${def.name} · ${nameOf(color.tone)}` };
+            return { ...other, ...tone(color.tone), ink: inkFor(other.felt), family };
         }),
     );
+    family.sort(byTone);
     return skin;
 }
 
@@ -265,7 +281,7 @@ const ALL = SKIN_SECTIONS.flatMap((s) => s.skins.flatMap((skin) => skin.family))
 
 /** A skin by its name; an unknown name (say, one that was removed) gets the default. */
 export function skinById(id: string | undefined): Skin {
-    return ALL.find((s) => s.id === id) ?? ALL[0];
+    return ALL.find((s) => s.id === id) ?? ALL.find((s) => s.id === DEFAULT_SKIN)!;
 }
 
 // ---- Drawing ----
@@ -504,37 +520,6 @@ function paint(skin: Skin, w: number, h: number, scale: number, clear: Spot[]) {
     switch (skin.paint.kind) {
         case "plain":
             return null;
-
-        case "waves": {
-            // Rows of fans, each row tucked under the one above, rings in tones of indigo. A row's
-            // fans don't overlap, so each ring of a row is one shape.
-            const r = 28 * scale;
-            const rings = ["#183463", "#1F4277", "#27508C", "#3462A0"];
-            const circle = (x: number, y: number, radius: number) =>
-                `M${x - radius} ${y} a${radius} ${radius} 0 1 0 ${2 * radius} 0 a${radius} ${radius} 0 1 0 ${-2 * radius} 0 Z`;
-            const rows = [];
-            for (let row = -1; row * r * 0.5 < h + r; row++) {
-                const y = row * r * 0.5;
-                const shift = row % 2 === 0 ? 0 : r;
-                const xs: number[] = [];
-                for (let x = -r + shift; x < w + r; x += 2 * r) xs.push(x);
-                rows.push(
-                    <G key={row}>
-                        {rings.map((fill, i) => (
-                            <Path
-                                key={i}
-                                d={xs.map((x) => circle(x, y, r * (1 - i * 0.22))).join(" ")}
-                                fill={fill}
-                                stroke="#DCE6F2"
-                                strokeWidth={0.9 * scale}
-                                strokeOpacity={0.35}
-                            />
-                        ))}
-                    </G>,
-                );
-            }
-            return rows;
-        }
 
         case "marble": {
             // Veins flowing one way across the stone, as in real marble: many thin and faint, a few
