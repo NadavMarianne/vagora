@@ -1,11 +1,13 @@
 import logging
 
 from fastapi import FastAPI, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 
 from app import (
+    app_version,
     cleanup,
     db,
     hands,
@@ -22,6 +24,7 @@ from app import (
     time_zones,
     users,
 )
+from app.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +49,17 @@ app.include_router(hands.router)
 async def daily_cleanup(request: Request, call_next):
     """Piggybacks the once-a-day cleanup on normal use (see app/cleanup.py)."""
     await run_in_threadpool(cleanup.run_daily_cleanup)
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def too_old_apps(request: Request, call_next):
+    """Asks apps older than the minimum version to update (see app/app_version.py)."""
+    if app_version.too_old(request.url.path, request.headers.get(app_version.HEADER)):
+        return JSONResponse(
+            status_code=status.HTTP_426_UPGRADE_REQUIRED,
+            content={"detail": app_version.MESSAGE, "apk_url": settings.apk_url or None},
+        )
     return await call_next(request)
 
 
