@@ -1,16 +1,18 @@
 // How a poker table looks: its skin. Three kinds: plain colors, art (each after a real art
-// tradition), and special ones (little card suits, a starry night, a royal pattern...). `Felt` draws
+// tradition), and special ones (card suits and chips drawn in fine lines, a royal pattern...). `Felt` draws
 // any of them, at any size: the table itself and the small previews to pick from. Patterns come
 // from a random generator seeded by the skin's name, so a table looks the same on every phone.
 //
 // The colors drawn on the felt (writing, card outlines, the hourglass, the gold and the warning
 // red) are never picked by hand: `inkFor` works them out from the felt's color with the contrast
 // rule used for readable text on screens (WCAG's AA level). Busy felts keep their middle
-// calm, where the board, the pot and the timer are.
+// calm, where the board, the pot and the timer are, and keep away from (or fade under) the cards
+// and chips in front of each player.
 import { memo, type ReactElement, useMemo } from "react";
 import { View } from "react-native";
 import Svg, {
     Circle,
+    ClipPath,
     Defs,
     G,
     Line,
@@ -18,7 +20,6 @@ import Svg, {
     RadialGradient,
     Rect,
     Stop,
-    Text as SvgText,
 } from "react-native-svg";
 
 export const DEFAULT_SKIN = "green";
@@ -28,7 +29,6 @@ const GOLD = "#C9A227";
 
 type Paint =
     | { kind: "plain" }
-    | { kind: "blocks" }
     | { kind: "waves" }
     | { kind: "marble" }
     | { kind: "mosaic" }
@@ -55,6 +55,8 @@ export type Ink = {
     accent: string;
     /** The same in the last seconds of a turn: red, as light or dark as it must be. */
     late: string;
+    /** A thin edge round chips lying on the felt, so they stand out from it. */
+    edge: string;
 };
 
 type SkinDef = {
@@ -84,8 +86,6 @@ const DEFS: { title: string; skins: SkinDef[] }[] = [
     {
         title: "Artistic",
         skins: [
-            // Primary-color blocks between thick black lines, after Mondrian.
-            { id: "blocks", name: "Blocks", felt: "#F1ECE0", rim: "#1A1A1A", paint: { kind: "blocks" } },
             // The Japanese seigaiha wave pattern, in tones of indigo.
             { id: "waves", name: "Waves", felt: "#1A3768", rim: "#3B2A1C", paint: { kind: "waves" } },
             // Black marble with white and gold veins.
@@ -94,14 +94,17 @@ const DEFS: { title: string; skins: SkinDef[] }[] = [
             { id: "mosaic", name: "Mosaic", felt: "#221A0E", rim: "#6B4E12", paint: { kind: "mosaic" } },
             // Bright paper shapes on cobalt, after Matisse's cut-outs.
             { id: "cutouts", name: "Cutouts", felt: "#1E3E92", rim: WOOD, paint: { kind: "cutouts" } },
+            // A night sky with a moon and a small constellation.
+            { id: "starry", name: "Starry night", felt: "#101A3D", rim: "#2C2340", paint: { kind: "stars" } },
         ],
     },
     {
         title: "Special",
         skins: [
-            { id: "suits", name: "Suits", felt: "#0E6B3C", rim: WOOD, paint: { kind: "suits" } },
-            { id: "starry", name: "Starry night", felt: "#101A3D", rim: "#2C2340", paint: { kind: "stars" } },
+            // Card suits drawn in fine red and charcoal lines on cream, in even rows.
+            { id: "suits", name: "Suits", felt: "#F3EEE4", rim: WOOD, paint: { kind: "suits" } },
             { id: "royal", name: "Royal", felt: "#5B0F1E", rim: "#8A6510", paint: { kind: "lattice" } },
+            // Chips drawn in fine cream and gold lines on green, in even rows.
             { id: "chips", name: "Chips", felt: "#0E5E36", rim: WOOD, paint: { kind: "chips" } },
             { id: "casino", name: "Casino", felt: "#0B5A32", rim: "#3B2614", paint: { kind: "ring" } },
         ],
@@ -171,6 +174,7 @@ export function inkFor(felt: string): Ink {
         halo: darkFelt ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.75)",
         accent: readable(felt, GOLD_HUE, darkFelt),
         late: readable(felt, RED_HUE, darkFelt),
+        edge: see(darkFelt ? 0.4 : 0.3),
     };
 }
 
@@ -205,26 +209,35 @@ function seeded(text: string) {
 /** Real felt gets a soft light in the middle, like a lamp over the table; printed art doesn't. */
 const LAMP: Paint["kind"][] = ["plain", "suits", "stars", "lattice", "chips", "ring"];
 
+/** A place on the felt, from its top-left corner (rim included). */
+export type Spot = { x: number; y: number; w: number; h: number };
+
 /** A felt with its rim: `width` × `height`, rounded by `radius`. `scale` sizes the rim and the
- * pattern's details (1 is a phone-size table). */
+ * pattern's details (1 is a phone-size table). Patterns keep away from (or fade under) the `clear`
+ * spots, where the players' cards and chips lie. */
 export const Felt = memo(function Felt({
     skin: skinId,
     width,
     height,
     radius,
     scale = 1,
+    clear = NONE,
 }: {
     skin: string | undefined;
     width: number;
     height: number;
     radius: number;
     scale?: number;
+    clear?: Spot[];
 }) {
     const skin = skinById(skinId);
     const rim = 10 * scale;
     const w = Math.max(0, width - 2 * rim);
     const h = Math.max(0, height - 2 * rim);
-    const pattern = useMemo(() => paint(skin, w, h, scale), [skin, w, h, scale]);
+    const pattern = useMemo(
+        () => paint(skin, w, h, scale, clear.map((c) => ({ ...c, x: c.x - rim, y: c.y - rim }))),
+        [skin, w, h, scale, clear, rim],
+    );
     const lamp = LAMP.includes(skin.paint.kind);
     return (
         <View
@@ -255,7 +268,100 @@ export const Felt = memo(function Felt({
     );
 });
 
-const SUITS = ["♠", "♥", "♦", "♣"];
+const NONE: Spot[] = [];
+
+// ---- Fine line drawings (the suits and chips felts) ----
+
+/** The four suits as outlines in a 2 × 2 box round (0, 0). */
+const SUIT_SHAPES = {
+    heart: "M0 0.92 C-0.35 0.62 -1 0.22 -1 -0.32 C-1 -0.8 -0.42 -1 0 -0.55 C0.42 -1 1 -0.8 1 -0.32 C1 0.22 0.35 0.62 0 0.92 Z",
+    diamond: "M0 -1 Q0.3 -0.38 0.74 0 Q0.3 0.38 0 1 Q-0.3 0.38 -0.74 0 Q-0.3 -0.38 0 -1 Z",
+    spade: "M0 -1 C0.35 -0.62 1 -0.22 1 0.22 C1 0.62 0.5 0.75 0.12 0.45 Q0.14 0.82 0.4 0.96 L-0.4 0.96 Q-0.14 0.82 -0.12 0.45 C-0.5 0.75 -1 0.62 -1 0.22 C-1 -0.22 -0.35 -0.62 0 -1 Z",
+    // Three round leaves (circles of radius 0.4) on a stem.
+    club: "M-0.36 -0.245 A0.4 0.4 0 1 1 0.36 -0.245 A0.4 0.4 0 1 1 0.1 0.39 Q0.12 0.8 0.38 0.96 L-0.38 0.96 Q-0.12 0.8 -0.1 0.39 A0.4 0.4 0 1 1 -0.36 -0.245 Z",
+};
+const ROUND = "M-1 0 A1 1 0 1 1 1 0 A1 1 0 1 1 -1 0 Z";
+/** A chip's six inlays round its edge, as outlines. */
+const INLAYS = Array.from({ length: 6 }, (_, k) => {
+    const a = (k * Math.PI) / 3 + Math.PI / 6;
+    const at = (r: number, side: number) =>
+        `${(Math.cos(a) * r - Math.sin(a) * side).toFixed(3)} ${(Math.sin(a) * r + Math.cos(a) * side).toFixed(3)}`;
+    return `M${at(0.68, -0.13)} L${at(0.95, -0.11)} L${at(0.95, 0.11)} L${at(0.68, 0.13)} Z`;
+}).join(" ");
+
+const ARGS: Record<string, number> = { M: 2, L: 2, C: 6, Q: 4, A: 7, Z: 0 };
+const r1 = (v: number) => Math.round(v * 10) / 10;
+
+/** A shape from the 2 × 2 box above, `s` times as big, its middle at (x, y). */
+function place(d: string, x: number, y: number, s: number) {
+    const tokens = d.match(/[MLCQAZ]|-?\d*\.?\d+/g) ?? [];
+    let out = "";
+    for (let i = 0; i < tokens.length; ) {
+        const cmd = tokens[i++];
+        const n = tokens.slice(i, i + ARGS[cmd]).map(Number);
+        i += ARGS[cmd];
+        out +=
+            cmd === "A"
+                ? `A${r1(n[0] * s)} ${r1(n[1] * s)} 0 ${n[3]} ${n[4]} ${r1(x + n[5] * s)} ${r1(y + n[6] * s)}`
+                : cmd + n.map((v, k) => r1(k % 2 ? y + v * s : x + v * s)).join(" ");
+    }
+    return out;
+}
+
+/** One drawing in a line-drawn pattern: an outline, `inner` another outline inside it (a share of
+ * its size), maybe a dotted line between the two and `extra` outlines, and inside the inner one a
+ * few crossing lines and a hatched band, like a pen drawing. */
+type Sketch = { shape: string; extra?: string; inner: number; dots: boolean; color: string; x: number; y: number; s: number; faded: boolean };
+
+/** Draws many sketches: one shape per color for their outlines, dots and inside lines, so even
+ * a hundred drawings stay light. Small felts (the previews) get the outlines only. */
+function sketches(list: Sketch[], id: string, scale: number, opacity: number, random: () => number) {
+    const groups = new Map<string, { color: string; faded: boolean; outline: string; dots: string; clip: string; lines: string }>();
+    const fine = scale >= 0.6;
+    for (const it of list) {
+        const key = `${it.color}${it.faded}`;
+        const g = groups.get(key) ?? { color: it.color, faded: it.faded, outline: "", dots: "", clip: "", lines: "" };
+        groups.set(key, g);
+        g.outline += place(it.shape, it.x, it.y, it.s) + place(it.shape, it.x, it.y, it.s * it.inner);
+        if (it.extra) g.outline += place(it.extra, it.x, it.y, it.s);
+        if (!fine) continue;
+        if (it.dots) g.dots += place(it.shape, it.x, it.y, it.s * (1 + it.inner) / 2);
+        g.clip += place(it.shape, it.x, it.y, it.s * it.inner);
+        // Lines through the drawing, long enough to cross it; the inner outline clips them.
+        const line = (px: number, py: number, a: number) => {
+            const [dx, dy] = [Math.cos(a) * 1.6, Math.sin(a) * 1.6];
+            g.lines += `M${r1(it.x + (px - dx) * it.s)} ${r1(it.y + (py - dy) * it.s)}L${r1(it.x + (px + dx) * it.s)} ${r1(it.y + (py + dy) * it.s)}`;
+        };
+        for (let k = 0; k < 3; k++) line(random() * 0.8 - 0.4, random() * 0.8 - 0.4, random() * Math.PI);
+        // A hatched band: four lines side by side.
+        const a = random() * Math.PI;
+        const from = random() * 0.6 - 0.5;
+        for (let k = 0; k < 4; k++) {
+            const o = from + k * 0.11;
+            line(-Math.sin(a) * o, Math.cos(a) * o, a);
+        }
+    }
+    return [...groups.values()].map((g, i) => (
+        <G key={i} opacity={g.faded ? opacity * 0.3 : opacity}>
+            <Path d={g.outline} stroke={g.color} strokeWidth={1.1 * scale} fill="none" strokeLinejoin="round" />
+            {g.dots !== "" && (
+                <Path d={g.dots} stroke={g.color} strokeWidth={1.5 * scale} strokeDasharray={`0 ${3.2 * scale}`} strokeLinecap="round" fill="none" />
+            )}
+            {g.clip !== "" && (
+                <>
+                    <Defs>
+                        <ClipPath id={`${id}-${i}`}>
+                            <Path d={g.clip} />
+                        </ClipPath>
+                    </Defs>
+                    <G clipPath={`url(#${id}-${i})`}>
+                        <Path d={g.lines} stroke={g.color} strokeWidth={0.6 * scale} fill="none" />
+                    </G>
+                </>
+            )}
+        </G>
+    ));
+}
 
 /** A closed, smooth shape through `points` (a Catmull-Rom curve drawn as Béziers). */
 function smooth(points: [number, number][]) {
@@ -272,7 +378,7 @@ function smooth(points: [number, number][]) {
 }
 
 /** The skin's pattern on a `w` × `h` felt. */
-function paint(skin: Skin, w: number, h: number, scale: number) {
+function paint(skin: Skin, w: number, h: number, scale: number, clear: Spot[]) {
     if (w <= 0 || h <= 0) return null;
     const random = seeded(skin.id);
     const between = (a: number, b: number) => a + random() * (b - a);
@@ -282,47 +388,35 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
     // The calm middle of busy felts, where the board, the pot and the timer are.
     const calm = (x: number, y: number, grow = 0) =>
         ((x - w / 2) / (w * 0.3 + grow)) ** 2 + ((y - h / 2) / (h * 0.2 + grow)) ** 2 < 1;
+    // Whether a round thing at (x, y), `r` across from its middle, touches a clear spot.
+    const nearClear = (x: number, y: number, r: number) =>
+        clear.some((c) => {
+            const dx = Math.max(c.x - x, 0, x - c.x - c.w);
+            const dy = Math.max(c.y - y, 0, y - c.y - c.h);
+            return dx * dx + dy * dy < (r + 4 * scale) ** 2;
+        });
     // A size that keeps a composition the same at any size (the table and its preview).
     const size = Math.sqrt(w * h);
+    // Even rows of drawings, every other row shifted half a step, centered on the felt.
+    const rows = (r: number, each: (x: number, y: number, row: number, column: number) => void) => {
+        const [dx, dy] = [3.6 * r, 3.1 * r];
+        const [columns, lines] = [Math.ceil(w / dx) + 1, Math.ceil(h / dy) + 1];
+        for (let row = 0; row < lines; row++)
+            for (let column = 0; column < columns; column++) {
+                const x = w / 2 + (column - (columns - 1) / 2) * dx + (row % 2 ? dx / 2 : 0);
+                const y = h / 2 + (row - (lines - 1) / 2) * dy;
+                each(x, y, row, column);
+            }
+    };
     switch (skin.paint.kind) {
         case "plain":
             return null;
-
-        case "blocks": {
-            // A big cream block in the middle (where the board and the pot are), framed by
-            // rows and columns of blocks, a few of them red, blue and yellow, all between thick
-            // black lines.
-            const [left, right, top, bottom] = [0.2 * w, 0.8 * w, 0.32 * h, 0.68 * h];
-            type Piece = { x: number; y: number; w: number; h: number };
-            const frame: Piece[] = [
-                { x: 0, y: 0, w, h: top },
-                { x: 0, y: bottom, w, h: h - bottom },
-                { x: 0, y: top, w: left, h: bottom - top },
-                { x: right, y: top, w: w - right, h: bottom - top },
-            ];
-            const pieces: Piece[] = [];
-            const split = (p: Piece, times: number) => {
-                if (times === 0) return pieces.push(p);
-                const cut = between(0.3, 0.7);
-                if (p.w > p.h)
-                    [{ ...p, w: p.w * cut }, { ...p, x: p.x + p.w * cut, w: p.w * (1 - cut) }].forEach((q) => split(q, times - 1));
-                else [{ ...p, h: p.h * cut }, { ...p, y: p.y + p.h * cut, h: p.h * (1 - cut) }].forEach((q) => split(q, times - 1));
-            };
-            frame.forEach((p, i) => split(p, i < 2 ? 2 : 1));
-            const order = pieces.map((_, i) => i).sort(() => random() - 0.5);
-            const colors = new Map<number, string>();
-            ["#D52B1E", "#1C4E9C", "#F4C51F", "#D52B1E", "#1C4E9C"].forEach((c, i) => colors.set(order[i], c));
-            const line = Math.max(1, 5 * scale);
-            return [...pieces, { x: left, y: top, w: right - left, h: bottom - top }].map((p, i) => (
-                <Rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} fill={colors.get(i) ?? skin.felt} stroke="#111111" strokeWidth={line} />
-            ));
-        }
 
         case "waves": {
             // Rows of fans, each row tucked under the one above, rings in tones of indigo. A row's
             // fans don't overlap, so each ring of a row is one shape.
             const r = 28 * scale;
-            const rings = ["#16305C", "#22477F", "#2F5F9E", "#4B7DBA"];
+            const rings = ["#183463", "#1F4277", "#27508C", "#3462A0"];
             const circle = (x: number, y: number, radius: number) =>
                 `M${x - radius} ${y} a${radius} ${radius} 0 1 0 ${2 * radius} 0 a${radius} ${radius} 0 1 0 ${-2 * radius} 0 Z`;
             const rows = [];
@@ -340,12 +434,25 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
                                 fill={fill}
                                 stroke="#DCE6F2"
                                 strokeWidth={0.9 * scale}
-                                strokeOpacity={0.5}
+                                strokeOpacity={0.35}
                             />
                         ))}
                     </G>,
                 );
             }
+            // The waves calm down in the middle, where the board and the pot are.
+            rows.push(
+                <G key="calm">
+                    <Defs>
+                        <RadialGradient id={`calm-${skin.id}`} cx="50%" cy="50%" r="50%">
+                            <Stop offset="0" stopColor={skin.felt} stopOpacity={0.92} />
+                            <Stop offset="0.6" stopColor={skin.felt} stopOpacity={0.8} />
+                            <Stop offset="1" stopColor={skin.felt} stopOpacity={0} />
+                        </RadialGradient>
+                    </Defs>
+                    <Rect x={w * 0.12} y={h * 0.26} width={w * 0.76} height={h * 0.48} fill={`url(#calm-${skin.id})`} />
+                </G>,
+            );
             return rows;
         }
 
@@ -394,7 +501,7 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
             const paths = tones.map(() => [] as string[]);
             for (let x = 0; x < w; x += cell)
                 for (let y = 0; y < h; y += cell) {
-                    if (calm(x + cell / 2, y + cell / 2) || random() < 0.12) continue;
+                    if (calm(x + cell / 2, y + cell / 2) || nearClear(x + cell / 2, y + cell / 2, cell) || random() < 0.12) continue;
                     const tone = random() < 0.06 ? 5 + Math.floor(random() * 3) : Math.floor(random() * 5);
                     const side = cell - gap;
                     paths[tone].push(`M${x} ${y}h${side}v${side}h${-side}Z`);
@@ -402,7 +509,7 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
             const spirals = [];
             for (let i = 0; i < 60 && spirals.length < 10; i++) {
                 const [x, y, r] = [between(0, w), between(0, h), between(0.03, 0.05) * size];
-                if (calm(x, y, r)) continue;
+                if (calm(x, y, r) || nearClear(x, y, r)) continue;
                 spirals.push(
                     <G key={`s${i}`}>
                         <Circle cx={x} cy={y} r={r} fill="#14100A" />
@@ -420,9 +527,9 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
             // Leafy shapes cut from colored paper with rounded lobes, and a few dots, round a
             // calm middle.
             const shapes = [];
-            for (let i = 0; i < 80 && shapes.length < 12; i++) {
-                const [x, y, r] = [between(-0.05, 1.05) * w, between(-0.05, 1.05) * h, between(0.08, 0.14) * size];
-                if (calm(x, y, r * 0.8)) continue;
+            for (let i = 0; i < 400 && shapes.length < 12; i++) {
+                const [x, y, r] = [between(-0.12, 1.12) * w, between(-0.12, 1.12) * h, between(0.08, 0.14) * size];
+                if (calm(x, y, r * 0.8) || nearClear(x, y, r * 0.75)) continue;
                 const lobes = 4 + Math.floor(random() * 4);
                 const turn = between(0, Math.PI * 2);
                 const points: [number, number][] = [];
@@ -438,37 +545,29 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
                 }
                 shapes.push(<Path key={i} d={smooth(points)} fill={pick(["#F6F1E7", "#F2B705", "#E8505B", "#2BA84A", "#111111", "#F28C28"])} />);
             }
-            for (let i = 0; i < 60 && shapes.length < 22; i++) {
+            for (let i = 0; i < 200 && shapes.length < 22; i++) {
                 const [x, y] = [between(0, w), between(0, h)];
-                if (calm(x, y, 6 * scale)) continue;
+                if (calm(x, y, 6 * scale) || nearClear(x, y, 6 * scale)) continue;
                 shapes.push(<Circle key={`d${i}`} cx={x} cy={y} r={between(0.012, 0.02) * size} fill={pick(["#F6F1E7", "#F2B705", "#E8505B"])} />);
             }
             return shapes;
         }
 
-        case "suits":
-            // Spades, hearts, diamonds and clubs scattered round the table, facing every way: faint
-            // enough to look like a print on the felt, and none in the middle.
-            return Array.from({ length: howMany(40) }, (_, i) => {
-                const suit = pick(SUITS);
-                const red = suit === "♥" || suit === "♦";
-                const [x, y] = [between(0, w), between(0, h)];
-                if (calm(x, y)) return null;
-                return (
-                    <SvgText
-                        key={i}
-                        x={x}
-                        y={y}
-                        fontSize={between(12, 16) * scale}
-                        fill={red ? "#FF9A9A" : "#FFFFFF"}
-                        opacity={red ? 0.16 : 0.11}
-                        textAnchor="middle"
-                        transform={`rotate(${between(0, 360)} ${x} ${y})`}
-                    >
-                        {suit}
-                    </SvgText>
-                );
+        case "suits": {
+            // Card suits drawn in fine lines, like a pen drawing: an outline, a dotted line and a
+            // second outline inside it, and crossing lines and hatching within. Even rows of hearts
+            // and clubs, then spades and diamonds; none in the middle, faint under the players'
+            // cards and chips.
+            const r = 12 * scale;
+            const list: Sketch[] = [];
+            rows(r, (x, y, row, column) => {
+                if (calm(x, y, r)) return;
+                const suit = row % 2 ? (column % 2 ? "diamond" : "spade") : column % 2 ? "club" : "heart";
+                const red = suit === "heart" || suit === "diamond";
+                list.push({ shape: SUIT_SHAPES[suit], inner: 0.74, dots: true, color: red ? "#C8323A" : "#3A3A3A", x, y, s: r, faded: nearClear(x, y, r) });
             });
+            return sketches(list, `${skin.id}-${Math.round(w)}`, scale, 0.6, random);
+        }
 
         case "stars": {
             // A night sky: many small stars, a few bright ones, a small constellation in a corner,
@@ -527,26 +626,16 @@ function paint(skin: Skin, w: number, h: number, scale: number) {
         }
 
         case "chips": {
-            // Casino chips seen from above, scattered round the table: big and clear, never on top
-            // of each other, and none in the middle.
-            const placed: [number, number, number][] = [];
-            for (let i = 0; i < 400 && placed.length < howMany(70); i++) {
-                const [x, y, r] = [between(0, w), between(0, h), between(8, 11) * scale];
-                if (calm(x, y, r)) continue;
-                if (placed.some(([px, py, pr]) => (px - x) ** 2 + (py - y) ** 2 < (pr + r + 3 * scale) ** 2)) continue;
-                placed.push([x, y, r]);
-            }
-            return placed.map(([x, y, r], i) => {
-                const color = pick(["#E04646", "#2F6FE0", "#22A05A", "#F07F1E", "#8B3FD0", GOLD]);
-                const spots = 2 * Math.PI * r * 0.82;
-                return (
-                    <G key={i} opacity={0.75} transform={`rotate(${between(0, 360)} ${x} ${y})`}>
-                        <Circle cx={x} cy={y} r={r} fill={color} />
-                        <Circle cx={x} cy={y} r={r * 0.82} fill="none" stroke="#FFFFFF" strokeWidth={r * 0.28} strokeDasharray={`${spots / 12} ${spots / 12}`} />
-                        <Circle cx={x} cy={y} r={r * 0.56} fill="none" stroke="#FFFFFF" strokeWidth={r * 0.06} opacity={0.8} />
-                    </G>
-                );
+            // Chips drawn in fine cream and gold lines, in even rows: an outline with six inlays
+            // round the edge, an inner ring, and crossing lines and hatching inside. None in the
+            // middle, faint under the players' cards and chips.
+            const r = 11 * scale;
+            const list: Sketch[] = [];
+            rows(r, (x, y, row, column) => {
+                if (calm(x, y, r)) return;
+                list.push({ shape: ROUND, extra: INLAYS, inner: 0.6, dots: false, color: (row + column) % 2 ? GOLD : "#F3EBD3", x, y, s: r, faded: nearClear(x, y, r) });
             });
+            return sketches(list, `${skin.id}-${Math.round(w)}`, scale, 0.45, random);
         }
 
         case "ring": {

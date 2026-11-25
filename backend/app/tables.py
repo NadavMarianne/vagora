@@ -50,14 +50,13 @@ Skin = Literal[
     "black",
     "white",
     # Artistic.
-    "blocks",
     "waves",
     "marble",
     "mosaic",
     "cutouts",
+    "starry",
     # Special.
     "suits",
-    "starry",
     "royal",
     "chips",
     "casino",

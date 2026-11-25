@@ -46,3 +46,12 @@
 - Special felts: the suits are fewer and fainter, the chips bigger and clearer and never on top of each other, the starry night got a moon and a small constellation, royal got gold dots where the lines cross, and casino a second gold line.
 - Found along the way: empty seats hang over the felt's edge, so on a white table "Sit here" vanished. Empty seats now have a solid background like taken ones. Card outlines got a soft edge, so they show on any patch of a busy felt.
 - Dense patterns draw each color as one shape, so the phone draws a few shapes instead of hundreds.
+
+## 2026-11-25: skins, take three
+- Removed Blocks (it didn't look good). Starry night moved to the art felts.
+- Suits and Chips redrawn after a picture Nadav picked: fine pen-like line drawings (an outline, a second one inside, dots between them, crossing lines and hatching within), many of them in even rows. Suits are red and charcoal on cream, chips cream and gold on green. Drawn with one shape per color, so a hundred drawings stay light for the phone.
+- Things were hard to see on busy felts, so:
+  - Patterns keep away from the spots in front of each player, where their cards, chips and bet lie (the scattered ones skip them, the even rows fade there).
+  - The waves calm down in the middle, like the other busy felts.
+  - Chips on the felt get a thin edge in the felt's writing color, so a blue chip shows on a blue felt.
+  - A folded player's box stayed see-through, so the felt's pattern showed behind the name. Now the box stays solid and only what's in it fades.
