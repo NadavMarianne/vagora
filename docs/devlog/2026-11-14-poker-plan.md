@@ -52,6 +52,8 @@
 - Suits and Chips redrawn after a picture Nadav picked: fine pen-like line drawings (an outline, a second one inside, dots between them, crossing lines and hatching within), many of them in even rows. Suits are red and charcoal on cream, chips cream and gold on green. Drawn with one shape per color, so a hundred drawings stay light for the phone.
 - Things were hard to see on busy felts, so:
   - Patterns keep away from the spots in front of each player, where their cards, chips and bet lie (the scattered ones skip them, the even rows fade there).
-  - The waves calm down in the middle, like the other busy felts.
   - Chips on the felt get a thin edge in the felt's writing color, so a blue chip shows on a blue felt.
   - A folded player's box stayed see-through, so the felt's pattern showed behind the name. Now the box stays solid and only what's in it fades.
+- After trying it: the special felts come in a few colors each, picked with tiny dots under the preview (suits in cream, white, black, green or blue; chips in green, blue, red, black or cream; royal and casino in five felt colors each). Each color is its own skin name, like `suits-blue`, so nothing changed in the database.
+- The drawn chips had random lines inside, which looked lopsided. Each is now drawn like a real chip, all symmetric: six inlays round the edge, an inner ring, twelve dots and a small suit in the middle.
+- Tried calming the waves in the middle with a soft patch; it looked bad, so it's gone.

@@ -55,11 +55,27 @@ Skin = Literal[
     "mosaic",
     "cutouts",
     "starry",
-    # Special.
+    # Special, each in a few colors.
     "suits",
-    "royal",
+    "suits-white",
+    "suits-black",
+    "suits-green",
+    "suits-blue",
     "chips",
+    "chips-blue",
+    "chips-red",
+    "chips-black",
+    "chips-cream",
+    "royal",
+    "royal-navy",
+    "royal-emerald",
+    "royal-purple",
+    "royal-black",
     "casino",
+    "casino-blue",
+    "casino-red",
+    "casino-purple",
+    "casino-black",
 ]
 
 

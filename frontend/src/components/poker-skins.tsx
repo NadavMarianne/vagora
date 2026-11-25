@@ -66,9 +66,20 @@ type SkinDef = {
     felt: string;
     rim: string;
     paint: Paint;
+    /** The two colors a line-drawn pattern is drawn in. */
+    lines?: [string, string];
+    /** The same pattern in other colors, each its own skin named `<id>-<key>`. */
+    colors?: Color[];
 };
 
-export type Skin = SkinDef & { ink: Ink };
+/** Another color of a special felt. */
+type Color = { key: string; name: string; felt: string; rim?: string; lines?: [string, string] };
+
+export type Skin = Omit<SkinDef, "colors"> & {
+    ink: Ink;
+    /** The skin and its other colors, the skin first (special felts only). */
+    family: Skin[];
+};
 
 const DEFS: { title: string; skins: SkinDef[] }[] = [
     {
@@ -101,12 +112,63 @@ const DEFS: { title: string; skins: SkinDef[] }[] = [
     {
         title: "Special",
         skins: [
-            // Card suits drawn in fine red and charcoal lines on cream, in even rows.
-            { id: "suits", name: "Suits", felt: "#F3EEE4", rim: WOOD, paint: { kind: "suits" } },
-            { id: "royal", name: "Royal", felt: "#5B0F1E", rim: "#8A6510", paint: { kind: "lattice" } },
-            // Chips drawn in fine cream and gold lines on green, in even rows.
-            { id: "chips", name: "Chips", felt: "#0E5E36", rim: WOOD, paint: { kind: "chips" } },
-            { id: "casino", name: "Casino", felt: "#0B5A32", rim: "#3B2614", paint: { kind: "ring" } },
+            // Card suits drawn in fine lines, in even rows: the red suits in the first color, the
+            // black ones in the second.
+            {
+                id: "suits",
+                name: "Suits",
+                felt: "#F3EEE4",
+                rim: WOOD,
+                paint: { kind: "suits" },
+                lines: ["#C8323A", "#3A3A3A"],
+                colors: [
+                    { key: "white", name: "White", felt: "#FBFAF7", lines: ["#C8323A", "#3A3A3A"] },
+                    { key: "black", name: "Black", felt: "#1C1D21", rim: "#3A2A1C", lines: ["#E86A72", "#D6D3CC"] },
+                    { key: "green", name: "Green", felt: "#0E6B3C", lines: ["#F6B1B5", "#F3EBD3"] },
+                    { key: "blue", name: "Blue", felt: "#14507F", lines: ["#F6B1B5", "#F3EBD3"] },
+                ],
+            },
+            // Chips drawn in fine lines, in even rows, the two colors taking turns.
+            {
+                id: "chips",
+                name: "Chips",
+                felt: "#0E5E36",
+                rim: WOOD,
+                paint: { kind: "chips" },
+                lines: ["#F3EBD3", GOLD],
+                colors: [
+                    { key: "blue", name: "Blue", felt: "#14507F", lines: ["#F3EBD3", GOLD] },
+                    { key: "red", name: "Red", felt: "#7E1F2B", lines: ["#F3EBD3", GOLD] },
+                    { key: "black", name: "Black", felt: "#1C1D21", rim: "#3A2A1C", lines: [GOLD, "#D6D3CC"] },
+                    { key: "cream", name: "Cream", felt: "#F3EEE4", lines: ["#C8323A", "#3A3A3A"] },
+                ],
+            },
+            {
+                id: "royal",
+                name: "Royal",
+                felt: "#5B0F1E",
+                rim: "#8A6510",
+                paint: { kind: "lattice" },
+                colors: [
+                    { key: "navy", name: "Navy", felt: "#13264D" },
+                    { key: "emerald", name: "Emerald", felt: "#0B4A33" },
+                    { key: "purple", name: "Purple", felt: "#3A1F5C" },
+                    { key: "black", name: "Black", felt: "#17171B" },
+                ],
+            },
+            {
+                id: "casino",
+                name: "Casino",
+                felt: "#0B5A32",
+                rim: "#3B2614",
+                paint: { kind: "ring" },
+                colors: [
+                    { key: "blue", name: "Blue", felt: "#124A78" },
+                    { key: "red", name: "Red", felt: "#741C28" },
+                    { key: "purple", name: "Purple", felt: "#432570" },
+                    { key: "black", name: "Black", felt: "#1C1F24" },
+                ],
+            },
         ],
     },
 ];
@@ -178,13 +240,28 @@ export function inkFor(felt: string): Ink {
     };
 }
 
-/** Every skin, in the sections the picker shows. The names match the backend's list. */
+/** A skin and its other colors, ready to draw. */
+function withColors({ colors = [], ...def }: SkinDef): Skin {
+    const family: Skin[] = [];
+    const skin: Skin = { ...def, ink: inkFor(def.felt), family };
+    family.push(
+        skin,
+        ...colors.map(({ key, name, ...color }) => {
+            const other = { ...def, ...color, id: `${def.id}-${key}`, name: `${def.name} · ${name}` };
+            return { ...other, ink: inkFor(other.felt), family };
+        }),
+    );
+    return skin;
+}
+
+/** Every skin, in the sections the picker shows (other colors inside each skin's `family`). The
+ * names match the backend's list. */
 export const SKIN_SECTIONS: { title: string; skins: Skin[] }[] = DEFS.map((section) => ({
     title: section.title,
-    skins: section.skins.map((skin) => ({ ...skin, ink: inkFor(skin.felt) })),
+    skins: section.skins.map(withColors),
 }));
 
-const ALL = SKIN_SECTIONS.flatMap((s) => s.skins);
+const ALL = SKIN_SECTIONS.flatMap((s) => s.skins.flatMap((skin) => skin.family));
 
 /** A skin by its name; an unknown name (say, one that was removed) gets the default. */
 export function skinById(id: string | undefined): Skin {
@@ -311,11 +388,25 @@ function place(d: string, x: number, y: number, s: number) {
 /** One drawing in a line-drawn pattern: an outline, `inner` another outline inside it (a share of
  * its size), maybe a dotted line between the two and `extra` outlines, and inside the inner one a
  * few crossing lines and a hatched band, like a pen drawing. */
-type Sketch = { shape: string; extra?: string; inner: number; dots: boolean; color: string; x: number; y: number; s: number; faded: boolean };
+type Sketch = {
+    shape: string;
+    extra?: string;
+    inner: number;
+    /** Where the dotted line runs, as a share of the size. */
+    dots?: number;
+    /** Crossing lines and hatching inside, or else `mark`, a small shape in the middle. */
+    hatch: boolean;
+    mark?: string;
+    color: string;
+    x: number;
+    y: number;
+    s: number;
+    faded: boolean;
+};
 
 /** Draws many sketches: one shape per color for their outlines, dots and inside lines, so even
  * a hundred drawings stay light. Small felts (the previews) get the outlines only. */
-function sketches(list: Sketch[], id: string, scale: number, opacity: number, random: () => number) {
+function sketches(list: Sketch[], id: string, scale: number, opacity: number, random: () => number, dotGap = 3.2 * scale) {
     const groups = new Map<string, { color: string; faded: boolean; outline: string; dots: string; clip: string; lines: string }>();
     const fine = scale >= 0.6;
     for (const it of list) {
@@ -325,7 +416,9 @@ function sketches(list: Sketch[], id: string, scale: number, opacity: number, ra
         g.outline += place(it.shape, it.x, it.y, it.s) + place(it.shape, it.x, it.y, it.s * it.inner);
         if (it.extra) g.outline += place(it.extra, it.x, it.y, it.s);
         if (!fine) continue;
-        if (it.dots) g.dots += place(it.shape, it.x, it.y, it.s * (1 + it.inner) / 2);
+        if (it.dots) g.dots += place(it.shape, it.x, it.y, it.s * it.dots);
+        if (it.mark) g.outline += place(it.mark, it.x, it.y, it.s * 0.3);
+        if (!it.hatch) continue;
         g.clip += place(it.shape, it.x, it.y, it.s * it.inner);
         // Lines through the drawing, long enough to cross it; the inner outline clips them.
         const line = (px: number, py: number, a: number) => {
@@ -345,7 +438,7 @@ function sketches(list: Sketch[], id: string, scale: number, opacity: number, ra
         <G key={i} opacity={g.faded ? opacity * 0.3 : opacity}>
             <Path d={g.outline} stroke={g.color} strokeWidth={1.1 * scale} fill="none" strokeLinejoin="round" />
             {g.dots !== "" && (
-                <Path d={g.dots} stroke={g.color} strokeWidth={1.5 * scale} strokeDasharray={`0 ${3.2 * scale}`} strokeLinecap="round" fill="none" />
+                <Path d={g.dots} stroke={g.color} strokeWidth={1.5 * scale} strokeDasharray={`0 ${dotGap}`} strokeLinecap="round" fill="none" />
             )}
             {g.clip !== "" && (
                 <>
@@ -440,19 +533,6 @@ function paint(skin: Skin, w: number, h: number, scale: number, clear: Spot[]) {
                     </G>,
                 );
             }
-            // The waves calm down in the middle, where the board and the pot are.
-            rows.push(
-                <G key="calm">
-                    <Defs>
-                        <RadialGradient id={`calm-${skin.id}`} cx="50%" cy="50%" r="50%">
-                            <Stop offset="0" stopColor={skin.felt} stopOpacity={0.92} />
-                            <Stop offset="0.6" stopColor={skin.felt} stopOpacity={0.8} />
-                            <Stop offset="1" stopColor={skin.felt} stopOpacity={0} />
-                        </RadialGradient>
-                    </Defs>
-                    <Rect x={w * 0.12} y={h * 0.26} width={w * 0.76} height={h * 0.48} fill={`url(#calm-${skin.id})`} />
-                </G>,
-            );
             return rows;
         }
 
@@ -564,7 +644,8 @@ function paint(skin: Skin, w: number, h: number, scale: number, clear: Spot[]) {
                 if (calm(x, y, r)) return;
                 const suit = row % 2 ? (column % 2 ? "diamond" : "spade") : column % 2 ? "club" : "heart";
                 const red = suit === "heart" || suit === "diamond";
-                list.push({ shape: SUIT_SHAPES[suit], inner: 0.74, dots: true, color: red ? "#C8323A" : "#3A3A3A", x, y, s: r, faded: nearClear(x, y, r) });
+                const [reds, blacks] = skin.lines ?? ["#C8323A", "#3A3A3A"];
+                list.push({ shape: SUIT_SHAPES[suit], inner: 0.74, dots: 0.87, hatch: true, color: red ? reds : blacks, x, y, s: r, faded: nearClear(x, y, r) });
             });
             return sketches(list, `${skin.id}-${Math.round(w)}`, scale, 0.6, random);
         }
@@ -626,16 +707,31 @@ function paint(skin: Skin, w: number, h: number, scale: number, clear: Spot[]) {
         }
 
         case "chips": {
-            // Chips drawn in fine cream and gold lines, in even rows: an outline with six inlays
-            // round the edge, an inner ring, and crossing lines and hatching inside. None in the
-            // middle, faint under the players' cards and chips.
+            // Chips drawn in fine lines, in even rows, each like a real chip: an outline with six
+            // inlays round the edge, an inner ring, a ring of dots, and a small suit in the middle.
+            // None in the middle of the table, faint under the players' cards and chips.
             const r = 11 * scale;
             const list: Sketch[] = [];
+            const suits = [SUIT_SHAPES.spade, SUIT_SHAPES.heart, SUIT_SHAPES.club, SUIT_SHAPES.diamond];
+            const [first, second] = skin.lines ?? ["#F3EBD3", GOLD];
             rows(r, (x, y, row, column) => {
                 if (calm(x, y, r)) return;
-                list.push({ shape: ROUND, extra: INLAYS, inner: 0.6, dots: false, color: (row + column) % 2 ? GOLD : "#F3EBD3", x, y, s: r, faded: nearClear(x, y, r) });
+                list.push({
+                    shape: ROUND,
+                    extra: INLAYS,
+                    inner: 0.6,
+                    dots: 0.47,
+                    hatch: false,
+                    mark: suits[(column + 2 * row) % 4],
+                    color: (row + column) % 2 ? second : first,
+                    x,
+                    y,
+                    s: r,
+                    faded: nearClear(x, y, r),
+                });
             });
-            return sketches(list, `${skin.id}-${Math.round(w)}`, scale, 0.45, random);
+            // Twelve dots round each ring, evenly.
+            return sketches(list, `${skin.id}-${Math.round(w)}`, scale, 0.5, random, (2 * Math.PI * 0.47 * r) / 12);
         }
 
         case "ring": {
