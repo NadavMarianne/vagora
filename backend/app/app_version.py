@@ -9,7 +9,7 @@ once the new app is out. Apps that don't send it (versions before this check) co
 from app.config import settings
 
 HEADER = "X-App-Version"
-MESSAGE = "This version of vagora is too old. Please update."
+MESSAGE = "This version of vagora is too old. Please update."  # Shown if the app has no screen for it.
 
 # Always answered: the health check (it carries no app version) and GitHub's release calls.
 OPEN = ("/health", "/internal/")
