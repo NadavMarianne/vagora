@@ -49,6 +49,17 @@ export function newVersionAnnounced(): void {
   onAnnounced?.();
 }
 
+/** Looks for an over-the-air update right now and, if there is one, reloads into it. Returns false
+ * when there's none (or no internet): then only a new APK can bring a newer version. */
+export async function updateNow(): Promise<boolean> {
+  if (!enabled) return false;
+  try {
+    return await updateIfAvailable(() => {});
+  } catch {
+    return false;
+  }
+}
+
 /** Whether the app is checking for an update, installing one, or ready to use. */
 export function useUpdate(): UpdateState {
   const [state, setState] = useState<UpdateState>(enabled ? "checking" : "ready");

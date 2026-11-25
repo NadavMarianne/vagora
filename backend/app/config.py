@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     # The password GitHub uses to announce a new app version (decision 0029). Secret: set only in
     # Vercel and in GitHub, never in Git. Empty means announcing is off.
     release_secret: str = ""
+    # The oldest app version that still works with this backend (decision 0029). Older apps are
+    # asked to update. Raised only when a change can't keep older apps working; 0 lets all in.
+    min_app_version: int = 0
+    # Where to download the newest APK, for an app too old to update over the air. Empty means
+    # the app tells the person to ask for the new version.
+    apk_url: str = ""
 
     @field_validator("database_url")
     @classmethod

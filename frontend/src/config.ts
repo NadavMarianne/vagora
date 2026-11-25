@@ -6,6 +6,11 @@ import * as Updates from "expo-updates";
 // Expo Go has no channel, so it uses development (decision 0028).
 const production = Updates.channel === "production";
 
+// This app's version, sent with every request. Raise it by one when a backend change can't keep
+// older apps working; after that release, raise MIN_APP_VERSION in Vercel to match, and older apps
+// are asked to update (decision 0029).
+export const APP_VERSION = 1;
+
 // The backend. Set EXPO_PUBLIC_API_URL to use another one, like a pull request's preview.
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??

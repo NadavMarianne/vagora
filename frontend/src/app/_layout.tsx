@@ -7,8 +7,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MenuButton } from "@/components/app-menu";
 import { LiveBanner } from "@/components/live-banner";
 import { NotificationBell } from "@/components/notification-bell";
+import { PleaseUpdate } from "@/components/please-update";
 import { Body, Button, Loading, Screen, Title } from "@/components/ui";
 import { warmUp } from "@/lib/api";
+import { useTooOld } from "@/lib/app-version";
 import { LiveProvider } from "@/lib/live";
 import { NotificationsProvider } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
@@ -24,7 +26,10 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts(FONTS);
   // Meanwhile, and whenever the app comes back to the screen, a new version installs right away.
   const update = useUpdate();
+  // The backend said this version is too old: nothing else works until it's updated.
+  const tooOld = useTooOld();
   if (update === "updating") return <Updating />;
+  if (tooOld) return <PleaseUpdate apkUrl={tooOld.apkUrl} />;
   if (!fontsLoaded || update === "checking") return null;
   return (
     <SessionProvider>
