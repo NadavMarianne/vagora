@@ -11,7 +11,7 @@ from app.config import settings
 HEADER = "X-App-Version"
 MESSAGE = "This version of vagora is too old. Please update."
 
-# Always answered: the health check (no app version on it) and GitHub's release calls.
+# Always answered: the health check (it carries no app version) and GitHub's release calls.
 OPEN = ("/health", "/internal/")
 
 
