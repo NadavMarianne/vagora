@@ -13,7 +13,7 @@ def minimum(monkeypatch):
 
 @pytest.mark.parametrize("headers", [{}, {"X-App-Version": "2"}, {"X-App-Version": "junk"}])
 def test_an_app_older_than_the_minimum_is_asked_to_update(minimum, headers):
-    response = TestClient(app).get("/users/me", headers=headers)
+    response = TestClient(app).get("/me", headers=headers)
 
     assert response.status_code == 426
     assert response.json() == {
@@ -24,14 +24,14 @@ def test_an_app_older_than_the_minimum_is_asked_to_update(minimum, headers):
 
 @pytest.mark.parametrize("version", ["3", "4"])
 def test_an_app_at_the_minimum_or_newer_goes_through(minimum, version):
-    response = TestClient(app).get("/users/me", headers={"X-App-Version": version})
+    response = TestClient(app).get("/me", headers={"X-App-Version": version})
 
     # Not logged in, but past the version check.
     assert response.status_code == 401
 
 
 def test_by_default_every_app_goes_through():
-    response = TestClient(app).get("/users/me")
+    response = TestClient(app).get("/me")
 
     assert response.status_code == 401
 
@@ -39,7 +39,7 @@ def test_by_default_every_app_goes_through():
 def test_without_a_download_link_the_app_gets_none(minimum, monkeypatch):
     monkeypatch.setattr(settings, "apk_url", "")
 
-    response = TestClient(app).get("/users/me")
+    response = TestClient(app).get("/me")
 
     assert response.json()["apk_url"] is None
 
