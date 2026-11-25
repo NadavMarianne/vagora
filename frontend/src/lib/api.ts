@@ -1,6 +1,6 @@
 // Talking to the backend. Every request carries the Firebase login token and the app's version.
 import { API_URL, APP_VERSION } from "@/config";
-import { tooOld } from "@/lib/app-version";
+import { notTooOld, tooOld } from "@/lib/app-version";
 import { auth } from "@/lib/firebase";
 
 /** The backend said no. `status` is the HTTP code, `message` its explanation. */
@@ -38,10 +38,14 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   } catch {
     throw new ApiError(0, "Can't reach vagora. Check your internet connection.");
   }
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) {
+    notTooOld();
+    return undefined as T;
+  }
   const data = await response.json().catch(() => null);
   // This app is too old for the backend: the whole app asks to update.
   if (response.status === 426) tooOld(data?.apk_url ?? null);
+  else notTooOld();
   if (!response.ok) throw new ApiError(response.status, explain(data?.detail));
   return data as T;
 }

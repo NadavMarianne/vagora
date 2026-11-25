@@ -15,6 +15,13 @@ export function tooOld(apkUrl: string | null) {
   listeners.forEach((listener) => listener());
 }
 
+/** The backend answered normally again (say, the minimum was lowered): the app opens again. */
+export function notTooOld() {
+  if (state === null) return;
+  state = null;
+  listeners.forEach((listener) => listener());
+}
+
 /** Whether the app is too old, and where its new version is. */
 export function useTooOld(): TooOld | null {
   return useSyncExternalStore(
