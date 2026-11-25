@@ -33,3 +33,30 @@
 ## 2026-11-15: polish
 - Poker colors: the gold buttons (Raise or Bet, the raise pop-up's button, Cards are out) are real metallic gold with a wave of light gliding over them and tiny sparkles. The red (fold, get up) and the blue (call) are darker.
 - The turn timer is an hourglass now: the sand runs down smoothly (animated on the phone's UI thread, not redrawn a few times a second), with the time left in gold digits under it. In the last five seconds the sand and the digits turn red and the digits beat.
+- Table skins: "Table decorations" in the open-a-table form, with folding sections of small previews. Colors (green, blue, red, orange, purple, black), artistic painted felts (watercolor, ink, sunset, ocean, pastel) and special ones (tiny card suits facing every way, a starry night, a royal gold pattern, scattered chips, a casino felt with a gold line). Each pattern is drawn from a random generator seeded by the skin's name, so a table looks the same on every phone. The writing on the felt got a soft dark shadow so it reads on every skin. Backend: a `skin` column on tables (migration), checked against the list, with a test.
+- Table settings after opening: whoever opened a table has a ⚙ button on it, which opens the same form with the table's settings (changes apply between hands, as the backend already required).
+- The table isn't turned to put you at the bottom any more: everyone starts with the same view, and a ↻ button turns it one seat clockwise (only on that phone).
+- Picking a seat uses the same full-screen table as playing, so it's big too.
+- Each skin has its own colors for the timer's digits and sand and the pot (gold on most, cream on orange, aqua on ocean, silver on ink...), and a warning color for the last seconds that shows on that felt.
+
+## 2026-11-19: skins, take two
+- Testing showed the colors on the felt looked random from table to table (cream here, aqua there). Now there's one rule for every felt: the writing, card outlines, hourglass, gold and warning red are all worked out from the felt's color with WCAG's contrast rule (the standard for readable text on screens). Gold is the same gold on almost every table, darker on light ones. Decision 0030 has the details.
+- Added a white table. With the rule it gets dark writing by itself.
+- The art felts were all faded blobs and brush strokes, which looked alike and not good. Replaced with five, each after a real art tradition: blocks (Mondrian), Japanese waves (seigaiha), black marble, a gold mosaic (Klimt) and paper cut-outs (Matisse). Solid shapes, no fading. The busy ones keep the middle calm for the board and the pot.
+- Special felts: the suits are fewer and fainter, the chips bigger and clearer and never on top of each other, the starry night got a moon and a small constellation, royal got gold dots where the lines cross, and casino a second gold line.
+- Found along the way: empty seats hang over the felt's edge, so on a white table "Sit here" vanished. Empty seats now have a solid background like taken ones. Card outlines got a soft edge, so they show on any patch of a busy felt.
+- Dense patterns draw each color as one shape, so the phone draws a few shapes instead of hundreds.
+
+## 2026-11-25: skins, take three
+- Removed Blocks (it didn't look good). Starry night moved to the art felts.
+- Suits and Chips redrawn after a picture Nadav picked: fine pen-like line drawings (an outline, a second one inside, dots between them, crossing lines and hatching within), many of them in even rows. Suits are red and charcoal on cream, chips cream and gold on green. Drawn with one shape per color, so a hundred drawings stay light for the phone.
+- Things were hard to see on busy felts, so:
+  - Patterns keep away from the spots in front of each player, where their cards, chips and bet lie (the scattered ones skip them, the even rows fade there).
+  - Chips on the felt get a thin edge in the felt's writing color, so a blue chip shows on a blue felt.
+  - A folded player's box stayed see-through, so the felt's pattern showed behind the name. Now the box stays solid and only what's in it fades.
+- After trying it: the special felts come in a few colors each, picked with tiny dots under the preview (suits in cream, white, black, green or blue; chips in green, blue, red, black or cream; royal and casino in five felt colors each). Each color is its own skin name, like `suits-blue`, so nothing changed in the database.
+- The drawn chips had random lines inside, which looked lopsided. Each is now drawn like a real chip, all symmetric: six inlays round the edge, an inner ring, twelve dots and a small suit in the middle.
+- Tried calming the waves in the middle with a soft patch; it looked bad, so it's gone.
+- Waves removed: it was too busy under the cards.
+- One order for colors everywhere: white, black, red, orange, green, blue, purple. The plain colors follow it, and so do each special felt's colors.
+- The dots were too small to tap. Tapping a special felt now opens a small menu of its colors, each a bigger preview with its name. Suits had two near-white colors (cream and white); now it's white, black, red, green and blue.
