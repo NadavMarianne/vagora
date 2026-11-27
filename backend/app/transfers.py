@@ -33,7 +33,7 @@ class SendView(BaseModel):
 
 
 def entry_note(start: str, note: str) -> str:
-    """"To Noa" or "To Noa: Happy birthday", cut to fit."""
+    """The entry's note, like "To Noa" or "To Noa: Happy birthday", cut to fit."""
     text = f"{start}: {note}" if note else start
     return text if len(text) <= NOTE_ROOM else text[: NOTE_ROOM - 1] + "…"
 
