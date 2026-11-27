@@ -9,7 +9,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
-from sqlalchemy import select
 
 from app import ledger, signals
 from app.markets import active_memberships, get_membership
