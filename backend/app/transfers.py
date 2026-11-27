@@ -126,6 +126,4 @@ def recent_sends(market_id: int, username: str, user: CurrentUser, db: DbSession
             return ""
         return entry.note.removeprefix(f"{prefix}: ")
 
-    return [
-        SentView(amount=-e.amount, note=note_of(e), created_at=e.created_at) for e in entries
-    ]
+    return [SentView(amount=-e.amount, note=note_of(e), created_at=e.created_at) for e in entries]
