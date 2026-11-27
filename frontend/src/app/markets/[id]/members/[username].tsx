@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
+import { CoinsSent, type Sent } from "@/components/coins-sent";
 import {
   addsSomething,
   cleanLines,
@@ -9,9 +10,9 @@ import {
   LimitsEditor,
   toDraft,
 } from "@/components/limits-editor";
-import { Body, Button, ErrorText, Info, Loading, Screen, Title } from "@/components/ui";
+import { Body, Button, ErrorText, Field, Info, Loading, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { Market, MemberPage } from "@/lib/types";
+import type { Market, MemberPage, SentEntry } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
 import { useLoad } from "@/lib/use-load";
 import type { Theme } from "@/lib/themes";
@@ -50,6 +51,10 @@ export default function MemberScreen() {
         @{member.username} · joined {new Date(member.joined_at).toLocaleDateString()}
       </Body>
 
+      {!member.is_me && market.transfers_enabled && (
+        <SendCoins market={market} member={member} onSent={reload} />
+      )}
+
       <Text style={styles.heading}>Limits</Text>
       {member.is_me ? (
         <MyLimits market={market} member={member} onSaved={reload} />
@@ -68,6 +73,115 @@ export default function MemberScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Sending this member coins from your balance, with an optional note. It can't be undone, so
+ * it asks first, then celebrates. Under it, your last sends to them. */
+function SendCoins({
+  market,
+  member,
+  onSent,
+}: {
+  market: Market;
+  member: MemberPage;
+  onSent: () => Promise<void>;
+}) {
+  const styles = useStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState<Sent | null>(null);
+  const recent = useLoad(
+    useCallback(
+      () => api<SentEntry[]>(`/markets/${market.id}/sent/${member.username}`),
+      [market.id, member.username],
+    ),
+  );
+  const sending = useAction(async () => {
+    await Promise.all([onSent(), recent.reload()]);
+  });
+  const coins = `${amount.toLocaleString()} ${market.currency_name}`;
+  const closeCelebration = useCallback(() => setSent(null), []);
+
+  function send() {
+    if (amount <= 0 || amount > market.my_balance) return;
+    Alert.alert(`Send ${coins} to ${member.display_name}?`, "Sent coins can't be taken back.", [
+      { text: "Back", style: "cancel" },
+      {
+        text: "Send",
+        onPress: () =>
+          sending.run(async () => {
+            await api(`/markets/${market.id}/send`, {
+              method: "POST",
+              body: { to: member.username, amount, note },
+            });
+            setSent({
+              amount,
+              currency: market.currency_name,
+              to: member.display_name,
+              note: note.trim(),
+            });
+            setOpen(false);
+            setAmount(0);
+            setNote("");
+          }),
+      },
+    ]);
+  }
+
+  return (
+    <>
+      <CoinsSent sent={sent} onClose={closeCelebration} />
+      {open ? (
+        <View style={styles.send}>
+          <Text style={styles.heading}>Send coins</Text>
+          <Body>
+            You have {market.my_balance.toLocaleString()} {market.currency_name}.
+          </Body>
+          <Field
+            label="How many"
+            value={amount ? String(amount) : ""}
+            onChangeText={(text) => setAmount(Number(text.replace(/\D/g, "")) || 0)}
+            keyboardType="number-pad"
+          />
+          <Field
+            label="A note (optional)"
+            value={note}
+            onChangeText={setNote}
+            maxLength={100}
+            placeholder="Happy birthday!"
+          />
+          <View style={styles.buttons}>
+            <View style={styles.half}>
+              <Button title="Back" kind="secondary" onPress={() => setOpen(false)} />
+            </View>
+            <View style={styles.half}>
+              <Button title="Send" onPress={send} />
+            </View>
+          </View>
+          {amount > market.my_balance && <ErrorText>{"You don't have that many."}</ErrorText>}
+          <ErrorText>{sending.error}</ErrorText>
+        </View>
+      ) : (
+        <Button title="Send coins" onPress={() => setOpen(true)} />
+      )}
+      {recent.data && recent.data.length > 0 && (
+        <View>
+          <Text style={styles.heading}>Your last sends to {member.display_name}</Text>
+          {/* Like the market's list of transactions. */}
+          {recent.data.map((entry, index) => (
+            <View key={index} style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowNote}>{entry.note || "Sent"}</Text>
+                <Text style={styles.rowDate}>{new Date(entry.created_at).toLocaleString()}</Text>
+              </View>
+              <Text style={styles.rowAmount}>{entry.amount.toLocaleString()}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </>
   );
 }
 
@@ -134,6 +248,23 @@ function MyLimits({
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+    send: { gap: 8 },
+    buttons: { flexDirection: "row", gap: 8 },
+    half: { flex: 1 },
+    // The same rows as the market's list of transactions.
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
+    },
+    rowText: { flexShrink: 1, gap: 2 },
+    rowNote: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text },
+    rowDate: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    rowAmount: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
     line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
     number: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.muted, width: 24 },
     lineText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },

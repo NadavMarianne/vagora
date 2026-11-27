@@ -169,6 +169,8 @@ class EntryKind(StrEnum):
     LIMITS_EDIT = "limits_edit"  # paid to edit the limits file; the coins vanish
     TABLE_BUY_IN = "table_buy_in"  # coins taken to a game table (sitting down or topping up)
     TABLE_CASH_OUT = "table_cash_out"  # a stack brought back from a game table
+    SENT = "sent"  # sent to another member (issue #46)
+    RECEIVED = "received"  # sent by another member
 
 
 class LedgerEntry(Base):
@@ -182,6 +184,9 @@ class LedgerEntry(Base):
     amount: Mapped[int] = mapped_column(BigInteger)
     kind: Mapped[str] = mapped_column(String(30))
     note: Mapped[str] = mapped_column(String(100))
+    # For coins sent between members: the other side's membership (who they went to, or came
+    # from). Empty for everything else.
+    other_membership_id: Mapped[int | None] = mapped_column(ForeignKey("memberships.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

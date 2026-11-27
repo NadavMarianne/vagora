@@ -40,6 +40,13 @@ export type Market = MarketSettings & {
   my_limits_set: boolean;
 };
 
+/** One of your sends to a member, on their page. */
+export type SentEntry = {
+  amount: number;
+  note: string;
+  created_at: string;
+};
+
 export type LedgerEntry = {
   amount: number;
   kind: string;

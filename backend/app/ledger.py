@@ -20,6 +20,7 @@ def record(
     kind: EntryKind,
     note: str,
     at: datetime | None = None,
+    other: Membership | None = None,
 ) -> LedgerEntry:
     """Adds a ledger entry and changes the stored balance by the same amount.
 
@@ -27,6 +28,7 @@ def record(
     The balance is changed in one database step that only succeeds if it stays at zero or
     above, so two payments at the same moment can't overdraw it.
     `at` dates the entry when it belongs to an earlier moment, like a caught-up allowance.
+    `other` is the other side of coins sent between members.
     """
     new_balance = db.scalar(
         update(Membership)
@@ -39,7 +41,13 @@ def record(
         raise NotEnoughCoins
     set_committed_value(membership, "balance", new_balance)
 
-    entry = LedgerEntry(membership_id=membership.id, amount=amount, kind=kind, note=note)
+    entry = LedgerEntry(
+        membership_id=membership.id,
+        amount=amount,
+        kind=kind,
+        note=note,
+        other_membership_id=other.id if other else None,
+    )
     if at is not None:
         entry.created_at = at
     db.add(entry)
