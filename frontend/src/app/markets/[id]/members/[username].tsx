@@ -167,17 +167,16 @@ function SendCoins({
         <Button title="Send coins" onPress={() => setOpen(true)} />
       )}
       {recent.data && recent.data.length > 0 && (
-        <View style={styles.recent}>
-          <Text style={styles.recentTitle}>Your last sends to {member.display_name}</Text>
+        <View>
+          <Text style={styles.heading}>Your last sends to {member.display_name}</Text>
+          {/* Like the market's list of transactions. */}
           {recent.data.map((entry, index) => (
-            <View key={index} style={styles.recentRow}>
-              <View style={styles.recentText}>
-                {entry.note !== "" && <Text style={styles.recentNote}>{entry.note}</Text>}
-                <Text style={styles.recentDate}>{new Date(entry.created_at).toLocaleString()}</Text>
+            <View key={index} style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowNote}>{entry.note || "Sent"}</Text>
+                <Text style={styles.rowDate}>{new Date(entry.created_at).toLocaleString()}</Text>
               </View>
-              <Text style={styles.recentAmount}>
-                {entry.amount.toLocaleString()} {market.currency_name}
-              </Text>
+              <Text style={styles.rowAmount}>{entry.amount.toLocaleString()}</Text>
             </View>
           ))}
         </View>
@@ -252,13 +251,20 @@ const makeStyles = (t: Theme) =>
     send: { gap: 8 },
     buttons: { flexDirection: "row", gap: 8 },
     half: { flex: 1 },
-    recent: { gap: 6 },
-    recentTitle: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.muted },
-    recentRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    recentText: { flex: 1 },
-    recentNote: { fontSize: 15, fontFamily: t.fonts.regular, color: t.colors.text },
-    recentDate: { fontSize: 12, fontFamily: t.fonts.regular, color: t.colors.muted },
-    recentAmount: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
+    // The same rows as the market's list of transactions.
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.colors.border,
+    },
+    rowText: { flexShrink: 1, gap: 2 },
+    rowNote: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text },
+    rowDate: { fontFamily: t.fonts.regular, fontSize: 13, color: t.colors.muted },
+    rowAmount: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text },
     line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
     number: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.muted, width: 24 },
     lineText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },
