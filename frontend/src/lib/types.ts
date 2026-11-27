@@ -4,19 +4,30 @@ export type Weekday =
   "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 
 export type AllowanceSchedule = {
-  frequency: "daily" | "weekly" | "monthly";
+  frequency: "daily" | "weekly" | "monthly" | "yearly" | "once";
   times: string[]; // "HH:MM"
   weekdays: Weekday[];
   days: number[]; // 1 to 31
+  /** Yearly: days of the year, "MM-DD". */
+  dates?: string[];
+  /** Once: the day, "YYYY-MM-DD". */
+  on?: string | null;
 };
 
-/** Coins every member gets on a schedule. A new one has no `id` yet. */
+/** Coins members get on a schedule. A new one has no `id` yet. */
 export type Allowance = {
   id?: number;
   name: string;
   amount: number;
   enabled: boolean;
   schedule: AllowanceSchedule;
+  /** Who gets it, by username; null means everyone, including people who join later. */
+  recipients?: string[] | null;
+  /** Valid only from and until these days ("YYYY-MM-DD", in the market's time zone). */
+  starts_on?: string | null;
+  ends_on?: string | null;
+  /** From the backend: it won't pay anymore. */
+  ended?: boolean;
 };
 
 /** The settings a market can change (everything except its name and currency name). */

@@ -8,7 +8,13 @@ import { DurationPicker } from "@/components/duration-picker";
 import { Tappable } from "@/components/tappable";
 import { TimeZonePicker } from "@/components/time-zone-picker";
 import { Body, Button, Field, useRevealFocused } from "@/components/ui";
-import type { Allowance, AllowanceSchedule, MarketSettings, Weekday } from "@/lib/types";
+import type {
+  Allowance,
+  AllowanceSchedule,
+  MarketSettings,
+  Member,
+  Weekday,
+} from "@/lib/types";
 import { useStyles, useTheme } from "@/lib/theme";
 import type { Theme } from "@/lib/themes";
 
@@ -66,6 +72,59 @@ const WEEKDAYS: { value: Weekday; label: string }[] = [
 ];
 
 const DAYS = Array.from({ length: 31 }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_CHIPS = MONTHS.map((label, i) => ({ value: i + 1, label }));
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "2026-12-11" as "Dec 11, 2026". */
+function showDay(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return `${MONTHS[month - 1] ?? "?"} ${date}, ${year}`;
+}
+
+/** Whether "YYYY-MM-DD" is a real day. */
+function isDay(text: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const [year, month, date] = text.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1, date));
+  return d.getUTCMonth() === month - 1 && d.getUTCDate() === date;
+}
+
+/** A day typed as YYYY-MM-DD, or left empty when `optional`. */
+function DayField({
+  label,
+  value,
+  onChange,
+  optional = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  onChange: (value: string | null) => void;
+  optional?: boolean;
+}) {
+  const styles = useStyles(makeStyles);
+  const text = value ?? "";
+  return (
+    <View style={styles.times}>
+      <Field
+        label={label}
+        value={text}
+        onChangeText={(typed) => onChange(typed.trim() === "" && optional ? null : typed.trim())}
+        placeholder={optional ? "Empty: no limit" : "2026-12-11"}
+        keyboardType="numbers-and-punctuation"
+        maxLength={10}
+      />
+      {text !== "" &&
+        (isDay(text) ? (
+          <Text style={styles.hint}>{showDay(text)}</Text>
+        ) : (
+          <Text style={styles.problem}>Write it like 2026-12-11 (year-month-day).</Text>
+        ))}
+    </View>
+  );
+}
 
 function CoinsField({
   label,
@@ -130,7 +189,7 @@ function TimesEditor({
 
 /** A short line describing an allowance, like "10 · weekly Sun, Wed · 09:00". */
 function summary(allowance: Allowance): string {
-  const { frequency, weekdays, days, times } = allowance.schedule;
+  const { frequency, weekdays, days, times, dates = [], on } = allowance.schedule;
   const when =
     frequency === "weekly"
       ? `weekly ${WEEKDAYS.filter((d) => weekdays.includes(d.value))
@@ -138,23 +197,39 @@ function summary(allowance: Allowance): string {
           .join(", ")}`
       : frequency === "monthly"
         ? `monthly on ${days.join(", ")}`
-        : "daily";
-  return `${allowance.amount} · ${when} · ${times.join(", ")}${allowance.enabled ? "" : " (off)"}`;
+        : frequency === "yearly"
+          ? `yearly on ${dates
+              .map((d) => `${MONTHS[Number(d.slice(0, 2)) - 1]} ${Number(d.slice(3))}`)
+              .join(", ")}`
+          : frequency === "once"
+            ? `once on ${on ? showDay(on) : "?"}`
+            : "daily";
+  const state = allowance.ended ? " (ended)" : allowance.enabled ? "" : " (off)";
+  return `${allowance.amount} · ${when} · ${times.join(", ")}${state}`;
 }
 
 function AllowanceEditor({
   value,
+  members,
   onChange,
   onRemove,
 }: {
   value: DraftAllowance;
+  /** The market's members, to choose who gets it (none yet when creating a market). */
+  members: Member[];
   onChange: (value: DraftAllowance) => void;
   onRemove: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   const set = (changes: Partial<Allowance>) => onChange({ ...value, ...changes });
   const setSchedule = (changes: Partial<AllowanceSchedule>) =>
     set({ schedule: { ...value.schedule, ...changes } });
   const { schedule } = value;
+  // Yearly: one day of the year, picked as a month and a date.
+  const yearly = schedule.dates?.[0] ?? "12-11";
+  const setYearly = (month: number, date: number) =>
+    setSchedule({ dates: [`${pad(month)}-${pad(date)}`] });
+  const everyone = value.recipients == null;
 
   return (
     <Foldable title={`${value.name || "New allowance"}: ${summary(value)}`} startOpen={!value.id}>
@@ -176,6 +251,8 @@ function AllowanceEditor({
           { value: "daily", label: "Daily" },
           { value: "weekly", label: "Weekly" },
           { value: "monthly", label: "Monthly" },
+          { value: "yearly", label: "Yearly" },
+          { value: "once", label: "Once" },
         ]}
         selected={[schedule.frequency]}
         onChange={([frequency]) => setSchedule({ frequency })}
@@ -201,8 +278,75 @@ function AllowanceEditor({
           <Body>A date a month doesn’t have, like the 31st, means its last day.</Body>
         </>
       )}
+      {schedule.frequency === "yearly" && (
+        <>
+          <Chips
+            label="Which month"
+            options={MONTH_CHIPS}
+            selected={[Number(yearly.slice(0, 2))]}
+            onChange={([month]) => setYearly(month, Number(yearly.slice(3)))}
+          />
+          <Chips
+            label="Which date"
+            options={DAYS}
+            selected={[Number(yearly.slice(3))]}
+            onChange={([date]) => setYearly(Number(yearly.slice(0, 2)), date)}
+          />
+        </>
+      )}
+      {schedule.frequency === "once" && (
+        <DayField label="On (year-month-day)" value={schedule.on} onChange={(on) => setSchedule({ on })} />
+      )}
       <TimesEditor times={schedule.times} onChange={(times) => setSchedule({ times })} />
-      <Body>Times are in the market’s time zone.</Body>
+      <Body>Times and days are in the market’s time zone.</Body>
+
+      {members.length > 0 && (
+        <>
+          <Chips
+            label="Who gets it"
+            options={[
+              { value: "everyone", label: "Everyone" },
+              { value: "chosen", label: "Only…" },
+            ]}
+            selected={[everyone ? "everyone" : "chosen"]}
+            onChange={([who]) =>
+              set({ recipients: who === "everyone" ? null : members.map((m) => m.username) })
+            }
+          />
+          {everyone ? (
+            <Body>Everyone, including people who join later.</Body>
+          ) : (
+            <Chips
+              multiple
+              options={members.map((m) => ({ value: m.username, label: m.display_name }))}
+              selected={value.recipients ?? []}
+              onChange={(recipients) => set({ recipients })}
+            />
+          )}
+          {!everyone && (value.recipients ?? []).length === 0 && (
+            <Text style={styles.problem}>Pick at least one person.</Text>
+          )}
+        </>
+      )}
+
+      <Text style={styles.label}>When it’s valid</Text>
+      <DayField
+        label="From (optional)"
+        value={value.starts_on}
+        onChange={(starts_on) => set({ starts_on })}
+        optional
+      />
+      <DayField
+        label="Until (optional)"
+        value={value.ends_on}
+        onChange={(ends_on) => set({ ends_on })}
+        optional
+      />
+      <Body>
+        {value.ended
+          ? "This allowance has ended. Change “Until” to start it again."
+          : "Leave both empty and it never expires."}
+      </Body>
       <Button title="Remove this allowance" kind="secondary" onPress={onRemove} />
     </Foldable>
   );
@@ -211,9 +355,12 @@ function AllowanceEditor({
 export function MarketSettingsForm({
   value,
   onChange,
+  members = [],
 }: {
   value: SettingsDraft;
   onChange: (value: SettingsDraft) => void;
+  /** The market's members, for choosing who gets an allowance. */
+  members?: Member[];
 }) {
   const set = (changes: Partial<SettingsDraft>) => onChange({ ...value, ...changes });
   const setAllowances = (allowances: DraftAllowance[]) => set({ allowances });
@@ -242,11 +389,15 @@ export function MarketSettingsForm({
       </Foldable>
 
       <Foldable title={`Allowances (${value.allowances.length})`}>
-        <Body>Coins everyone gets on a schedule. Add as many as you like.</Body>
+        <Body>
+          Coins members get on a schedule: daily, weekly, monthly, yearly, or just once.
+          Add as many as you like.
+        </Body>
         {value.allowances.map((allowance) => (
           <AllowanceEditor
             key={allowance.key}
             value={allowance}
+            members={members}
             onChange={(changed) =>
               setAllowances(value.allowances.map((a) => (a.key === allowance.key ? changed : a)))
             }
@@ -289,6 +440,8 @@ export function MarketSettingsForm({
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     label: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.text },
+    hint: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.muted },
+    problem: { fontSize: 13, fontFamily: t.fonts.regular, color: t.colors.bad },
     times: { gap: 8 },
     timeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     timeInput: {

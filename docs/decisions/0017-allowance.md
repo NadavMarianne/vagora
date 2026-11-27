@@ -5,15 +5,21 @@
 ## Decision
 Each market can have **any number of allowances** (updated 2026-10-30). Each one has its own **name** (shown on every payment, like "+100 Pocket money"; names may repeat), **amount**, **on/off switch**, and **schedule**. There's no limit on how many; if abuse ever slows the app, a generous safety cap can be added.
 
-Each allowance gives every member the same amount of coins on a flexible schedule:
+Each allowance gives its members the same amount of coins on a flexible schedule:
 
 | Frequency | The market picks | Example |
 |---|---|---|
 | Daily | One or more times a day | 09:00 and 21:00 |
 | Weekly | One or more weekdays, and time(s) | Sunday and Wednesday at 10:00 |
 | Monthly | One or more dates, and time(s) | The 1st and the 15th at 08:00 |
+| Yearly (2026-11-27) | A day of the year, and time(s) | Every December 11th at 09:00 |
+| Once (2026-11-27) | One day, and time(s) | 2026-12-11 at 09:00 |
 
 - A monthly date that doesn't exist in a shorter month (like the 31st) becomes that month's last day.
+- A yearly February 29th is paid on the 28th in other years.
+- **Who gets it** (2026-11-27): everyone (the default, including people who join later) or only chosen members.
+- **When it's valid** (2026-11-27): optionally only from a day, until a day, or both (days in the market's time zone, both included). With neither, it never expires. An allowance past its last day stays in the list marked "ended", and can be extended or removed.
+- Changing who gets it or its valid days starts it fresh, like a schedule change, so nobody is paid for the time before.
 - The allowance can be switched off and on.
 - Someone who joins gets their first allowance on the next scheduled time. Their starting amount covers them until then. Joining on the 13th with a payout on the 14th means you get it.
 - **No allowance for time away.** Someone who leaves and comes back is paid again from the moment they return, never for the time they were gone.

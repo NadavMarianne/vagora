@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import update
@@ -307,6 +307,13 @@ def test_no_allowance_for_time_away(db, member):
         {"schedule": {"frequency": "daily", "times": []}},
         {"schedule": {"frequency": "monthly", "times": ["09:00"], "days": [32]}},
         {"schedule": {"frequency": "weekly", "times": ["09:00"], "weekdays": ["funday"]}},
+        {"schedule": {"frequency": "yearly", "times": ["09:00"]}},
+        {"schedule": {"frequency": "yearly", "times": ["09:00"], "dates": ["02-30"]}},
+        {"schedule": {"frequency": "once", "times": ["09:00"]}},
+        {"schedule": {"frequency": "once", "times": ["09:00"], "on": "2026-02-30"}},
+        {"starts_on": "2026-12-11", "ends_on": "2026-12-10"},
+        {"ends_on": "2026-13-01"},
+        {"recipients": []},
     ],
 )
 def test_bad_allowances_are_refused(member, bad):
@@ -328,4 +335,142 @@ def test_schedule_is_tidied(member):
         "times": ["09:00", "21:00"],
         "weekdays": ["monday", "sunday"],
         "days": [],
+        "dates": [],
+        "on": None,
     }
+
+
+# --- Yearly and one-time schedules ---
+
+
+def test_yearly_on_chosen_days():
+    schedule = {"frequency": "yearly", "times": ["09:00"], "dates": ["12-11", "03-01"]}
+
+    found = payout_times(schedule, "UTC", utc(2026, 1, 1), utc(2027, 12, 31))
+
+    assert found == [
+        utc(2026, 3, 1, 9),
+        utc(2026, 12, 11, 9),
+        utc(2027, 3, 1, 9),
+        utc(2027, 12, 11, 9),
+    ]
+
+
+def test_february_29th_is_the_28th_in_other_years():
+    schedule = {"frequency": "yearly", "times": ["09:00"], "dates": ["02-29"]}
+
+    found = payout_times(schedule, "UTC", utc(2027, 1, 1), utc(2028, 12, 31))
+
+    assert found == [utc(2027, 2, 28, 9), utc(2028, 2, 29, 9)]
+
+
+def test_once_pays_one_day():
+    schedule = {"frequency": "once", "times": ["09:00", "20:00"], "on": "2026-12-11"}
+
+    found = payout_times(schedule, "UTC", utc(2026, 1, 1), utc(2028, 1, 1))
+
+    assert found == [utc(2026, 12, 11, 9), utc(2026, 12, 11, 20)]
+
+
+# --- Valid days ---
+
+
+def test_only_between_its_valid_days():
+    schedule = {"frequency": "daily", "times": ["09:00"]}
+    first, last = date(2026, 3, 10), date(2026, 3, 12)
+
+    found = payout_times(schedule, "UTC", utc(2026, 3, 1), utc(2026, 3, 31), first, last)
+
+    assert found == [utc(2026, 3, 10, 9), utc(2026, 3, 11, 9), utc(2026, 3, 12, 9)]
+
+
+def test_valid_days_are_in_the_market_time_zone():
+    # 01:00 in Jerusalem on the 10th is still the 9th in UTC.
+    schedule = {"frequency": "daily", "times": ["01:00"]}
+    day = date(2026, 1, 10)
+
+    found = payout_times(schedule, JERUSALEM, utc(2026, 1, 1), utc(2026, 1, 31), day, day)
+
+    assert found == [utc(2026, 1, 9, 23)]
+
+
+def test_an_allowance_that_ended_says_so(member):
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).date().isoformat()
+
+    market = create_market(
+        member(), allowance("Old", ends_on=yesterday), allowance("Current", ends_on=tomorrow)
+    ).json()
+
+    assert [a["ended"] for a in market["allowances"]] == [True, False]
+    assert market["allowances"][0]["ends_on"] == yesterday
+
+
+def test_nothing_is_paid_after_the_last_day(db, member):
+    client = member()
+    two_days_ago = (datetime.now(UTC) - timedelta(days=2)).date().isoformat()
+    market_id = create_market(client, allowance(ends_on=two_days_ago)).json()["id"]
+    rewind(db, 5)
+
+    # From five days ago to the end of two days ago: at most four days of two payouts.
+    balance = client.get(f"/markets/{market_id}").json()["my_balance"]
+    assert 0 < balance <= 4 * 2 * 10
+
+
+def test_nothing_is_paid_before_the_first_day(db, member):
+    client = member()
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).date().isoformat()
+    market_id = create_market(client, allowance(starts_on=tomorrow)).json()["id"]
+    rewind(db, 3)
+
+    assert client.get(f"/markets/{market_id}").json()["my_balance"] == 0
+
+
+# --- Who gets it ---
+
+
+def two_members(member):
+    """Dana's market with Noa in it. Returns (dana, noa, market_id)."""
+    dana, noa = member("dana_k"), member("noa_r")
+    market_id = create_market(dana).json()["id"]
+    invite_id = dana.post(f"/markets/{market_id}/invites", json={"username": "noa_r"}).json()["id"]
+    noa.post(f"/invites/{invite_id}/accept")
+    return dana, noa, market_id
+
+
+def test_only_the_chosen_members_are_paid(db, member):
+    dana, noa, market_id = two_members(member)
+    edit(dana, market_id, allowance("For Noa", recipients=["noa_r"]))
+    rewind(db, 1)
+
+    assert dana.get(f"/markets/{market_id}").json()["my_balance"] == 0
+    assert noa.get(f"/markets/{market_id}").json()["my_balance"] == 20
+    assert dana.get(f"/markets/{market_id}").json()["allowances"][0]["recipients"] == ["noa_r"]
+
+
+def test_everyone_is_the_default(member):
+    dana, _, market_id = two_members(member)
+
+    market = edit(dana, market_id, allowance()).json()
+
+    assert market["allowances"][0]["recipients"] is None
+
+
+def test_only_people_in_the_market(member):
+    dana, _, market_id = two_members(member)
+    member("bo_x")
+
+    response = edit(dana, market_id, allowance(recipients=["bo_x"]))
+
+    assert response.status_code == 422
+
+
+def test_changing_who_gets_it_starts_fresh(db, member):
+    dana, noa, market_id = two_members(member)
+    kept = edit(dana, market_id, allowance(recipients=["dana_k"])).json()["allowances"][0]
+    rewind(db, 1)
+    # The day that came due is paid to Dana first; Noa is included only from now on.
+    edit(dana, market_id, {**allowance(recipients=["dana_k", "noa_r"]), "id": kept["id"]})
+
+    assert dana.get(f"/markets/{market_id}").json()["my_balance"] == 20
+    assert noa.get(f"/markets/{market_id}").json()["my_balance"] == 0
