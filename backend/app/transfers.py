@@ -118,9 +118,14 @@ def recent_sends(market_id: int, username: str, user: CurrentUser, db: DbSession
         .order_by(LedgerEntry.created_at.desc(), LedgerEntry.id.desc())
         .limit(RECENT)
     )
-    # The entry says "To Noa: Happy birthday"; the page shows only "Happy birthday".
-    prefix = f"To {them.user.display_name}: "
+    # The entry says "To Noa: Happy birthday" (or just "To Noa"); the page shows only the note.
+    prefix = f"To {them.user.display_name}"
+
+    def note_of(entry: LedgerEntry) -> str:
+        if entry.note == prefix:
+            return ""
+        return entry.note.removeprefix(f"{prefix}: ")
+
     return [
-        SentView(amount=-e.amount, note=e.note.removeprefix(prefix), created_at=e.created_at)
-        for e in entries
+        SentView(amount=-e.amount, note=note_of(e), created_at=e.created_at) for e in entries
     ]
