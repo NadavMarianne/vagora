@@ -12,3 +12,9 @@
 - Nobody can send more than they have. The coins leave one balance and reach the other in one step, with an entry in each history ("To Noa: Happy birthday", "From Nadav: Happy birthday"), and the other member gets a notification.
 - After trying it: sending now ends with a celebration on the sender's screen (a big gold coin pops in, small coins burst out of it, the amount counts up, "sent to Noa" and the note). Tap to close, or it closes after 4 seconds.
 - A member's page shows your last 2 sends to them, under "Send coins". For that, each history entry of a send now remembers the other side (a new database column, `other_membership_id`).
+
+## Allowances for chosen members, with dates
+- Decided: each allowance goes to everyone (default, including people who join later) or only to chosen members, and can be valid from a day, until a day, or both. With neither it never expires. An ended allowance stays in the list marked "ended" and can be extended.
+- Also two new schedules: yearly (a day of the year, like a birthday) and once (one day).
+- Changing who gets it or its valid days starts it fresh, so nobody is paid for the time before (decision 0017 updated).
+- Days are typed as year-month-day (2026-12-11), with the date shown back in words. A yearly day is picked as a month and a date.

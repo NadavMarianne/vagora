@@ -9,16 +9,20 @@ import {
 } from "@/components/market-settings-form";
 import { Body, Button, ErrorText, Field, Loading, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import type { Market } from "@/lib/types";
+import type { Market, Member } from "@/lib/types";
 
 export default function MarketSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [name, setName] = useState("");
   const [currencyName, setCurrencyName] = useState("");
   const [settings, setSettings] = useState<SettingsDraft | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    api<Member[]>(`/markets/${id}/members`)
+      .then(setMembers)
+      .catch(() => {});
     api<Market>(`/markets/${id}`)
       .then((market) => {
         setName(market.name);
@@ -64,7 +68,7 @@ export default function MarketSettingsScreen() {
     <Screen>
       <Field label="Market name" value={name} onChangeText={setName} />
       <Field label="Currency name" value={currencyName} onChangeText={setCurrencyName} />
-      <MarketSettingsForm value={settings} onChange={setSettings} />
+      <MarketSettingsForm value={settings} onChange={setSettings} members={members} />
       <Body>Any member can change these. Changing the allowance schedule starts it fresh.</Body>
       <ErrorText>{error}</ErrorText>
       <Button title="Save" onPress={save} />

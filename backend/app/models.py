@@ -1,11 +1,12 @@
 """Database tables."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -63,7 +64,7 @@ class Market(Base):
 
 
 class Allowance(Base):
-    """Coins every member gets on a schedule. A market can have any number of them."""
+    """Coins members get on a schedule. A market can have any number of them."""
 
     __tablename__ = "allowances"
     __table_args__ = (CheckConstraint("amount > 0", name="allowance_amount_positive"),)
@@ -81,6 +82,11 @@ class Allowance(Base):
     counting_from: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Who gets it: user IDs, or None for everyone (including people who join later).
+    recipients: Mapped[list[int] | None] = mapped_column(JSONB)
+    # Valid only from and until these days (both included), in the market's time zone.
+    starts_on: Mapped[date | None] = mapped_column(Date)
+    ends_on: Mapped[date | None] = mapped_column(Date)
 
     market: Mapped[Market] = relationship(back_populates="allowances")
 
