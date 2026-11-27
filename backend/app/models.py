@@ -169,6 +169,8 @@ class EntryKind(StrEnum):
     LIMITS_EDIT = "limits_edit"  # paid to edit the limits file; the coins vanish
     TABLE_BUY_IN = "table_buy_in"  # coins taken to a game table (sitting down or topping up)
     TABLE_CASH_OUT = "table_cash_out"  # a stack brought back from a game table
+    SENT = "sent"  # sent to another member (issue #46)
+    RECEIVED = "received"  # sent by another member
 
 
 class LedgerEntry(Base):

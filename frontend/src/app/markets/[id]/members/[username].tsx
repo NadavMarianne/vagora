@@ -9,7 +9,7 @@ import {
   LimitsEditor,
   toDraft,
 } from "@/components/limits-editor";
-import { Body, Button, ErrorText, Info, Loading, Screen, Title } from "@/components/ui";
+import { Body, Button, ErrorText, Field, Info, Loading, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Market, MemberPage } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
@@ -50,6 +50,10 @@ export default function MemberScreen() {
         @{member.username} · joined {new Date(member.joined_at).toLocaleDateString()}
       </Body>
 
+      {!member.is_me && market.transfers_enabled && (
+        <SendCoins market={market} member={member} onSent={reload} />
+      )}
+
       <Text style={styles.heading}>Limits</Text>
       {member.is_me ? (
         <MyLimits market={market} member={member} onSaved={reload} />
@@ -68,6 +72,91 @@ export default function MemberScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Sending this member coins from your balance, with an optional note. It can't be undone, so
+ * it asks first. */
+function SendCoins({
+  market,
+  member,
+  onSent,
+}: {
+  market: Market;
+  member: MemberPage;
+  onSent: () => Promise<void>;
+}) {
+  const styles = useStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState("");
+  const sending = useAction(onSent);
+  const coins = `${amount.toLocaleString()} ${market.currency_name}`;
+
+  function send() {
+    if (amount <= 0 || amount > market.my_balance) return;
+    Alert.alert(
+      `Send ${coins} to ${member.display_name}?`,
+      "Sent coins can't be taken back.",
+      [
+        { text: "Back", style: "cancel" },
+        {
+          text: "Send",
+          onPress: () =>
+            sending.run(async () => {
+              await api(`/markets/${market.id}/send`, {
+                method: "POST",
+                body: { to: member.username, amount, note },
+              });
+              setSent(`Sent ${coins} to ${member.display_name}.`);
+              setOpen(false);
+              setAmount(0);
+              setNote("");
+            }),
+        },
+      ],
+    );
+  }
+
+  if (!open) {
+    return (
+      <>
+        <Button title="Send coins" onPress={() => (setSent(""), setOpen(true))} />
+        {sent !== "" && <Text style={styles.sent}>{sent}</Text>}
+      </>
+    );
+  }
+  return (
+    <View style={styles.send}>
+      <Text style={styles.heading}>Send coins</Text>
+      <Body>
+        You have {market.my_balance.toLocaleString()} {market.currency_name}.
+      </Body>
+      <Field
+        label="How many"
+        value={amount ? String(amount) : ""}
+        onChangeText={(text) => setAmount(Number(text.replace(/\D/g, "")) || 0)}
+        keyboardType="number-pad"
+      />
+      <Field
+        label="A note (optional)"
+        value={note}
+        onChangeText={setNote}
+        maxLength={100}
+        placeholder="Happy birthday!"
+      />
+      <View style={styles.buttons}>
+        <View style={styles.half}>
+          <Button title="Back" kind="secondary" onPress={() => setOpen(false)} />
+        </View>
+        <View style={styles.half}>
+          <Button title="Send" onPress={send} />
+        </View>
+      </View>
+      {amount > market.my_balance && <ErrorText>{"You don't have that many."}</ErrorText>}
+      <ErrorText>{sending.error}</ErrorText>
+    </View>
   );
 }
 
@@ -134,6 +223,10 @@ function MyLimits({
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     heading: { fontSize: 18, fontFamily: t.fonts.bold, color: t.colors.text, marginTop: 8 },
+    send: { gap: 8 },
+    buttons: { flexDirection: "row", gap: 8 },
+    half: { flex: 1 },
+    sent: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, textAlign: "center" },
     line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
     number: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.muted, width: 24 },
     lineText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },

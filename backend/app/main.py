@@ -22,6 +22,7 @@ from app import (
     releases,
     tables,
     time_zones,
+    transfers,
     users,
 )
 from app.config import settings
@@ -43,6 +44,7 @@ app.include_router(time_zones.router)
 app.include_router(releases.router)
 app.include_router(tables.router)
 app.include_router(hands.router)
+app.include_router(transfers.router)
 
 
 @app.middleware("http")
