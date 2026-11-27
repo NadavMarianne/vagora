@@ -121,3 +121,26 @@ def test_a_long_note_is_cut_to_fit(home):
     note = history(noa, market_id)[0][2]
     assert len(note) == 100
     assert note.endswith("…")
+
+
+def test_your_last_two_sends_to_someone(home, member):
+    dana, noa, market_id = home
+    bo = member("bo_x")
+    invite = dana.post(f"/markets/{market_id}/invites", json={"username": "bo_x"}).json()
+    bo.post(f"/invites/{invite['id']}/accept")
+    send = f"/markets/{market_id}/send"
+    dana.post(send, json={"to": "noa_r", "amount": 1, "note": "first"})
+    dana.post(send, json={"to": "noa_r", "amount": 2})
+    dana.post(send, json={"to": "bo_x", "amount": 3, "note": "not Noa"})
+    dana.post(send, json={"to": "noa_r", "amount": 4, "note": "last"})
+    noa.post(send, json={"to": "dana_k", "amount": 5, "note": "the other way"})
+
+    sent = dana.get(f"/markets/{market_id}/sent/noa_r").json()
+
+    assert [(s["amount"], s["note"]) for s in sent] == [(4, "last"), (2, "")]
+
+
+def test_nothing_sent_yet(home):
+    dana, _, market_id = home
+
+    assert dana.get(f"/markets/{market_id}/sent/noa_r").json() == []

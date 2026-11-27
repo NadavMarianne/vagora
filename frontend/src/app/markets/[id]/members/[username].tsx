@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
+import { CoinsSent, type Sent } from "@/components/coins-sent";
 import {
   addsSomething,
   cleanLines,
@@ -11,7 +12,7 @@ import {
 } from "@/components/limits-editor";
 import { Body, Button, ErrorText, Field, Info, Loading, Screen, Title } from "@/components/ui";
 import { api } from "@/lib/api";
-import type { Market, MemberPage } from "@/lib/types";
+import type { Market, MemberPage, SentEntry } from "@/lib/types";
 import { useAction } from "@/lib/use-action";
 import { useLoad } from "@/lib/use-load";
 import type { Theme } from "@/lib/themes";
@@ -76,7 +77,7 @@ export default function MemberScreen() {
 }
 
 /** Sending this member coins from your balance, with an optional note. It can't be undone, so
- * it asks first. */
+ * it asks first, then celebrates. Under it, your last sends to them. */
 function SendCoins({
   market,
   member,
@@ -90,73 +91,98 @@ function SendCoins({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
-  const [sent, setSent] = useState("");
-  const sending = useAction(onSent);
+  const [sent, setSent] = useState<Sent | null>(null);
+  const recent = useLoad(
+    useCallback(
+      () => api<SentEntry[]>(`/markets/${market.id}/sent/${member.username}`),
+      [market.id, member.username],
+    ),
+  );
+  const sending = useAction(async () => {
+    await Promise.all([onSent(), recent.reload()]);
+  });
   const coins = `${amount.toLocaleString()} ${market.currency_name}`;
+  const closeCelebration = useCallback(() => setSent(null), []);
 
   function send() {
     if (amount <= 0 || amount > market.my_balance) return;
-    Alert.alert(
-      `Send ${coins} to ${member.display_name}?`,
-      "Sent coins can't be taken back.",
-      [
-        { text: "Back", style: "cancel" },
-        {
-          text: "Send",
-          onPress: () =>
-            sending.run(async () => {
-              await api(`/markets/${market.id}/send`, {
-                method: "POST",
-                body: { to: member.username, amount, note },
-              });
-              setSent(`Sent ${coins} to ${member.display_name}.`);
-              setOpen(false);
-              setAmount(0);
-              setNote("");
-            }),
-        },
-      ],
-    );
+    Alert.alert(`Send ${coins} to ${member.display_name}?`, "Sent coins can't be taken back.", [
+      { text: "Back", style: "cancel" },
+      {
+        text: "Send",
+        onPress: () =>
+          sending.run(async () => {
+            await api(`/markets/${market.id}/send`, {
+              method: "POST",
+              body: { to: member.username, amount, note },
+            });
+            setSent({
+              amount,
+              currency: market.currency_name,
+              to: member.display_name,
+              note: note.trim(),
+            });
+            setOpen(false);
+            setAmount(0);
+            setNote("");
+          }),
+      },
+    ]);
   }
 
-  if (!open) {
-    return (
-      <>
-        <Button title="Send coins" onPress={() => (setSent(""), setOpen(true))} />
-        {sent !== "" && <Text style={styles.sent}>{sent}</Text>}
-      </>
-    );
-  }
   return (
-    <View style={styles.send}>
-      <Text style={styles.heading}>Send coins</Text>
-      <Body>
-        You have {market.my_balance.toLocaleString()} {market.currency_name}.
-      </Body>
-      <Field
-        label="How many"
-        value={amount ? String(amount) : ""}
-        onChangeText={(text) => setAmount(Number(text.replace(/\D/g, "")) || 0)}
-        keyboardType="number-pad"
-      />
-      <Field
-        label="A note (optional)"
-        value={note}
-        onChangeText={setNote}
-        maxLength={100}
-        placeholder="Happy birthday!"
-      />
-      <View style={styles.buttons}>
-        <View style={styles.half}>
-          <Button title="Back" kind="secondary" onPress={() => setOpen(false)} />
+    <>
+      <CoinsSent sent={sent} onClose={closeCelebration} />
+      {open ? (
+        <View style={styles.send}>
+          <Text style={styles.heading}>Send coins</Text>
+          <Body>
+            You have {market.my_balance.toLocaleString()} {market.currency_name}.
+          </Body>
+          <Field
+            label="How many"
+            value={amount ? String(amount) : ""}
+            onChangeText={(text) => setAmount(Number(text.replace(/\D/g, "")) || 0)}
+            keyboardType="number-pad"
+          />
+          <Field
+            label="A note (optional)"
+            value={note}
+            onChangeText={setNote}
+            maxLength={100}
+            placeholder="Happy birthday!"
+          />
+          <View style={styles.buttons}>
+            <View style={styles.half}>
+              <Button title="Back" kind="secondary" onPress={() => setOpen(false)} />
+            </View>
+            <View style={styles.half}>
+              <Button title="Send" onPress={send} />
+            </View>
+          </View>
+          {amount > market.my_balance && <ErrorText>{"You don't have that many."}</ErrorText>}
+          <ErrorText>{sending.error}</ErrorText>
         </View>
-        <View style={styles.half}>
-          <Button title="Send" onPress={send} />
+      ) : (
+        <Button title="Send coins" onPress={() => setOpen(true)} />
+      )}
+      {recent.data && recent.data.length > 0 && (
+        <View style={styles.recent}>
+          <Text style={styles.recentTitle}>Your last sends to {member.display_name}</Text>
+          {recent.data.map((entry, index) => (
+            <View key={index} style={styles.recentRow}>
+              <View style={styles.recentText}>
+                {entry.note !== "" && <Text style={styles.recentNote}>{entry.note}</Text>}
+                <Text style={styles.recentDate}>{new Date(entry.created_at).toLocaleString()}</Text>
+              </View>
+              <Text style={styles.recentAmount}>
+                {entry.amount.toLocaleString()} {market.currency_name}
+              </Text>
+            </View>
+          ))}
         </View>
-      </View>
-      {amount > market.my_balance && <ErrorText>{"You don't have that many."}</ErrorText>}
-      <ErrorText>{sending.error}</ErrorText>
-    </View>
+      )}
+    </>
   );
 }
 
@@ -226,7 +252,13 @@ const makeStyles = (t: Theme) =>
     send: { gap: 8 },
     buttons: { flexDirection: "row", gap: 8 },
     half: { flex: 1 },
-    sent: { fontSize: 16, fontFamily: t.fonts.bold, color: t.colors.text, textAlign: "center" },
+    recent: { gap: 6 },
+    recentTitle: { fontSize: 14, fontFamily: t.fonts.bold, color: t.colors.muted },
+    recentRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    recentText: { flex: 1 },
+    recentNote: { fontSize: 15, fontFamily: t.fonts.regular, color: t.colors.text },
+    recentDate: { fontSize: 12, fontFamily: t.fonts.regular, color: t.colors.muted },
+    recentAmount: { fontSize: 15, fontFamily: t.fonts.bold, color: t.colors.text },
     line: { flexDirection: "row", gap: 8, paddingVertical: 4 },
     number: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.muted, width: 24 },
     lineText: { fontFamily: t.fonts.regular, fontSize: 16, color: t.colors.text, flexShrink: 1 },
